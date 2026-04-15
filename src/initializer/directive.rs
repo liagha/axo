@@ -30,36 +30,39 @@ impl<'a> Initializer<'a> {
         result
     }
 
-    fn path_value<'source>(
-    ) -> Classifier<'a, 'source, Self, Token<'a>, Symbol<'a>, InitializeError<'a>> {
+    fn separator<'source>() -> Classifier<'a, 'source, Self, Token<'a>, Symbol<'a>, InitializeError<'a>> {
+        Classifier::predicate(|token: &Token| {
+            matches!(
+                token.kind.try_unwrap_operator(),
+                Some(
+                    OperatorKind::Slash
+                        | OperatorKind::Backslash
+                        | OperatorKind::Dot
+                        | OperatorKind::Colon
+                )
+            )
+        })
+    }
+
+    fn segment<'source>() -> Classifier<'a, 'source, Self, Token<'a>, Symbol<'a>, InitializeError<'a>> {
+        Classifier::predicate(|token: &Token| {
+            token.kind.is_identifier() || token.kind.is_string() || token.kind.is_integer()
+        })
+    }
+
+    fn path_value<'source>() -> Classifier<'a, 'source, Self, Token<'a>, Symbol<'a>, InitializeError<'a>> {
         Classifier::sequence([
-            Classifier::predicate(|token: &Token| {
-                token.kind.is_identifier()
-                    || token.kind.is_string()
-                    || token.kind.is_integer()
-                    || matches!(
-                        token.kind.try_unwrap_operator(),
-                        Some(OperatorKind::Slash | OperatorKind::Backslash | OperatorKind::Dot)
-                    )
-            }),
+            Classifier::repetition(Self::separator(), 0, None),
             Classifier::repetition(
-                Classifier::predicate(|token: &Token| {
-                    token.kind.is_identifier()
-                        || token.kind.is_string()
-                        || token.kind.is_integer()
-                        || matches!(
-                            token.kind.try_unwrap_operator(),
-                            Some(
-                                OperatorKind::Slash
-                                    | OperatorKind::Backslash
-                                    | OperatorKind::Dot
-                                    | OperatorKind::Colon
-                            )
-                        )
-                }),
+                Classifier::sequence([
+                    Self::segment(),
+                    Classifier::repetition(Self::separator(), 1, None),
+                ]),
                 0,
                 None,
             ),
+            Classifier::repetition(Self::segment(), 0, Some(1)),
+            Classifier::repetition(Self::separator(), 0, None),
         ])
     }
 
@@ -118,12 +121,7 @@ impl<'a> Initializer<'a> {
                 );
 
                 let symbol = Symbol::new(
-                    SymbolKind::binding(Binding::new(
-                        target,
-                        Some(value),
-                        None,
-                        BindingKind::Meta,
-                    )),
+                    SymbolKind::binding(Binding::new(target, Some(value), None, BindingKind::Meta)),
                     identifier.span().merge(&path.span()),
                     Visibility::Public,
                 );
@@ -154,7 +152,8 @@ impl<'a> Initializer<'a> {
                         token.kind.try_unwrap_operator(),
                         Some(operator) if operator.as_slice() == [OperatorKind::Minus, OperatorKind::Minus]
                     )
-                }).with_ignore(),
+                })
+                    .with_ignore(),
             ]),
             Classifier::predicate(move |token: &Token| {
                 if let Some(identifier) = token.kind.try_unwrap_identifier() {
@@ -180,12 +179,7 @@ impl<'a> Initializer<'a> {
                 );
 
                 let symbol = Symbol::new(
-                    SymbolKind::binding(Binding::new(
-                        target,
-                        Some(value),
-                        None,
-                        BindingKind::Meta,
-                    )),
+                    SymbolKind::binding(Binding::new(target, Some(value), None, BindingKind::Meta)),
                     span,
                     Visibility::Public,
                 );
@@ -196,8 +190,7 @@ impl<'a> Initializer<'a> {
             })
     }
 
-    pub fn verbosity<'source>(
-    ) -> Classifier<'a, 'source, Self, Token<'a>, Symbol<'a>, InitializeError<'a>> {
+    pub fn verbosity<'source>() -> Classifier<'a, 'source, Self, Token<'a>, Symbol<'a>, InitializeError<'a>> {
         Classifier::sequence([
             Classifier::repetition(
                 Classifier::predicate(|token: &Token| {
@@ -219,10 +212,7 @@ impl<'a> Initializer<'a> {
                     let identifier = form.collect_inputs()[0].clone();
                     let span = identifier.span();
 
-                    *form = Form::Input(Token::new(
-                        TokenKind::identifier(Str::from("Verbosity")),
-                        span,
-                    ));
+                    *form = Form::Input(Token::new(TokenKind::identifier(Str::from("Verbosity")), span));
 
                     Ok(())
                 }),
@@ -238,12 +228,7 @@ impl<'a> Initializer<'a> {
                 let value = Element::new(ElementKind::literal(value.clone()), value.span);
 
                 let symbol = Symbol::new(
-                    SymbolKind::binding(Binding::new(
-                        target,
-                        Some(value),
-                        None,
-                        BindingKind::Meta,
-                    )),
+                    SymbolKind::binding(Binding::new(target, Some(value), None, BindingKind::Meta)),
                     span,
                     Visibility::Public,
                 );
@@ -254,36 +239,27 @@ impl<'a> Initializer<'a> {
             })
     }
 
-    pub fn input<'source>(
-    ) -> Classifier<'a, 'source, Self, Token<'a>, Symbol<'a>, InitializeError<'a>> {
+    pub fn input<'source>() -> Classifier<'a, 'source, Self, Token<'a>, Symbol<'a>, InitializeError<'a>> {
         Self::path_directive(Str::from("Input"), |identifier| {
             identifier == "i" || identifier == "input"
         })
     }
 
-    pub fn output<'source>(
-    ) -> Classifier<'a, 'source, Self, Token<'a>, Symbol<'a>, InitializeError<'a>> {
+    pub fn output<'source>() -> Classifier<'a, 'source, Self, Token<'a>, Symbol<'a>, InitializeError<'a>> {
         Self::path_directive(Str::from("Output"), |identifier| {
             identifier == "o" || identifier == "output"
         })
     }
 
-    pub fn discard<'source>(
-    ) -> Classifier<'a, 'source, Self, Token<'a>, Symbol<'a>, InitializeError<'a>> {
-        Self::boolean_directive(Str::from("Discard"), |identifier| {
-            identifier == "discard"
-        })
+    pub fn discard<'source>() -> Classifier<'a, 'source, Self, Token<'a>, Symbol<'a>, InitializeError<'a>> {
+        Self::boolean_directive(Str::from("Discard"), |identifier| identifier == "discard")
     }
 
-    pub fn bare<'source>(
-    ) -> Classifier<'a, 'source, Self, Token<'a>, Symbol<'a>, InitializeError<'a>> {
-        Self::boolean_directive(Str::from("Bare"), |identifier| {
-            identifier == "bare"
-        })
+    pub fn bare<'source>() -> Classifier<'a, 'source, Self, Token<'a>, Symbol<'a>, InitializeError<'a>> {
+        Self::boolean_directive(Str::from("Bare"), |identifier| identifier == "bare")
     }
 
-    pub fn implicit_input<'source>(
-    ) -> Classifier<'a, 'source, Self, Token<'a>, Symbol<'a>, InitializeError<'a>> {
+    pub fn implicit_input<'source>() -> Classifier<'a, 'source, Self, Token<'a>, Symbol<'a>, InitializeError<'a>> {
         Classifier::with_transform(Self::path_value(), |former, classifier| {
             let form = former.forms.get_mut(classifier.form).unwrap();
             let inputs = form.collect_inputs();
@@ -293,7 +269,7 @@ impl<'a> Initializer<'a> {
                 return Ok(());
             }
 
-            let span = inputs[0].clone().span();
+            let span = inputs.span();
             let value = Token::new(
                 TokenKind::identifier(Str::from(Self::path_string(inputs))),
                 span,
@@ -305,12 +281,7 @@ impl<'a> Initializer<'a> {
             let value = Element::new(ElementKind::literal(value.clone()), value.span);
 
             let symbol = Symbol::new(
-                SymbolKind::binding(Binding::new(
-                    target,
-                    Some(value),
-                    None,
-                    BindingKind::Meta,
-                )),
+                SymbolKind::binding(Binding::new(target, Some(value), None, BindingKind::Meta)),
                 span,
                 Visibility::Public,
             );

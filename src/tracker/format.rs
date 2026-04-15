@@ -8,7 +8,6 @@ impl Debug for Location<'_> {
         match self {
             Location::Entry(file) => write!(f, "File({})", file),
             Location::Void => write!(f, "Void"),
-            Location::Flag => write!(f, "Flag"),
         }
     }
 }
@@ -18,7 +17,6 @@ impl Display for Location<'_> {
         match self {
             Location::Entry(file) => write!(f, "{}", file),
             Location::Void => write!(f, "Void"),
-            Location::Flag => write!(f, "Flag"),
         }
     }
 }

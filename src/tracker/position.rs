@@ -1,7 +1,7 @@
 use orbyte::Orbyte;
 use crate::{
     data::{Identity, Str, Offset},
-    internal::platform::{args, read_to_string, Path, PathBuf},
+    internal::platform::{read_to_string, Path, PathBuf},
     tracker::{ErrorKind, Span, TrackError},
 };
 
@@ -9,7 +9,6 @@ use crate::{
 pub enum Location<'location> {
     Entry(Str<'location>),
     Void,
-    Flag,
 }
 
 impl<'location> Location<'location> {
@@ -38,18 +37,6 @@ impl<'location> Location<'location> {
                     Err(error) => Err(TrackError::new(ErrorKind::from_io(error, *self), Span::void())),
                 }
             }
-            Location::Flag => Ok(args()
-                .skip(1)
-                .map(|arg| {
-                    if arg.contains(' ') || arg.contains('\t') {
-                        format!("\"{}\"", arg.replace('\\', "\\\\").replace('"', "\\\""))
-                    } else {
-                        arg
-                    }
-                })
-                .collect::<Vec<String>>()
-                .join(" ")
-                .into()),
             Location::Void => Err(TrackError::new(ErrorKind::EmptyVoid(*self), Span::void())),
         }
     }
@@ -70,10 +57,6 @@ impl<'location> Location<'location> {
 
     pub fn entry(string: Str<'location>) -> Location<'location> {
         Location::Entry(string)
-    }
-
-    pub fn flag() -> Location<'location> {
-        Location::Flag
     }
 }
 

@@ -1,6 +1,7 @@
 #[cfg(feature = "interpreter")]
 mod dialog;
 
+use std::env::args;
 use axo::{
     data::{Identity, Module, Str},
     initializer::Initializer,
@@ -37,7 +38,8 @@ pub const BASE: &[(&str, &str)] = &[
 ];
 
 fn main() {
-    let mut initializer = Initializer::new(Location::Flag);
+    let flag = arguments();
+    let mut initializer = Initializer::new(flag);
     let targets = initializer.initialize();
 
     let bare = initializer.output.iter().any(|symbol| {
@@ -59,9 +61,9 @@ fn main() {
 
     if targets.is_empty() {
         #[cfg(feature = "interpreter")]
-        dialog::start(bare, initializer.output);
+        dialog::start(bare, initializer.output, flag);
     } else {
-        build(targets, bare, initializer.output, failures);
+        build(targets, bare, initializer.output, failures, flag);
     }
 }
 
@@ -100,8 +102,9 @@ fn build(
     bare: bool,
     directives: Vec<Symbol>,
     failures: Vec<SessionError<'static>>,
+    flag_content: Str<'static>,
 ) {
-    let mut session = create(bare, directives, failures);
+    let mut session = create(bare, directives, failures, flag_content);
 
     targets.iter().for_each(|(target, span)| {
         if !traverse(target, &mut session.records) {
@@ -129,6 +132,7 @@ pub fn create<'a>(
     bare: bool,
     directives: Vec<Symbol<'a>>,
     failures: Vec<SessionError<'a>>,
+    flag: Str<'a>,
 ) -> Session<'a> {
     let mut timer = DefaultTimer::new_default();
     _ = timer.start();
@@ -137,6 +141,10 @@ pub fn create<'a>(
     let mut records = Map::new();
     let cache = Map::new();
 
+    let mut flag_record = Record::new(RecordKind::Flag, Location::Entry(Str::from("flag")));
+    flag_record.set_content(flag.to_string());
+    records.insert(0, flag_record);
+    
     if !bare {
         for &(path, content) in BASE {
             if let Some(kind) = RecordKind::from_path(path) {
@@ -175,13 +183,28 @@ pub fn create<'a>(
     Session {
         timer,
         records,
-        initializer: Initializer::new(Location::Flag),
+        initializer: Initializer::new(arguments()),
         resolver,
         errors: failures,
         target: None,
         cache,
         buffers: Vec::new(),
     }
+}
+
+pub fn arguments<'a>() -> Str<'a> {
+    args()
+        .skip(1)
+        .map(|arg| {
+            if arg.contains(' ') || arg.contains('\t') {
+                format!("\"{}\"", arg.replace('\\', "\\\\").replace('"', "\\\""))
+            } else {
+                arg
+            }
+        })
+        .collect::<Vec<String>>()
+        .join(" ")
+        .into()
 }
 
 pub fn traverse<'a>(target: &Location<'a>, records: &mut Map<Identity, Record<'a>>) -> bool {

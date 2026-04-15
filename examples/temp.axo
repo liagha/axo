@@ -1,16 +1,1 @@
-func main(): Integer {
-    const name = "ali"
-    var buffer: [Character; 50]
-
-    print.print_string("Hey ")
-    print.print_string(name)
-    print.print_string("!\n")
-
-    const age = 25
-    const height = 1.75
-    print.sprintf(buffer, "I am %d years old and %f meters tall.", age, height)
-
-    print.print_string(buffer)
-
-    0
-}
+return(Token { kind = "NUMBER", value = parsed_val, next_position = lexer.position })

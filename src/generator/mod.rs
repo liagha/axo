@@ -210,6 +210,9 @@ Action<
                     direct.push(record.location);
                     None
                 }
+                RecordKind::Flag => {
+                    None
+                }
             };
 
             if let Some(path) = target {

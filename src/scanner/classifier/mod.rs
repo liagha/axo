@@ -8,53 +8,10 @@ use crate::{
         Character, CharacterError, ErrorKind, Operator, Punctuation, PunctuationKind, ScanError,
         Scanner, Token, TokenKind,
     },
-    tracker::{Peekable, Span, Spanned},
+    tracker::Spanned,
 };
 
 impl<'a> Scanner<'a> {
-    fn consumed<'source>(
-        former: &crate::combinator::Former<'a, 'source, Self, Character, Token<'a>, ScanError<'a>>,
-        classifier: &crate::combinator::Classifier<'a, 'source, Self, Character, Token<'a>, ScanError<'a>>,
-    ) -> Vec<Character> {
-        classifier
-            .consumed
-            .iter()
-            .filter_map(|index| former.consumed.get(*index).cloned())
-            .collect()
-    }
-
-    fn span<'source>(
-        former: &crate::combinator::Former<'a, 'source, Self, Character, Token<'a>, ScanError<'a>>,
-        classifier: &crate::combinator::Classifier<'a, 'source, Self, Character, Token<'a>, ScanError<'a>>,
-    ) -> Span {
-        let consumed = Self::consumed(former, classifier);
-        if consumed.is_empty() {
-            if let Some(next) = former.source.get(classifier.marker) {
-                next.span
-            } else {
-                Span::point(classifier.state)
-            }
-        } else {
-            consumed.span()
-        }
-    }
-
-    fn expected<'source>(
-        label: &'static str,
-        former: &crate::combinator::Former<'a, 'source, Self, Character, Token<'a>, ScanError<'a>>,
-        classifier: &crate::combinator::Classifier<'a, 'source, Self, Character, Token<'a>, ScanError<'a>>,
-    ) -> ScanError<'a> {
-        ScanError::new(ErrorKind::Expected(label), Self::span(former, classifier))
-    }
-
-    fn unterminated<'source>(
-        label: &'static str,
-        former: &crate::combinator::Former<'a, 'source, Self, Character, Token<'a>, ScanError<'a>>,
-        classifier: &crate::combinator::Classifier<'a, 'source, Self, Character, Token<'a>, ScanError<'a>>,
-    ) -> ScanError<'a> {
-        ScanError::new(ErrorKind::Unterminated(label), Self::span(former, classifier))
-    }
-
     fn string<'source>() -> Classifier<'a, 'source, Self, Character, Token<'a>, ScanError<'a>> {
         Classifier::sequence([
             Classifier::literal('"').with_ignore(),
@@ -66,9 +23,7 @@ impl<'a> Scanner<'a> {
                 0,
                 None,
             ),
-            Classifier::literal('"')
-                .with_ignore()
-                .with_panic(|former, classifier| Self::unterminated("string literal", former, &classifier)),
+            Classifier::literal('"').with_ignore(),
         ])
             .with_transform(move |former, classifier| {
                 let form = former.forms.get_mut(classifier.form).unwrap();
@@ -94,9 +49,7 @@ impl<'a> Scanner<'a> {
                 0,
                 None,
             ),
-            Classifier::literal('`')
-                .with_ignore()
-                .with_panic(|former, classifier| Self::unterminated("string literal", former, &classifier)),
+            Classifier::literal('`').with_ignore(),
         ])
             .with_transform(move |former, classifier| {
                 let form = former.forms.get_mut(classifier.form).unwrap();
@@ -117,10 +70,8 @@ impl<'a> Scanner<'a> {
             Classifier::alternative([
                 Classifier::predicate(|c: &Character| !matches!(c.value, '\'' | '\\')),
                 Self::escape_sequence(),
-            ])
-                .with_panic(|former, classifier| Self::expected("a character", former, &classifier)),
-            Classifier::literal('\'')
-                .with_panic(|former, classifier| Self::unterminated("character literal", former, &classifier)),
+            ]),
+            Classifier::literal('\''),
         ])
             .with_transform(|former, classifier| {
                 let form = former.forms.get_mut(classifier.form).unwrap();
@@ -245,8 +196,7 @@ impl<'a> Scanner<'a> {
                         None,
                     ),
                     Classifier::sequence([Classifier::literal('*'), Classifier::literal('/')])
-                        .with_ignore()
-                        .with_panic(|former, classifier| Self::unterminated("block comment", former, &classifier)),
+                        .with_ignore(),
                 ]),
             ])]),
             |former, classifier| {

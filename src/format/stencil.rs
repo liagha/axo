@@ -39,7 +39,7 @@ impl Default for Stencil {
             indent: 4,
             show_head: false,
             show_variant: true,
-            show_name: false,
+            show_name: true,
             inline: false,
             block: false,
             trailing: false,

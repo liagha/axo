@@ -16,8 +16,16 @@ impl<'a> Parser<'a> {
     ) -> Classifier<'a, 'source, Self, Token<'a>, Element<'a>, ParseError<'a>> {
         Classifier::alternative_with(
             patterns,
-            |state| state.is_aligned() || state.is_panicked(),
+            |state| state.is_aligned(),
             |new, old| {
+                if new.is_aligned() != old.is_aligned() {
+                    return new.is_aligned();
+                }
+
+                if new.is_aligned() {
+                    return new.marker > old.marker;
+                }
+
                 if new.is_panicked() != old.is_panicked() {
                     return new.is_panicked();
                 }
@@ -26,7 +34,11 @@ impl<'a> Parser<'a> {
                     return new.marker > old.marker;
                 }
 
-                new.is_aligned() && (old.is_failed() || new.marker > old.marker)
+                if new.is_failed() != old.is_failed() {
+                    return new.is_failed();
+                }
+
+                new.marker > old.marker
             },
         )
     }

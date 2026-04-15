@@ -25,6 +25,7 @@ pub enum RecordKind {
     Schema,
     Object,
     C,
+    Flag,
 }
 
 impl RecordKind {
@@ -48,6 +49,7 @@ impl RecordKind {
             RecordKind::Schema => "ll",
             RecordKind::Object => "o",
             RecordKind::C => "c",
+            RecordKind::Flag => "",
         }
     }
 }

@@ -153,8 +153,8 @@ impl Dialog {
     }
 }
 
-pub fn start(bare: bool, directives: Vec<Symbol>) {
-    let mut session = crate::create(bare, directives, Vec::new());
+pub fn start(bare: bool, directives: Vec<Symbol>, flag_content: Str) {
+    let mut session = crate::create(bare, directives, Vec::new(), flag_content);
     let mut core = Interpreter::new(1024);
 
     let mut keys: Vec<_> = session

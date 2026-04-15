@@ -5,13 +5,13 @@ use crate::{
     tracker::Span,
 };
 
-#[derive(Clone, Hash, Orbyte)]
+#[derive(Clone, Debug, Hash, Orbyte)]
 pub struct Token<'token> {
     pub kind: TokenKind<'token>,
     pub span: Span,
 }
 
-#[derive(Clone, Eq, Hash, Orbyte, PartialEq)]
+#[derive(Clone, Debug, Eq, Hash, Orbyte, PartialEq)]
 pub enum TokenKind<'token> {
     Float(Float),
     Integer(Integer),

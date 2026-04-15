@@ -8,6 +8,7 @@ use crate::{
 };
 
 pub struct Initializer<'a> {
+    pub content: Str<'a>,
     pub index: Offset,
     pub state: Position,
     pub input: Vec<Token<'a>>,
@@ -67,8 +68,9 @@ impl<'a> Peekable<'a, Token<'a>> for Initializer<'a> {
 }
 
 impl<'a> Initializer<'a> {
-    pub fn new(_: Location<'a>) -> Self {
+    pub fn new(content: Str<'a>) -> Self {
         Initializer {
+            content,
             index: 0,
             state: Position::new(0),
             input: Vec::new(),
@@ -105,9 +107,7 @@ impl<'a> Initializer<'a> {
     }
 
     pub fn initialize(&mut self) -> Vec<(Location<'a>, Span)> {
-        let location = Location::Flag;
-        let content = location.get_value().unwrap();
-        let mut scanner = Scanner::new(Position::new(0), content);
+        let mut scanner = Scanner::new(Position::new(0), self.content);
         scanner.scan();
 
         self.input = scanner.output;
