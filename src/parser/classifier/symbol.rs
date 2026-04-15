@@ -22,7 +22,7 @@ impl<'a> Parser<'a> {
         Classifier::sequence([
             Classifier::predicate(|token: &Token| {
                 if let Some(id) = token.kind.try_unwrap_identifier() {
-                    matches!(id.as_str().unwrap(), "static" | "var" | "const" | "meta")
+                    matches!(id.as_str().unwrap(), "static" | "let" | "meta")
                 } else {
                     false
                 }
@@ -46,13 +46,12 @@ impl<'a> Parser<'a> {
                 let kind = if let Some(identifier) = keyword.kind.try_unwrap_identifier() {
                     match identifier.as_str().unwrap() {
                         "static" => BindingKind::Static,
-                        "const" => BindingKind::Constant,
-                        "var" => BindingKind::Variable,
+                        "let" => BindingKind::Let,
                         "meta" => BindingKind::Meta,
-                        _ => BindingKind::Constant,
+                        _ => BindingKind::Let,
                     }
                 } else {
-                    BindingKind::Constant
+                    BindingKind::Let
                 };
 
                 let mut body = sequence[1].unwrap_output().clone();

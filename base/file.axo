@@ -1,53 +1,53 @@
-func file_write(C, const file: Integer, const buffer: *UInt8, const length: UInt64): Integer
-func file_read(C, const file: Integer, const buffer: *UInt8, const count: UInt64): UInt64
-func file_open(C, const path: String, const flags: Integer, const mode: Integer): Integer
-func file_close(C, const file: Integer): Integer
-func file_unlink(C, const path: String): Integer
-func file_seek(C, const file: Integer, const offset: Int64, const whence: Integer): Int64
+func file_write(C, let file: Integer, let buffer: *UInt8, let length: UInt64): Integer
+func file_read(C, let file: Integer, let buffer: *UInt8, let count: UInt64): UInt64
+func file_open(C, let path: String, let flags: Integer, let mode: Integer): Integer
+func file_close(C, let file: Integer): Integer
+func file_unlink(C, let path: String): Integer
+func file_seek(C, let file: Integer, let offset: Int64, let whence: Integer): Int64
 
-const STANDARD_INPUT = 0
-const STANDARD_OUTPUT = 1
-const STANDARD_ERROR = 2
+let STANDARD_INPUT = 0
+let STANDARD_OUTPUT = 1
+let STANDARD_ERROR = 2
 
-const INVALID_FILE = -1
+let INVALID_FILE = -1
 
-const READ_ONLY = 0
-const WRITE_ONLY = 1
-const READ_WRITE = 2
+let READ_ONLY = 0
+let WRITE_ONLY = 1
+let READ_WRITE = 2
 
-const FILE_CREATE = 64
-const FILE_EXCLUSIVE = 128
-const FILE_NOTERMINAL = 256
-const FILE_TRUNCATE = 512
+let FILE_CREATE = 64
+let FILE_EXCLUSIVE = 128
+let FILE_NOTERMINAL = 256
+let FILE_TRUNCATE = 512
 
-const FILE_APPEND = 1024
-const FILE_NONBLOCK = 2048
-const DATA_SYNC = 4096
-const FILE_ASYNCHRONOUS = 8192
-const FILE_DIRECT = 16384
-const FILE_LARGE = 32768
-const FILE_DIRECTORY = 65536
-const FILE_NOFOLLOW = 131072
-const FILE_NOTIME = 262144
-const CLOSE_EXECUTE = 524288
-const FILE_SYNC = 1052672
-const FILE_PATH = 2097152
-const FILE_TEMPORARY = 4259840
+let FILE_APPEND = 1024
+let FILE_NONBLOCK = 2048
+let DATA_SYNC = 4096
+let FILE_ASYNCHRONOUS = 8192
+let FILE_DIRECT = 16384
+let FILE_LARGE = 32768
+let FILE_DIRECTORY = 65536
+let FILE_NOFOLLOW = 131072
+let FILE_NOTIME = 262144
+let CLOSE_EXECUTE = 524288
+let FILE_SYNC = 1052672
+let FILE_PATH = 2097152
+let FILE_TEMPORARY = 4259840
 
-const USER_ALL = 448
-const USER_READ = 256
-const USER_WRITE = 128
-const USER_EXECUTE = 64
-const GROUP_ALL = 56
-const GROUP_READ = 32
-const GROUP_WRITE = 16
-const GROUP_EXECUTE = 8
-const OTHER_ALL = 7
-const OTHER_READ = 4
-const OTHER_WRITE = 2
-const OTHER_EXECUTE = 1
+let USER_ALL = 448
+let USER_READ = 256
+let USER_WRITE = 128
+let USER_EXECUTE = 64
+let GROUP_ALL = 56
+let GROUP_READ = 32
+let GROUP_WRITE = 16
+let GROUP_EXECUTE = 8
+let OTHER_ALL = 7
+let OTHER_READ = 4
+let OTHER_WRITE = 2
+let OTHER_EXECUTE = 1
 
-const SEEK_START = 0
-const SEEK_CURRENT = 1
-const SEEK_END = 2
+let SEEK_START = 0
+let SEEK_CURRENT = 1
+let SEEK_END = 2
 

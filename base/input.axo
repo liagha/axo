@@ -1,2 +1,2 @@
-func get_input(C, const prompt: String): String
+func get_input(C, let prompt: String): String
 

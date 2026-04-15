@@ -1,22 +1,22 @@
 struct Token {
-    const kind: String,
-    const value: Float,
-    const next_position: UInt64
+    let kind: String,
+    let value: Float,
+    let next_position: UInt64
 }
 
 struct Lexer {
-    const source: String,
-    var position: UInt64
+    let source: String,
+    let position: UInt64
 }
 
 struct ParseResult {
-    const value: Float,
-    const next_position: UInt64
+    let value: Float,
+    let next_position: UInt64
 }
 
-func compute_power(const base: Float, const exp: Float): Float {
-    var result = 1.0
-    var count = exp
+func compute_power(let base: Float, let exp: Float): Float {
+    let result = 1.0
+    let count = exp
     while(count > 0.0, {
         result = result * base
         count = count - 1.0
@@ -24,8 +24,8 @@ func compute_power(const base: Float, const exp: Float): Float {
     return(result)
 }
 
-func compute_modulo(const a: Float, const b: Float): Float {
-    var result = a
+func compute_modulo(let a: Float, let b: Float): Float {
+    let result = a
     if(b == 0.0, {
         return(0.0)
     })
@@ -35,9 +35,9 @@ func compute_modulo(const a: Float, const b: Float): Float {
     return(result)
 }
 
-func next_token(var lexer: Lexer): Token {
+func next_token(let lexer: Lexer): Token {
     while(lexer.position < string.string_length(lexer.source), {
-        const current_char: UInt8 = string.character_at(lexer.source, lexer.position)
+        let current_char: UInt8 = string.character_at(lexer.source, lexer.position)
 
         if(string.is_whitespace(current_char), {
             lexer.position = lexer.position + cast.integer_uint64(1)
@@ -93,14 +93,14 @@ func next_token(var lexer: Lexer): Token {
         })
 
         if(string.is_digit(current_char), {
-            const start = lexer.position
+            let start = lexer.position
 
             while(lexer.position < string.string_length(lexer.source) && (string.is_digit(string.character_at(lexer.source, lexer.position)) || string.character_at(lexer.source, lexer.position) == cast.character_uint8('.')), {
                 lexer.position = lexer.position + cast.integer_uint64(1)
             })
 
-            const num_str = string.string_substring(lexer.source, start, lexer.position)
-            const parsed_val = string.parse_float(num_str)
+            let num_str = string.string_substring(lexer.source, start, lexer.position)
+            let parsed_val = string.parse_float(num_str)
 
             print.print_string("Lexed: NUMBER (")
             print.print_float(parsed_val)
@@ -118,10 +118,10 @@ func next_token(var lexer: Lexer): Token {
     return(Token { kind = "EOF", value = 0.0, next_position = lexer.position })
 }
 
-func parse_expression(var lexer: Lexer): ParseResult
+func parse_expression(let lexer: Lexer): ParseResult
 
-func parse_factor(var lexer: Lexer): ParseResult {
-    var tok = next_token(lexer)
+func parse_factor(let lexer: Lexer): ParseResult {
+    let tok = next_token(lexer)
     lexer.position = tok.next_position
 
     if(tok.kind == "NUMBER", {
@@ -131,10 +131,10 @@ func parse_factor(var lexer: Lexer): ParseResult {
         return(ParseResult { value = tok.value, next_position = lexer.position })
     }, {
         if(tok.kind == "LPAREN", {
-            var inner_res = parse_expression(lexer)
+            let inner_res = parse_expression(lexer)
             lexer.position = inner_res.next_position
 
-            var next_tok = next_token(lexer)
+            let next_tok = next_token(lexer)
             if(next_tok.kind == "RPAREN", {
                 lexer.position = next_tok.next_position
                 return(ParseResult { value = inner_res.value, next_position = lexer.position })
@@ -148,18 +148,18 @@ func parse_factor(var lexer: Lexer): ParseResult {
     })
 }
 
-func parse_power(var lexer: Lexer): ParseResult {
-    var left_res = parse_factor(lexer)
+func parse_power(let lexer: Lexer): ParseResult {
+    let left_res = parse_factor(lexer)
     lexer.position = left_res.next_position
-    var current_value = left_res.value
-    var loop = cast.integer_uint8(1)
+    let current_value = left_res.value
+    let loop = cast.integer_uint8(1)
 
     while(loop == cast.integer_uint8(1), {
-        var peek_lexer = Lexer { source = lexer.source, position = lexer.position }
-        var tok = next_token(peek_lexer)
+        let peek_lexer = Lexer { source = lexer.source, position = lexer.position }
+        let tok = next_token(peek_lexer)
         if(tok.kind == "POWER", {
             lexer.position = tok.next_position
-            var right_res = parse_factor(lexer)
+            let right_res = parse_factor(lexer)
             lexer.position = right_res.next_position
             current_value = compute_power(current_value, right_res.value)
         }, {
@@ -175,30 +175,30 @@ func parse_power(var lexer: Lexer): ParseResult {
     return(ParseResult { value = current_value, next_position = lexer.position })
 }
 
-func parse_term(var lexer: Lexer): ParseResult {
-    var left_res = parse_power(lexer)
+func parse_term(let lexer: Lexer): ParseResult {
+    let left_res = parse_power(lexer)
     lexer.position = left_res.next_position
-    var current_value = left_res.value
-    var loop = cast.integer_uint8(1)
+    let current_value = left_res.value
+    let loop = cast.integer_uint8(1)
 
     while(loop == cast.integer_uint8(1), {
-        var peek_lexer = Lexer { source = lexer.source, position = lexer.position }
-        var tok = next_token(peek_lexer)
+        let peek_lexer = Lexer { source = lexer.source, position = lexer.position }
+        let tok = next_token(peek_lexer)
         if(tok.kind == "MULTIPLY", {
             lexer.position = tok.next_position
-            var right_res = parse_power(lexer)
+            let right_res = parse_power(lexer)
             lexer.position = right_res.next_position
             current_value = current_value * right_res.value
         }, {
             if(tok.kind == "DIVIDE", {
                 lexer.position = tok.next_position
-                var right_res = parse_power(lexer)
+                let right_res = parse_power(lexer)
                 lexer.position = right_res.next_position
                 current_value = current_value / right_res.value
             }, {
                 if(tok.kind == "MODULO", {
                     lexer.position = tok.next_position
-                    var right_res = parse_power(lexer)
+                    let right_res = parse_power(lexer)
                     lexer.position = right_res.next_position
                     current_value = compute_modulo(current_value, right_res.value)
                 }, {
@@ -216,24 +216,24 @@ func parse_term(var lexer: Lexer): ParseResult {
     return(ParseResult { value = current_value, next_position = lexer.position })
 }
 
-func parse_expression(var lexer: Lexer): ParseResult {
-    var left_res = parse_term(lexer)
+func parse_expression(let lexer: Lexer): ParseResult {
+    let left_res = parse_term(lexer)
     lexer.position = left_res.next_position
-    var current_value = left_res.value
-    var loop = cast.integer_uint8(1)
+    let current_value = left_res.value
+    let loop = cast.integer_uint8(1)
 
     while(loop == cast.integer_uint8(1), {
-        var peek_lexer = Lexer { source = lexer.source, position = lexer.position }
-        var tok = next_token(peek_lexer)
+        let peek_lexer = Lexer { source = lexer.source, position = lexer.position }
+        let tok = next_token(peek_lexer)
         if(tok.kind == "PLUS", {
             lexer.position = tok.next_position
-            var right_res = parse_term(lexer)
+            let right_res = parse_term(lexer)
             lexer.position = right_res.next_position
             current_value = current_value + right_res.value
         }, {
             if(tok.kind == "MINUS", {
                 lexer.position = tok.next_position
-                var right_res = parse_term(lexer)
+                let right_res = parse_term(lexer)
                 lexer.position = right_res.next_position
                 current_value = current_value - right_res.value
             }, {
@@ -251,9 +251,9 @@ func parse_expression(var lexer: Lexer): ParseResult {
 }
 
 func main(): Integer {
-    const input_text: String = input.get_input("Enter your calculation: ")
-    var lexer = Lexer { source = input_text, position = cast.integer_uint64(0) }
-    var result = parse_expression(lexer)
+    let input_text: String = input.get_input("Enter your calculation: ")
+    let lexer = Lexer { source = input_text, position = cast.integer_uint64(0) }
+    let result = parse_expression(lexer)
 
     print.print_string("Final Result: ")
     print.print_float(result.value)

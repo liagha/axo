@@ -90,7 +90,7 @@ impl<'a> Parser<'a> {
             | TokenKind::Integer(_) => true,
             TokenKind::Identifier(identifier) => !matches!(
                 identifier.unwrap_str(),
-                "static" | "var" | "const" | "struct" | "union" | "func" | "module"
+                "static" | "let" | "struct" | "union" | "func" | "module"
             ),
             _ => false,
         })

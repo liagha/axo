@@ -27,7 +27,6 @@ impl<'typing> From<TypeKind<'typing>> for Type<'typing> {
 
 #[derive(Clone, Debug, Orbyte, PartialEq)]
 pub enum TypeKind<'typing> {
-    Module(Str<'typing>),
     Integer { size: Scale, signed: Boolean },
     Float { size: Scale },
     Boolean,
@@ -44,6 +43,7 @@ pub enum TypeKind<'typing> {
     Has(Str<'typing>, Box<Type<'typing>>),
     And(Box<Type<'typing>>, Box<Type<'typing>>),
     Or(Box<Type<'typing>>, Box<Type<'typing>>),
+    Module(Str<'typing>),
     Structure(Box<Aggregate<Str<'typing>, Type<'typing>>>),
     Union(Box<Aggregate<Str<'typing>, Type<'typing>>>),
     Function(Box<Function<Str<'typing>, Type<'typing>, Type<'typing>, Option<Box<Type<'typing>>>>>),
@@ -645,16 +645,29 @@ impl<'resolver> Resolver<'resolver> {
                 left.clone()
             }
 
-            (TypeKind::Has(left_name, left_target), TypeKind::Has(right_name, right_target))
-            if left_name == right_name => {
-                let unified = self.unify(span, &left_target, &right_target);
-                Type::from(TypeKind::Has(left_name, Box::new(unified)))
+            (TypeKind::Has(left_name, left_target), TypeKind::Has(right_name, right_target)) => {
+                if left_name == right_name {
+                    let unified = self.unify(span, &left_target, &right_target);
+                    Type::from(TypeKind::Has(left_name, Box::new(unified)))
+                } else {
+                    Type::from(TypeKind::And(Box::new(left.clone()), Box::new(right.clone())))
+                }
             }
 
             (TypeKind::And(left_a, left_b), TypeKind::And(right_a, right_b)) => {
                 let a = self.unify(span, &left_a, &right_a);
                 let b = self.unify(span, &left_b, &right_b);
                 Type::from(TypeKind::And(Box::new(a), Box::new(b)))
+            }
+
+            (TypeKind::And(a, b), _) => {
+                let first = self.unify(span, &a, &right);
+                self.unify(span, &b, &first)
+            }
+
+            (_, TypeKind::And(a, b)) => {
+                let first = self.unify(span, &left, &a);
+                self.unify(span, &first, &b)
             }
 
             (TypeKind::Or(left_a, left_b), TypeKind::Or(right_a, right_b)) => {
@@ -665,12 +678,12 @@ impl<'resolver> Resolver<'resolver> {
 
             (TypeKind::Function(left_func), TypeKind::Function(right_func))
             if left_func.members.len() == right_func.members.len() => {
-                let mut unified_members = Vec::with_capacity(left_func.members.len());
+                let mut unified = Vec::with_capacity(left_func.members.len());
                 for (first, second) in left_func.members.iter().zip(right_func.members.iter()) {
-                    unified_members.push(self.unify(span, first, second));
+                    unified.push(self.unify(span, first, second));
                 }
 
-                let unified_output = match (left_func.output, right_func.output) {
+                let output = match (left_func.output, right_func.output) {
                     (Some(first), Some(second)) => Some(Box::new(self.unify(span, &first, &second))),
                     (Some(first), None) => Some(first.clone()),
                     (None, Some(second)) => Some(second.clone()),
@@ -683,13 +696,13 @@ impl<'resolver> Resolver<'resolver> {
                     left_func.target.clone()
                 };
 
-                let unified_body = self.unify(span, &left_func.body, &right_func.body);
+                let body = self.unify(span, &left_func.body, &right_func.body);
 
                 Type::new(left.identity, TypeKind::Function(Box::new(Function::new(
                     name,
-                    unified_members,
-                    unified_body,
-                    unified_output,
+                    unified,
+                    body,
+                    output,
                     left_func.interface,
                     left_func.entry,
                     left_func.variadic

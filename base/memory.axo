@@ -1,24 +1,24 @@
-func allocate_memory(C, const size: UInt64): *UInt8
-func free_memory(C, const pointer: *UInt8)
-func reallocate_memory(C, const pointer: *UInt8, const size: UInt64): *UInt8
+func allocate_memory(C, let size: UInt64): *UInt8
+func free_memory(C, let pointer: *UInt8)
+func reallocate_memory(C, let pointer: *UInt8, let size: UInt64): *UInt8
 
-func memory_map(C, const address: *UInt8, const length: UInt64, const protection: Integer, const flags: Integer, const file: Integer, const offset: Int64): *UInt8
-func memory_unmap(C, const address: *UInt8, const length: UInt64): Integer
+func memory_map(C, let address: *UInt8, let length: UInt64, let protection: Integer, let flags: Integer, let file: Integer, let offset: Int64): *UInt8
+func memory_unmap(C, let address: *UInt8, let length: UInt64): Integer
 
-const PROTECT_NONE = 0
-const PROTECT_READ = 1
-const PROTECT_WRITE = 2
-const PROTECT_EXECUTE = 4
+let PROTECT_NONE = 0
+let PROTECT_READ = 1
+let PROTECT_WRITE = 2
+let PROTECT_EXECUTE = 4
 
-const MAP_SHARED = 1
-const MAP_PRIVATE = 2
-const MAP_FIXED = 16
-const MAP_ANONYMOUS = 32
-const MAP_GROWSDOWN = 256
-const MAP_LOCKED = 8192
-const MAP_NORESERVE = 16384
-const MAP_POPULATE = 32768
-const MAP_HUGEPAGES = 262144
+let MAP_SHARED = 1
+let MAP_PRIVATE = 2
+let MAP_FIXED = 16
+let MAP_ANONYMOUS = 32
+let MAP_GROWSDOWN = 256
+let MAP_LOCKED = 8192
+let MAP_NORESERVE = 16384
+let MAP_POPULATE = 32768
+let MAP_HUGEPAGES = 262144
 
-const MAP_FAILED = -1
+let MAP_FAILED = -1
 

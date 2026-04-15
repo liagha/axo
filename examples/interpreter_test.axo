@@ -1,5 +1,5 @@
 func main() {
-    const x = 2 + 3
+    let x = 2 + 3
 
     print.print_integer(x)
 }

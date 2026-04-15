@@ -1,5 +1,5 @@
-func process_exit(C, const status: Integer)
+func process_exit(C, let status: Integer)
 
-const EXIT_SUCCESS = 0
-const EXIT_FAILURE = 1
+let EXIT_SUCCESS = 0
+let EXIT_FAILURE = 1
 
