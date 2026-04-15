@@ -37,13 +37,11 @@ impl<'typing> Show<'typing> for TypeKind<'typing> {
             TypeKind::Tuple { members } => base
                 .variant("Tuple")
                 .field("members", members.format(config.clone())),
-            TypeKind::Function(function) => {
-                base
-                    .variant("Function")
-                    .field("name", function.target.format(config.clone()))
-                    .field("members", function.members.format(config.clone()))
-                    .field("output", function.output.format(config.clone()))
-            },
+            TypeKind::Function(function) => base
+                .variant("Function")
+                .field("name", function.target.format(config.clone()))
+                .field("members", function.members.format(config.clone()))
+                .field("output", function.output.format(config.clone())),
             TypeKind::Variable(variable) => {
                 base.variant("Variable").field("id", variable.to_string())
             }
@@ -55,6 +53,20 @@ impl<'typing> Show<'typing> for TypeKind<'typing> {
             TypeKind::Union(union) => base
                 .variant("Union")
                 .field("union", union.format(config.clone())),
+            TypeKind::Any => base.variant("Any"),
+            TypeKind::Type => base.variant("Type"),
+            TypeKind::Has(name, target) => base
+                .variant("Has")
+                .field("name", name.format(config.clone()))
+                .field("target", target.format(config.clone())),
+            TypeKind::And(left, right) => base
+                .variant("And")
+                .field("left", left.format(config.clone()))
+                .field("right", right.format(config.clone())),
+            TypeKind::Or(left, right) => base
+                .variant("Or")
+                .field("left", left.format(config.clone()))
+                .field("right", right.format(config.clone())),
         }
     }
 }
