@@ -124,17 +124,15 @@ impl<'a> Scanner<'a> {
     {
         Classifier::with_transform(
             Classifier::sequence([
-                Classifier::predicate(|c: &Character| c.value == '-').into_optional(),
                 Classifier::persistence(
                     Classifier::alternative([
                         Classifier::predicate(|c: &Character| c.is_numeric()),
                         Classifier::literal('.'),
                         Classifier::literal('_').with_ignore(),
                     ]),
-                    0,
+                    1, // Changed from 0 to 1 so it must match at least one digit or dot
                     None,
-                )
-                    .into_optional(),
+                ),
                 Classifier::optional(Classifier::sequence([
                     Classifier::predicate(|c: &Character| matches!(c.value, 'e' | 'E')),
                     Classifier::optional(Classifier::predicate(|c: &Character| {
