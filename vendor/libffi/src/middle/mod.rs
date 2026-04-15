@@ -1,0 +1,733 @@
+//! Middle layer providing a somewhat safer (but still quite unsafe)
+//! API.
+//!
+//! The main idea of the middle layer is to wrap types [`low::ffi_cif`]
+//! and [`low::ffi_closure`] as [`Cif`] and [`Closure`], respectively,
+//! so that their resources are managed properly. However, calling a
+//! function via a CIF or closure is still unsafe because argument types
+//! aren’t checked. See the [`high`](crate::high) layer for closures
+//! with type-checked arguments.
+
+use crate::low;
+pub use crate::low::{ffi_abi as FfiAbi, ffi_abi_FFI_DEFAULT_ABI, Callback, CallbackMut, CodePtr};
+use alloc::boxed::Box;
+use core::any::Any;
+use core::ffi::c_void;
+use core::marker::PhantomData;
+use core::ptr::{null_mut, NonNull};
+
+mod types;
+mod util;
+pub use types::Type;
+
+mod builder;
+pub use builder::Builder;
+
+#[derive(Debug)]
+pub(crate) struct ClosureAlloc(NonNull<low::ffi_closure>);
+
+impl Drop for ClosureAlloc {
+    fn drop(&mut self) {
+        unsafe {
+            low::closure_free(self.0.as_ptr());
+        }
+    }
+}
+
+/// Contains an untyped pointer to a function argument.
+///
+/// When calling a function via a [CIF](Cif), each argument
+/// must be passed as a C `void*`. Wrapping the argument in the [`Arg`]
+/// struct accomplishes the necessary coercion.
+#[derive(Clone, Debug)]
+#[repr(C)]
+pub struct Arg<'arg>(*mut c_void, PhantomData<&'arg c_void>);
+
+impl<'arg> Arg<'arg> {
+    /// Coerces an argument reference into the [`Arg`] type.
+    ///
+    /// This is used to wrap each argument pointer before passing them
+    /// to [`Cif::call`].
+    pub fn new<'argument, T: ?Sized>(r: &'argument T) -> Self
+    where
+        'argument: 'arg,
+    {
+        Arg(r as *const T as *mut c_void, PhantomData)
+    }
+}
+
+/// Coerces an argument reference into the [`Arg`] type.
+///
+/// This is used to wrap each argument pointer before passing them
+/// to [`Cif::call`]. (This is the same as [`Arg::new`]).
+pub fn arg<T: ?Sized>(r: &T) -> Arg<'_> {
+    Arg::new(r)
+}
+
+/// Contains an untyped pointer for where to put the return value of a function.
+///
+/// Similar to `Arg`, `Ret` coerces a reference to a C `void *` pointer, only
+/// using a mutable reference as libffi will write to the memory location.
+#[derive(Clone, Debug)]
+#[repr(C)]
+pub struct Ret<'ret>(*mut c_void, PhantomData<&'ret mut c_void>);
+
+impl<'ret> Ret<'ret> {
+    /// Coerces an argument reference into the [`Ret`] type.
+    ///
+    /// This is used to instruct libffi where to put the result when using
+    /// [`Cif::call_return_into`].
+    pub fn new<'return_buf, T: ?Sized>(r: &'return_buf mut T) -> Self
+    where
+        'return_buf: 'ret,
+    {
+        Self(r as *mut T as *mut c_void, PhantomData)
+    }
+
+    /// Returns a `Ret` that can be used when calling `void` functions that do
+    /// not return any value. It will create a `Ret` containing a `NULL` pointer
+    /// and must only be used when calling functions without any return value.
+    pub fn void() -> Self {
+        Self(null_mut(), PhantomData)
+    }
+}
+
+/// Coerces an argument reference into the [`Ret`] type.
+///
+/// This is used to instruct libffi where to put the result when using
+/// [`Cif::call_return_into`]. Calling `ret` is the same as calling
+/// [`Ret::new`].
+pub fn ret<T: ?Sized>(r: &mut T) -> Ret<'_> {
+    Ret::new(r)
+}
+
+/// Describes the calling convention and types for calling a function.
+///
+/// This is the middle layer’s wrapping of the [`low`](crate::low) and
+/// [`raw`](crate::raw) layers’ [`low::ffi_cif`]. An initialized CIF
+/// contains references to an array of argument types and a result type,
+/// each of which may be allocated on the heap. `Cif` manages the memory
+/// of those referenced objects.
+///
+/// Construct with [`Cif::new`].
+///
+/// # Examples
+///
+/// ```
+/// extern "C" fn add(x: f64, y: &f64) -> f64 {
+///     return x + y;
+/// }
+///
+/// use libffi::middle::*;
+///
+/// let args = vec![Type::f64(), Type::pointer()];
+/// let cif = Cif::new(args.into_iter(), Type::f64());
+///
+/// let n = unsafe { cif.call(CodePtr(add as *mut _), &[arg(&5f64), arg(&&6f64)]) };
+/// assert_eq!(11f64, n);
+/// ```
+#[derive(Debug)]
+pub struct Cif {
+    cif: low::ffi_cif,
+    args: types::TypeArray,
+    result: Type,
+}
+
+// To clone a Cif we need to clone the types and then make sure the new
+// ffi_cif refers to the clones of the types.
+impl Clone for Cif {
+    fn clone(&self) -> Self {
+        let mut copy = Self {
+            cif: self.cif,
+            args: self.args.clone(),
+            result: self.result.clone(),
+        };
+
+        copy.cif.arg_types = copy.args.as_raw_ptr();
+        copy.cif.rtype = copy.result.as_raw_ptr();
+
+        copy
+    }
+}
+
+impl Cif {
+    /// Creates a new [CIF](Cif) for the given argument and result
+    /// types with the default ABI.
+    ///
+    /// Takes ownership of the argument and result [`Type`]s, because
+    /// the resulting [`Cif`] retains references to them. Defaults to
+    /// the platform’s default calling convention; this can be changed by
+    /// creating the [`Cif`] using [`Cif::new_with_abi`].
+    pub fn new<I>(args: I, result: Type) -> Self
+    where
+        I: IntoIterator<Item = Type>,
+        I::IntoIter: ExactSizeIterator<Item = Type>,
+    {
+        Self::new_with_abi(args, result, ffi_abi_FFI_DEFAULT_ABI)
+    }
+
+    /// Creates a new [CIF](Cif) for the given argument and result
+    /// types with the specified ABI.
+    ///
+    /// Takes ownership of the argument and result [`Type`]s, because
+    /// the resulting [`Cif`] retains references to them.
+    pub fn new_with_abi<I>(args: I, result: Type, abi: FfiAbi) -> Self
+    where
+        I: IntoIterator<Item = Type>,
+        I::IntoIter: ExactSizeIterator<Item = Type>,
+    {
+        let args = args.into_iter();
+        let nargs = args.len();
+        let args = types::TypeArray::new(args);
+        let mut cif = low::ffi_cif::default();
+
+        unsafe { low::prep_cif(&mut cif, abi, nargs, result.as_raw_ptr(), args.as_raw_ptr()) }
+            .expect("low::prep_cif");
+
+        // Note that cif retains references to args and result,
+        // which is why we hold onto them here.
+        Self { cif, args, result }
+    }
+
+    /// Creates a new variadic [CIF](Cif) for the given argument and result
+    /// types with the default ABI.
+    ///
+    /// Takes ownership of the argument and result [`Type`]s, because
+    /// the resulting [`Cif`] retains references to them. Defaults to
+    /// the platform’s default calling convention; this can be changed by
+    /// creating the [`Cif`] using [`Cif::new_variadic_with_abi`].
+    pub fn new_variadic<I>(args: I, fixed_args: usize, result: Type) -> Self
+    where
+        I: IntoIterator<Item = Type>,
+        I::IntoIter: ExactSizeIterator<Item = Type>,
+    {
+        Self::new_variadic_with_abi(args, fixed_args, result, ffi_abi_FFI_DEFAULT_ABI)
+    }
+
+    /// Creates a new variadic [CIF](Cif) for the given argument and result
+    /// types with the default ABI.
+    ///
+    /// Takes ownership of the argument and result [`Type`]s, because
+    /// the resulting [`Cif`] retains references to them.
+    pub fn new_variadic_with_abi<I>(args: I, fixed_args: usize, result: Type, abi: FfiAbi) -> Self
+    where
+        I: IntoIterator<Item = Type>,
+        I::IntoIter: ExactSizeIterator<Item = Type>,
+    {
+        let args = args.into_iter();
+        let nargs = args.len();
+        let args = types::TypeArray::new(args);
+        let mut cif: low::ffi_cif = Default::default();
+
+        unsafe {
+            low::prep_cif_var(
+                &mut cif,
+                abi,
+                fixed_args,
+                nargs,
+                result.as_raw_ptr(),
+                args.as_raw_ptr(),
+            )
+        }
+        .expect("low::prep_cif_var");
+
+        // Note that cif retains references to args and result,
+        // which is why we hold onto them here.
+        Self { cif, args, result }
+    }
+
+    /// Calls a function with the given arguments.
+    ///
+    /// In particular, this method invokes function `fun` passing it
+    /// arguments `args`, and returns the result.
+    ///
+    /// # Safety
+    ///
+    /// There is no checking that the calling convention and types
+    /// in the `Cif` match the actual calling convention and types of
+    /// `fun`, nor that they match the types of `args`.
+    pub unsafe fn call<R>(&self, fun: CodePtr, args: &[Arg]) -> R {
+        assert_eq!(
+            self.cif.nargs as usize,
+            args.len(),
+            "Cif::call: passed wrong number of arguments"
+        );
+
+        low::call::<R>(
+            &self.cif as *const _ as *mut _,
+            fun,
+            args.as_ptr() as *mut *mut c_void,
+        )
+    }
+
+    /// Calls a function with the given arguments and writes the return value to
+    /// the value `ret` references.
+    ///
+    /// If the function does not return anything, `ret` will not be written to.
+    /// In that case, [`Ret::void`] can be used to create a `ret` value without
+    /// having to create a new reference.
+    ///
+    /// # Safety
+    ///
+    /// There is no checking that the calling convention and types
+    /// in the `Cif` match the actual calling convention and types of
+    /// `fun`, nor that they match the types of `args`.
+    ///
+    /// `ret` must point to a writable memory location the result value can be
+    /// written to.
+    pub unsafe fn call_return_into(&self, fun: CodePtr, args: &[Arg], ret: Ret) {
+        assert_eq!(
+            self.cif.nargs as usize,
+            args.len(),
+            "Cif::call: passed wrong number of arguments"
+        );
+
+        low::call_return_into(
+            &self.cif as *const _ as *mut _,
+            fun,
+            args.as_ptr() as *mut *mut c_void,
+            ret.0,
+        );
+    }
+
+    /// Gets a raw pointer to the underlying [`low::ffi_cif`].
+    ///
+    /// This can be used for passing a `middle::Cif` to functions from the
+    /// [`low`](crate::low) and [`raw`](crate::raw) modules.
+    pub fn as_raw_ptr(&self) -> *mut low::ffi_cif {
+        &self.cif as *const _ as *mut _
+    }
+}
+
+/// Represents a closure callable from C.
+///
+/// A libffi closure captures a `void*` (“userdata”) and passes it to a
+/// callback when the code pointer (obtained via [`Closure::code_ptr`])
+/// is invoked. Lifetype parameter `'a` ensures that the closure does
+/// not outlive the userdata.
+///
+/// Construct with [`Closure::new`] and [`Closure::new_mut`].
+///
+/// # Examples
+///
+/// In this example we turn a Rust lambda into a C function. We first
+/// define function `lambda_callback`, which will be called by libffi
+/// when the closure is called. The callback function takes four
+/// arguments: a CIF describing its arguments, a pointer for where to
+/// store its result, a pointer to an array of pointers to its
+/// arguments, and a userdata pointer. In this ase, the Rust closure
+/// value `lambda` is passed as userdata to `lambda_callback`, which
+/// then invokes it.
+///
+/// ```
+/// use std::mem;
+/// use std::os::raw::c_void;
+///
+/// use libffi::middle::*;
+/// use libffi::low;
+///
+/// unsafe extern "C" fn lambda_callback<F: Fn(u64, u64) -> u64>(
+///     _cif: &low::ffi_cif,
+///     result: &mut u64,
+///     args: *const *const c_void,
+///     userdata: &F)
+/// {
+///     let args = args as *const &u64;
+///     let arg1 = **args.offset(0);
+///     let arg2 = **args.offset(1);
+///
+///     *result = userdata(arg1, arg2);
+/// }
+///
+/// let cif = Cif::new(vec![Type::u64(), Type::u64()].into_iter(),
+///                    Type::u64());
+/// let lambda = |x: u64, y: u64| x + y;
+/// let closure = Closure::new(cif, lambda_callback, &lambda);
+///
+/// let fun: &extern "C" fn(u64, u64) -> u64 = unsafe {
+///     closure.instantiate_code_ptr()
+/// };
+///
+/// assert_eq!(11, fun(5, 6));
+/// assert_eq!(12, fun(5, 7));
+/// ```
+#[derive(Debug)]
+pub struct Closure<'a> {
+    _cif: Box<Cif>,
+    _alloc: ClosureAlloc,
+    code: CodePtr,
+    _marker: PhantomData<&'a ()>,
+}
+
+impl<'a> Closure<'a> {
+    /// Creates a new closure with immutable userdata.
+    ///
+    /// # Arguments
+    ///
+    /// - `cif` — describes the calling convention and argument and
+    ///   result types
+    /// - `callback` — the function to call when the closure is invoked
+    /// - `userdata` — the pointer to pass to `callback` along with the
+    ///   arguments when the closure is called
+    ///
+    /// # Result
+    ///
+    /// The new closure.
+    pub fn new<U, R>(cif: Cif, callback: Callback<U, R>, userdata: &'a U) -> Self {
+        let cif = Box::new(cif);
+        let (alloc, code) = low::closure_alloc();
+        let alloc = ClosureAlloc(NonNull::new(alloc).unwrap());
+
+        unsafe {
+            low::prep_closure(
+                alloc.0.as_ptr(),
+                cif.as_raw_ptr(),
+                callback,
+                userdata as *const U,
+                code,
+            )
+            .unwrap();
+        }
+
+        Closure {
+            _cif: cif,
+            _alloc: alloc,
+            code,
+            _marker: PhantomData,
+        }
+    }
+
+    /// Creates a new closure with mutable userdata.
+    ///
+    /// # Arguments
+    ///
+    /// - `cif` — describes the calling convention and argument and
+    ///   result types
+    /// - `callback` — the function to call when the closure is invoked
+    /// - `userdata` — the pointer to pass to `callback` along with the
+    ///   arguments when the closure is called
+    ///
+    /// # Result
+    ///
+    /// The new closure.
+    pub fn new_mut<U, R>(cif: Cif, callback: CallbackMut<U, R>, userdata: &'a mut U) -> Self {
+        let cif = Box::new(cif);
+        let (alloc, code) = low::closure_alloc();
+        let alloc = ClosureAlloc(NonNull::new(alloc).unwrap());
+
+        unsafe {
+            low::prep_closure_mut(
+                alloc.0.as_ptr(),
+                cif.as_raw_ptr(),
+                callback,
+                userdata as *mut U,
+                code,
+            )
+            .unwrap();
+        }
+
+        Closure {
+            _cif: cif,
+            _alloc: alloc,
+            code,
+            _marker: PhantomData,
+        }
+    }
+
+    /// Obtains the callable code pointer for a closure.
+    ///
+    /// # Safety
+    ///
+    /// The result needs to be transmuted to the correct type before
+    /// it can be called. If the type is wrong then undefined behavior
+    /// will result.
+    pub fn code_ptr(&self) -> &unsafe extern "C" fn() {
+        self.code.as_fun()
+    }
+
+    /// Transmutes the callable code pointer for a closure to a reference
+    /// to any type. This is intended to be used to transmute it to its
+    /// correct function type in order to call it.
+    ///
+    /// # Safety
+    ///
+    /// This method allows transmuting to a reference to *any* sized type,
+    /// and cannot check whether the code pointer actually has that type.
+    /// If the type is wrong then undefined behavior will result.
+    pub unsafe fn instantiate_code_ptr<T>(&self) -> &T {
+        self.code.as_any_ref_()
+    }
+}
+
+/// The type of callback invoked by a [`ClosureOnce`].
+pub type CallbackOnce<U, R> = CallbackMut<Option<U>, R>;
+
+/// A closure that owns needs-drop data.
+///
+/// This allows the closure’s callback to take ownership of the data, in
+/// which case the userdata will be gone if called again.
+#[derive(Debug)]
+pub struct ClosureOnce {
+    _alloc: ClosureAlloc,
+    code: CodePtr,
+    _cif: Box<Cif>,
+    _userdata: Box<dyn Any>,
+}
+
+impl ClosureOnce {
+    /// Creates a new closure with owned userdata.
+    ///
+    /// # Arguments
+    ///
+    /// - `cif` — describes the calling convention and argument and
+    ///   result types
+    /// - `callback` — the function to call when the closure is invoked
+    /// - `userdata` — the value to pass to `callback` along with the
+    ///   arguments when the closure is called
+    ///
+    /// # Result
+    ///
+    /// The new closure.
+    pub fn new<U: Any, R>(cif: Cif, callback: CallbackOnce<U, R>, userdata: U) -> Self {
+        let _cif = Box::new(cif);
+        let _userdata = Box::new(Some(userdata)) as Box<dyn Any>;
+        let (alloc, code) = low::closure_alloc();
+        let alloc = ClosureAlloc(NonNull::new(alloc).unwrap());
+
+        {
+            let borrow = _userdata.downcast_ref::<Option<U>>().unwrap();
+            unsafe {
+                low::prep_closure_mut(
+                    alloc.0.as_ptr(),
+                    _cif.as_raw_ptr(),
+                    callback,
+                    borrow as *const _ as *mut _,
+                    code,
+                )
+                .unwrap();
+            }
+        }
+
+        Self {
+            _alloc: alloc,
+            code,
+            _cif,
+            _userdata,
+        }
+    }
+
+    /// Obtains the callable code pointer for a closure.
+    ///
+    /// # Safety
+    ///
+    /// The result needs to be transmuted to the correct type before
+    /// it can be called. If the type is wrong then undefined behavior
+    /// will result.
+    pub fn code_ptr(&self) -> &unsafe extern "C" fn() {
+        self.code.as_fun()
+    }
+
+    /// Transmutes the callable code pointer for a closure to a reference
+    /// to any type. This is intended to be used to transmute it to its
+    /// correct function type in order to call it.
+    ///
+    /// # Safety
+    ///
+    /// This method allows transmuting to a reference to *any* sized type,
+    /// and cannot check whether the code pointer actually has that type.
+    /// If the type is wrong then undefined behavior will result.
+    pub unsafe fn instantiate_code_ptr<T>(&self) -> &T {
+        self.code.as_any_ref_()
+    }
+}
+
+#[cfg(all(test, feature = "std"))]
+mod test {
+    use super::*;
+    use crate::low;
+    use core::ffi::{c_char, c_void};
+    use std::ffi::CStr;
+
+    #[test]
+    fn call() {
+        let cif = Cif::new(alloc::vec![Type::i64(), Type::i64()], Type::i64());
+        let f = |m: i64, n: i64| -> i64 {
+            unsafe { cif.call(CodePtr(add_it as *mut c_void), &[arg(&m), arg(&n)]) }
+        };
+
+        assert_eq!(12, f(5, 7));
+        assert_eq!(13, f(6, 7));
+        assert_eq!(15, f(8, 7));
+    }
+
+    #[test]
+    fn call_return_into() {
+        let cif = Cif::new(alloc::vec![Type::i64(), Type::i64()], Type::i64());
+
+        let mut ret_val: i64 = 0;
+
+        unsafe {
+            cif.call_return_into(
+                CodePtr(add_it as *mut c_void),
+                &[arg(&5i64), arg(&7i64)],
+                ret(&mut ret_val),
+            );
+        }
+
+        assert_eq!(12, ret_val);
+    }
+
+    extern "C" fn add_it(n: i64, m: i64) -> i64 {
+        n + m
+    }
+
+    #[test]
+    fn closure() {
+        let cif = Cif::new(alloc::vec![Type::u64()], Type::u64());
+        let env: u64 = 5;
+        let closure = Closure::new(cif, callback, &env);
+
+        let fun: &extern "C" fn(u64) -> u64 = unsafe { closure.instantiate_code_ptr() };
+
+        assert_eq!(11, fun(6));
+        assert_eq!(12, fun(7));
+    }
+
+    unsafe extern "C" fn callback(
+        _cif: &low::ffi_cif,
+        result: &mut u64,
+        args: *const *const c_void,
+        userdata: &u64,
+    ) {
+        let args = args as *const &u64;
+        *result = **args + *userdata;
+    }
+
+    #[test]
+    fn rust_lambda() {
+        let cif = Cif::new(std::vec![Type::u64(), Type::u64()], Type::u64());
+        let env = |x: u64, y: u64| x + y;
+        let closure = Closure::new(cif, callback2, &env);
+
+        let fun: &extern "C" fn(u64, u64) -> u64 = unsafe { closure.instantiate_code_ptr() };
+
+        assert_eq!(11, fun(5, 6));
+    }
+
+    unsafe extern "C" fn callback2<F: Fn(u64, u64) -> u64>(
+        _cif: &low::ffi_cif,
+        result: &mut u64,
+        args: *const *const c_void,
+        userdata: &F,
+    ) {
+        let args = args as *const &u64;
+        let arg1 = **args.offset(0);
+        let arg2 = **args.offset(1);
+
+        *result = userdata(arg1, arg2);
+    }
+
+    #[test]
+    fn clone_cif() {
+        let cif = Cif::new(
+            alloc::vec![
+                Type::structure(alloc::vec![
+                    Type::structure(alloc::vec![Type::u64(), Type::u8(), Type::f64()]),
+                    Type::i8(),
+                    Type::i64(),
+                ]),
+                Type::u64(),
+            ],
+            Type::u64(),
+        );
+        let clone_cif = cif.clone();
+
+        unsafe {
+            let args = core::slice::from_raw_parts(cif.cif.arg_types, cif.cif.nargs as usize);
+            let struct_arg = args
+                .first()
+                .expect("CIF arguments slice was empty")
+                .as_ref()
+                .expect("CIF first argument was null");
+            // Get slice of length 1 to get the first element
+            let struct_size = struct_arg.size;
+            let struct_parts = core::slice::from_raw_parts(struct_arg.elements, 1);
+            let substruct_size = struct_parts
+                .first()
+                .expect("CIF struct argument's elements slice was empty")
+                .as_ref()
+                .expect("CIF struct argument's first element was null")
+                .size;
+
+            let clone_args =
+                core::slice::from_raw_parts(clone_cif.cif.arg_types, clone_cif.cif.nargs as usize);
+            let clone_struct_arg = clone_args
+                .first()
+                .expect("CIF arguments slice was empty")
+                .as_ref()
+                .expect("CIF first argument was null");
+            // Get slice of length 1 to get the first element
+            let clone_struct_size = clone_struct_arg.size;
+            let clone_struct_parts = core::slice::from_raw_parts(clone_struct_arg.elements, 1);
+            let clone_substruct_size = clone_struct_parts
+                .first()
+                .expect("Cloned CIF struct argument's elements slice was empty")
+                .as_ref()
+                .expect("Cloned CIF struct argument's first element was null")
+                .size;
+
+            assert_eq!(struct_size, clone_struct_size);
+            assert_eq!(substruct_size, clone_substruct_size);
+        }
+    }
+
+    /// Test variadic functions by calling `snprintf`
+    #[test]
+    fn call_snprintf() {
+        extern "C" {
+            fn snprintf(s: *mut c_char, n: usize, format: *const c_char, ...) -> i32;
+        }
+
+        let mut output_buffer = [0u8; 50];
+
+        let expected = c"num: 123, pi: 3.14, This is a &Cstr";
+
+        let format_str = c"num: %d, pi: %.2f, %s";
+
+        let num = 123;
+        let pi = core::f64::consts::PI;
+        let cstr = c"This is a &Cstr";
+
+        let cif = Cif::new_variadic(
+            [
+                Type::pointer(),
+                Type::usize(),
+                Type::pointer(),
+                Type::i32(),
+                Type::f64(),
+                Type::pointer(),
+            ],
+            3,
+            Type::i32(),
+        );
+
+        let result: i32 = unsafe {
+            cif.call(
+                CodePtr(snprintf as *mut _),
+                &[
+                    arg(&output_buffer.as_mut_ptr()),
+                    arg(&output_buffer.len()),
+                    arg(&format_str.as_ptr()),
+                    arg(&num),
+                    arg(&pi),
+                    arg(&cstr.as_ptr()),
+                ],
+            )
+        };
+
+        let output_cstr = CStr::from_bytes_until_nul(&output_buffer).unwrap();
+
+        assert_eq!(result, expected.to_bytes().len().try_into().unwrap());
+        assert_eq!(expected, output_cstr);
+    }
+}

@@ -35,3 +35,6 @@ members = [
 strip = true
 opt-level = "z"
 lto = true
+
+[patch.crates-io]
+windows-link = { path = "vendor-dummy/windows-link" }
