@@ -1,8 +1,8 @@
 pub mod error;
-mod format;
 mod peekable;
 mod position;
 mod span;
+mod format;
 
 use crate::{data::Scale, format::Display, reporter::Error};
 

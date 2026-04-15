@@ -1,25 +1,8 @@
+// src/tracker/format.rs
 use crate::{
     format::{Debug, Display, Formatter, Result},
-    tracker::{Location, Position, Span},
+    tracker::{Position, Span},
 };
-
-impl Debug for Location<'_> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
-        match self {
-            Location::Entry(file) => write!(f, "File({})", file),
-            Location::Void => write!(f, "Void"),
-        }
-    }
-}
-
-impl Display for Location<'_> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
-        match self {
-            Location::Entry(file) => write!(f, "{}", file),
-            Location::Void => write!(f, "Void"),
-        }
-    }
-}
 
 impl Display for Position {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {

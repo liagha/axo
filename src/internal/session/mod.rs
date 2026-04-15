@@ -232,7 +232,7 @@ impl<'session> Session<'session> {
 
     pub fn add_path(&mut self, path: &'session str) {
         use crate::tracker::Location;
-        let location = Location::Entry(Str::from(path));
+        let location = Location::from(path);
         let kind = RecordKind::from_path(path).unwrap_or(RecordKind::Source);
         let record = Record::new(kind, location);
         let id = self.records.len() | 0x40000000;
@@ -241,7 +241,7 @@ impl<'session> Session<'session> {
 
     pub fn add_string(&mut self, name: &'session str, content: String) {
         use crate::tracker::Location;
-        let location = Location::Entry(Str::from(name));
+        let location = Location::from(name);
         let mut record = Record::new(RecordKind::Source, location);
         record.set_content(content);
         let id = self.records.len() | 0x40000000;

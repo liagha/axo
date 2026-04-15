@@ -206,7 +206,7 @@ pub fn start(bare: bool, directives: Vec<Symbol>, flag_content: Str) {
             continue;
         }
 
-        let location = Location::Entry(Str::from("dialog"));
+        let location = Location::from("dialog");
         let mut record = Record::new(RecordKind::Source, location);
         record.set_content(input);
 

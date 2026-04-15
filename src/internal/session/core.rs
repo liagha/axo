@@ -311,7 +311,7 @@ impl<'session> Session<'session> {
             .join("schema")
             .join(location.stem().unwrap())
             .with_extension("ll");
-        Location::Entry(Str::from(target))
+        Location::from(target)
     }
 
     pub fn object(
@@ -330,7 +330,7 @@ impl<'session> Session<'session> {
                 .with_extension("o")
         };
 
-        Location::Entry(Str::from(target))
+        Location::from(target)
     }
 
     pub fn executable(
@@ -346,6 +346,6 @@ impl<'session> Session<'session> {
                 .with_extension("")
         };
 
-        Location::Entry(Str::from(target))
+        Location::from(target)
     }
 }

@@ -150,7 +150,7 @@ impl<'a> Initializer<'a> {
                 let name = target_name(symbol)?;
                 if name == Str::from("Input") || name.starts_with("Input(") {
                     let value = value_name(symbol)?;
-                    Some((Location::Entry(value), symbol.span))
+                    Some((value, symbol.span))
                 } else {
                     None
                 }

@@ -27,7 +27,7 @@ use {
             time::Duration,
             SessionError, RecordKind, Session,
         },
-        tracker::Peekable,
+        tracker::{Peekable, Location},
     },
 };
 
@@ -123,7 +123,7 @@ Action<
 
 impl<'source> Default for Parser<'source> {
     fn default() -> Self {
-        Parser::new(crate::tracker::Location::Entry(crate::data::Str::from(file!())))
+        Parser::new(Location::from(file!()))
     }
 }
 
@@ -141,7 +141,7 @@ mod tests {
         scanner.scan();
         assert!(scanner.errors.is_empty());
 
-        let mut parser = Parser::new(Location::Entry(Str::from("test")));
+        let mut parser = Parser::new(Location::from("test"));
         parser.set_input(scanner.output);
         parser.parse();
         parser

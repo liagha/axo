@@ -141,7 +141,7 @@ pub fn create<'a>(
     let mut records = Map::new();
     let cache = Map::new();
 
-    let mut flag_record = Record::new(RecordKind::Flag, Location::Entry(Str::from("flag")));
+    let mut flag_record = Record::new(RecordKind::Flag, Location::from("flag"));
     flag_record.set_content(flag.to_string());
     records.insert(0, flag_record);
     
@@ -149,7 +149,7 @@ pub fn create<'a>(
         for &(path, content) in BASE {
             if let Some(kind) = RecordKind::from_path(path) {
                 let string = path.to_string();
-                let location = Location::Entry(Str::from(string.clone()));
+                let location = Location::from(string.clone());
                 let mut hasher = DefaultHasher::new();
                 Hash::hash(&string, &mut hasher);
                 let identity = (hasher.finish() as Identity) & 0x3FFFFFFF;
@@ -227,7 +227,7 @@ pub fn traverse<'a>(target: &Location<'a>, records: &mut Map<Identity, Record<'a
                 } else {
                     let string = child.to_string_lossy().into_owned();
                     if let Some(kind) = RecordKind::from_path(&string) {
-                        let location = Location::Entry(Str::from(string.clone()));
+                        let location = Location::from(string.clone());
                         let mut hasher = DefaultHasher::new();
                         Hash::hash(&string, &mut hasher);
                         let identity = (hasher.finish() as Identity) | 0x40000000;

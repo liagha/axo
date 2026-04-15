@@ -1,62 +1,39 @@
-use orbyte::Orbyte;
 use crate::{
-    data::{Identity, Str, Offset},
+    data::{Identity, Offset, Str},
     internal::platform::{read_to_string, Path, PathBuf},
     tracker::{ErrorKind, Span, TrackError},
 };
 
-#[derive(Clone, Copy, Eq, Hash, Orbyte, PartialEq)]
-pub enum Location<'location> {
-    Entry(Str<'location>),
-    Void,
-}
+pub type Location<'a> = Str<'a>;
 
-impl<'location> Location<'location> {
-    pub fn as_path(&self) -> Result<PathBuf, TrackError<'location>> {
-        match self {
-            Location::Entry(path) => Ok(PathBuf::from(path).clone()),
-            _ => Err(TrackError::new(ErrorKind::NotAnEntry(*self), Span::void())),
-        }
+impl<'a> Location<'a> {
+    pub fn as_path(&self) -> Result<PathBuf, TrackError<'a>> {
+        Ok(PathBuf::from(self).clone())
     }
 
-    pub fn to_path(&self) -> Result<PathBuf, TrackError<'location>> {
-        match self {
-            Location::Entry(path) => Ok(PathBuf::from(path).clone()),
-            _ => Err(TrackError::new(ErrorKind::NotAnEntry(*self), Span::void())),
-        }
+    pub fn to_path(&self) -> Result<PathBuf, TrackError<'a>> {
+        Ok(PathBuf::from(self).clone())
     }
 
-    pub fn get_value(&self) -> Result<Str<'location>, TrackError<'location>> {
-        match self {
-            Location::Entry(path) => {
-                let location = Location::Entry(path.clone());
-                let path = location.to_path()?;
+    pub fn get_value(&self) -> Result<Str<'a>, TrackError<'a>> {
+        let path = self.to_path()?;
 
-                match read_to_string(&path) {
-                    Ok(content) => Ok(content.into()),
-                    Err(error) => Err(TrackError::new(ErrorKind::from_io(error, *self), Span::void())),
-                }
-            }
-            Location::Void => Err(TrackError::new(ErrorKind::EmptyVoid(*self), Span::void())),
+        match read_to_string(&path) {
+            Ok(content) => Ok(content.into()),
+            Err(error) => Err(TrackError::new(ErrorKind::from_io(error, self.clone()), Span::void())),
         }
     }
 
     pub fn stem(&self) -> Option<&str> {
-        match self {
-            Location::Entry(path) => Path::new(path).file_stem()?.to_str(),
-            _ => None,
-        }
+        Path::new(self).file_stem()?.to_str()
     }
 
     pub fn extension(&self) -> Option<&str> {
-        match self {
-            Location::Entry(path) => Path::new(path).extension()?.to_str(),
-            _ => None,
-        }
+        Path::new(self).extension()?.to_str()
     }
 
-    pub fn entry(string: Str<'location>) -> Location<'location> {
-        Location::Entry(string)
+    pub fn entry(string: Str<'a>) -> Location<'a> {
+        string
     }
 }
 
@@ -99,7 +76,10 @@ impl Position {
 
     #[inline]
     pub fn advance(&self, amount: Offset) -> Self {
-        Self { offset: self.offset + amount, ..*self }
+        Self {
+            offset: self.offset + amount,
+            ..*self
+        }
     }
 
     #[inline]
