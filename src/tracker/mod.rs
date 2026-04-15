@@ -4,9 +4,48 @@ mod position;
 mod span;
 mod format;
 
-use crate::{data::Scale, format::Display, reporter::Error};
 
 pub use {error::*, peekable::*, position::*, span::*};
+use {
+    crate::{
+        internal::platform::{read_to_string, Path, PathBuf},
+        format::Display, reporter::Error,
+        data::{Str, Scale}
+    }
+};
+
+pub type Location<'a> = Str<'a>;
+
+impl<'a> Location<'a> {
+    pub fn as_path(&self) -> Result<PathBuf, TrackError<'a>> {
+        Ok(PathBuf::from(self).clone())
+    }
+
+    pub fn to_path(&self) -> Result<PathBuf, TrackError<'a>> {
+        Ok(PathBuf::from(self).clone())
+    }
+
+    pub fn get_value(&self) -> Result<Str<'a>, TrackError<'a>> {
+        let path = self.to_path()?;
+
+        match read_to_string(&path) {
+            Ok(content) => Ok(content.into()),
+            Err(error) => Err(TrackError::new(ErrorKind::from_io(error, self.clone()), Span::void())),
+        }
+    }
+
+    pub fn stem(&self) -> Option<&str> {
+        Path::new(self).file_stem()?.to_str()
+    }
+
+    pub fn extension(&self) -> Option<&str> {
+        Path::new(self).extension()?.to_str()
+    }
+
+    pub fn entry(string: Str<'a>) -> Location<'a> {
+        string
+    }
+}
 
 pub trait Spanned<'spanned> {
     #[track_caller]

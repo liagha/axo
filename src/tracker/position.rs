@@ -1,41 +1,6 @@
 use crate::{
-    data::{Identity, Offset, Str},
-    internal::platform::{read_to_string, Path, PathBuf},
-    tracker::{ErrorKind, Span, TrackError},
+    data::{Identity, Offset},
 };
-
-pub type Location<'a> = Str<'a>;
-
-impl<'a> Location<'a> {
-    pub fn as_path(&self) -> Result<PathBuf, TrackError<'a>> {
-        Ok(PathBuf::from(self).clone())
-    }
-
-    pub fn to_path(&self) -> Result<PathBuf, TrackError<'a>> {
-        Ok(PathBuf::from(self).clone())
-    }
-
-    pub fn get_value(&self) -> Result<Str<'a>, TrackError<'a>> {
-        let path = self.to_path()?;
-
-        match read_to_string(&path) {
-            Ok(content) => Ok(content.into()),
-            Err(error) => Err(TrackError::new(ErrorKind::from_io(error, self.clone()), Span::void())),
-        }
-    }
-
-    pub fn stem(&self) -> Option<&str> {
-        Path::new(self).file_stem()?.to_str()
-    }
-
-    pub fn extension(&self) -> Option<&str> {
-        Path::new(self).extension()?.to_str()
-    }
-
-    pub fn entry(string: Str<'a>) -> Location<'a> {
-        string
-    }
-}
 
 #[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq, Ord, PartialOrd)]
 pub struct Position {
