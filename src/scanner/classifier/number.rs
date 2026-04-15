@@ -130,7 +130,7 @@ impl<'a> Scanner<'a> {
                         Classifier::literal('.'),
                         Classifier::literal('_').with_ignore(),
                     ]),
-                    1, // Changed from 0 to 1 so it must match at least one digit or dot
+                    1, 
                     None,
                 ),
                 Classifier::optional(Classifier::sequence([

@@ -1,4 +1,3 @@
-// src/tracker/format.rs
 use crate::{
     format::{Debug, Display, Formatter, Result},
     tracker::{Position, Span},
