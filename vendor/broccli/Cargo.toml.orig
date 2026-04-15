@@ -1,0 +1,21 @@
+[package]
+name = "broccli"
+version = "0.0.22"
+edition = "2021"
+authors = ["Ali Aghaahmadi <itsaliaghaahmadi@gmail.com>"]
+description = "A library for working with command-line interfaces"
+license = "MIT OR Apache-2.0"
+keywords = ["cli", "tui", "rust"]
+categories = ["development-tools", "command-line-interface"]
+
+[features]
+default = ["xprint"]
+wasm = ["dep:wasm-bindgen"]
+xprint = []
+
+
+[dependencies]
+libc = "0.2.169"
+broccolor = { version = "0.0.4", path = "broccolor" }
+brocproc = { version = "0.0.8", path = "brocproc" }
+wasm-bindgen = { version = "0.2.100", optional = true }
