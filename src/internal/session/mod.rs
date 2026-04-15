@@ -3,31 +3,34 @@ mod core;
 pub use core::*;
 
 use {
-    orbyte::{Serialize, Deserialize},
     crate::{
         analyzer::Analyzer,
         combinator::{Action, Operation, Operator},
-        data::{memory::{Arc, transmute}, Str},
+        data::{
+            memory::{transmute, Arc},
+            Str,
+        },
         internal::{
             platform::{
-                temp_dir,
-                create_dir_all,
-                read, write,
-                catch_unwind,
-                DLL_EXTENSION,
-                AssertUnwindSafe,
-                Lock,
+                catch_unwind, create_dir_all, read, write,
+                AssertUnwindSafe, Lock,
             },
             time::Duration,
         },
         parser::Parser,
         resolver::Resolver,
         scanner::Scanner,
-    }
+    },
+    orbyte::{Deserialize, Serialize},
 };
 
 #[cfg(feature = "interpreter")]
-use crate::interpreter::{InterpretAction, Interpreter};
+use crate::{
+    interpreter::{InterpretAction, Interpreter},
+    internal::{
+        platform::{DLL_EXTENSION, temp_dir}
+    }
+};
 
 #[cfg(feature = "generator")]
 use crate::generator::{EmitAction, GenerateAction, RunAction};
@@ -36,22 +39,24 @@ pub struct PrepareAction;
 
 pub fn prepare<'source>(session: &mut Session<'source>) -> bool {
     use crate::{
-        internal::{
-            hash::{DefaultHasher, Hash, Hasher, Map},
-            platform::read_to_string,
-        },
+        internal::hash::{DefaultHasher, Hash, Hasher, Map},
         tracker::Location,
     };
 
     let manifest = session.manifest();
     if session.cache.is_empty() && session.get_directive(Str::from("Discard")).is_none() {
-        if let Ok(data) = read(&manifest) {
+        if let Ok(mut data) = read(&manifest) {
+            data.shrink_to_fit();
             session.buffers.push(data);
             let raw = session.buffers.last().unwrap().as_slice();
             let extended: &'source [u8] = unsafe { transmute(raw) };
 
-            if let Some(cache) = Session::decode::<Option<Map<Location<'source>, u64>>>(extended).flatten() {
+            if let Some(cache) =
+                Session::decode::<Option<Map<Location<'source>, u64>>>(extended).flatten()
+            {
                 session.cache = cache;
+            } else {
+                session.buffers.pop();
             }
         }
     }
@@ -64,31 +69,45 @@ pub fn prepare<'source>(session: &mut Session<'source>) -> bool {
 
         if record.kind == RecordKind::Source || record.kind == RecordKind::C {
             let location = record.location;
-            let path = location.to_string();
-            let mut content = None;
+            let mut hash = None;
 
-            record.sync_rows();
             if let Some(value) = &record.content {
-                content = Some(value.clone());
-            } else if let Ok(value) = read_to_string(&path) {
-                record.set_content(value.clone());
-                content = Some(value);
-            }
-
-            if let Some(value) = content {
                 let mut hasher = DefaultHasher::new();
                 value.hash(&mut hasher);
-                let hash = hasher.finish();
+                hash = Some(hasher.finish());
+            } else if let Ok(path) = location.to_path() {
+                if let Ok(metadata) = path.metadata() {
+                    let mut hasher = DefaultHasher::new();
+                    if let Ok(modified) = metadata.modified() {
+                        if let Ok(duration) = modified.duration_since(std::time::UNIX_EPOCH) {
+                            duration.as_secs().hash(&mut hasher);
+                            duration.subsec_nanos().hash(&mut hasher);
+                        }
+                    }
+                    metadata.len().hash(&mut hasher);
+                    hash = Some(hasher.finish());
+                }
+            }
 
-                record.hash = hash;
+            if let Some(value) = hash {
+                record.hash = value;
 
                 if let Some(&prior) = session.cache.get(&location) {
-                    record.dirty = prior != hash;
+                    record.dirty = prior != value;
                 } else {
                     record.dirty = true;
                 }
 
-                session.cache.insert(location, hash);
+                session.cache.insert(location, value);
+
+                if record.dirty {
+                    if record.content.is_none() {
+                        if let Ok(text) = location.get_value() {
+                            record.set_content(Str::from(text));
+                        }
+                    }
+                    record.sync_rows();
+                }
             }
         }
     }
@@ -220,11 +239,17 @@ impl<'session> Session<'session> {
             let buffer = Some(value.clone()).serialize();
             _ = write(path, buffer);
             Some(value)
-        } else if let Ok(bytes) = read(&path) {
+        } else if let Ok(mut bytes) = read(&path) {
+            bytes.shrink_to_fit();
             self.buffers.push(bytes);
             let raw = self.buffers.last().unwrap().as_slice();
             let extended: &'session [u8] = unsafe { transmute(raw) };
-            Self::decode(extended).flatten()
+
+            let result = Self::decode(extended).flatten();
+            if result.is_none() {
+                self.buffers.pop();
+            }
+            result
         } else {
             None
         }
@@ -239,7 +264,7 @@ impl<'session> Session<'session> {
         self.records.insert(id, record);
     }
 
-    pub fn add_string(&mut self, name: &'session str, content: String) {
+    pub fn add_string(&mut self, name: &'session str, content: Str<'session>) {
         use crate::tracker::Location;
         let location = Location::from(name);
         let mut record = Record::new(RecordKind::Source, location);
@@ -248,10 +273,7 @@ impl<'session> Session<'session> {
         self.records.insert(id, record);
     }
 
-    pub fn run(
-        mut self,
-        mut pipeline: Operation<'session, Arc<Lock<Session<'session>>>>,
-    ) -> Self {
+    pub fn run(mut self, mut pipeline: Operation<'session, Arc<Lock<Session<'session>>>>) -> Self {
         _ = self.timer.start();
 
         if !self.errors.is_empty() {

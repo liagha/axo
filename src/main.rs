@@ -142,7 +142,7 @@ pub fn create<'a>(
     let cache = Map::new();
 
     let mut flag_record = Record::new(RecordKind::Flag, Location::from("flag"));
-    flag_record.set_content(flag.to_string());
+    flag_record.set_content(flag);
     records.insert(0, flag_record);
     
     if !bare {
@@ -154,7 +154,7 @@ pub fn create<'a>(
                 Hash::hash(&string, &mut hasher);
                 let identity = (hasher.finish() as Identity) & 0x3FFFFFFF;
                 let mut record = Record::new(kind, location);
-                record.set_content(content.to_string());
+                record.set_content(Str::from(content));
                 records.insert(identity, record);
             }
         }

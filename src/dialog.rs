@@ -169,7 +169,7 @@ pub fn start(bare: bool, directives: Vec<Symbol>, flag_content: Str) {
     let mut terminal = Dialog::new();
 
     loop {
-        let Some(input) = terminal.read("> ") else {
+        let Some(input) = terminal.read("> ").map(Str::from) else {
             break;
         };
 

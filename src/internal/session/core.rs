@@ -58,7 +58,7 @@ pub struct Record<'session> {
     pub kind: RecordKind,
     pub location: Location<'session>,
     pub module: Option<Identity>,
-    pub content: Option<String>,
+    pub content: Option<Str<'session>>,
     pub rows: Option<Vec<Offset>>,
     pub tokens: Option<Vec<Token<'session>>>,
     pub elements: Option<Vec<Element<'session>>>,
@@ -87,7 +87,7 @@ impl<'session> Record<'session> {
         }
     }
 
-    pub fn set_content(&mut self, content: String) {
+    pub fn set_content(&mut self, content: Str<'session>) {
         self.rows = Some(Self::rows(&content));
         self.content = Some(content);
     }
