@@ -314,7 +314,7 @@ Action<
         operator: &mut Operator<Arc<Lock<Session<'source>>>>,
         operation: &mut Operation<'source, Arc<Lock<Session<'source>>>>,
     ) -> () {
-        let mut session = operator.store.write().unwrap();
+        let session = operator.store.write().unwrap();
         if session.get_directive(Str::from("Discard")).is_some() {
             if session.errors.is_empty() {
                 operation.set_resolve(Vec::new());
