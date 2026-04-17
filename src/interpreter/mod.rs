@@ -52,131 +52,172 @@ impl<'source> InterpretAction<'source> {
     }
 }
 
-pub fn interpret<'source>(
-    session: &mut Session<'source>,
-    core: &mut Interpreter<'source>,
-    keys: &[Identity],
-) {
-    let mut sources: Vec<_> = keys
-        .iter()
-        .copied()
-        .filter(|key| {
-            session
-                .records
-                .get(key)
-                .map(|record| {
-                    record.kind == RecordKind::Source
-                        && record.fetch(0).is_some()
-                        && record.fetch(3).is_some()
-                })
-                .unwrap_or(false)
-        })
-        .collect();
-    sources.sort();
+impl<'source> Action<
+    'static,
+    Operator<Arc<Lock<Session<'source>>>>,
+    Operation<'source, Arc<Lock<Session<'source>>>>,
+> for InterpretAction<'source>
+{
+    fn action(
+        &self,
+        operator: &mut Operator<Arc<Lock<Session<'source>>>>,
+        operation: &mut Operation<'source, Arc<Lock<Session<'source>>>>,
+    ) {
+        let mut guard = operator.store.write().unwrap();
+        let session = &mut *guard;
+        let mut core = self.core.write().unwrap();
 
-    let library = load_library(session);
-    let start = core.code.len();
+        let initial = session.errors.len();
+        session.report_start("interpreting");
 
-    for key in &sources {
-        let Some(record) = session.records.get(key) else {
-            continue;
-        };
+        let mut sources: Vec<_> = session
+            .records
+            .iter()
+            .filter(|(_, r)| r.kind == RecordKind::Source && r.fetch(0).is_some())
+            .map(|(&k, _)| k)
+            .collect();
+        sources.sort();
 
-        let analyses = if let Some(Artifact::Analyses(a)) = record.fetch(3) {
-            a.clone()
+        Interpreter::execute(session, &mut core, &sources);
+
+        let duration = Duration::from_nanos(session.timer.lap().unwrap_or_default());
+        session.report_finish("interpreting", duration, session.errors.len() - initial);
+
+        if session.errors.is_empty() {
+            operation.set_resolve(Vec::new());
         } else {
-            continue;
-        };
-
-        let Some(stem) = record.location.stem() else {
-            continue;
-        };
-
-        for analysis in &analyses {
-            if let AnalysisKind::Function(function) = &analysis.kind {
-                if matches!(function.interface, Interface::C) {
-                    bind_function(core, function, &library);
-                }
-            }
-        }
-
-        let stem = Str::from(stem.to_string());
-        core.modules.insert(stem, analyses);
-    }
-
-    core.compile();
-
-    if session.errors.is_empty() && core.code.len() > start {
-        core.pointer = start;
-        core.frames.clear();
-        core.stack.clear();
-
-        if let Err(error) = core.run() {
-            session.errors.push(SessionError::Interpret(error));
+            operation.set_reject();
         }
     }
 }
 
-fn load_library(session: &Session) -> Option<Library> {
-    let discard = session.get_directive(Str::from("Discard")).is_some();
-    let build = if discard {
-        temp_dir().join("axo").join("build")
-    } else {
-        session.base().join("build")
-    };
+impl<'source> Interpreter<'source> {
+    pub fn execute(
+        session: &mut Session<'source>,
+        core: &mut Interpreter<'source>,
+        keys: &[Identity],
+    ) {
+        let mut sources: Vec<_> = keys
+            .iter()
+            .copied()
+            .filter(|key| {
+                session
+                    .records
+                    .get(key)
+                    .map(|record| {
+                        record.kind == RecordKind::Source
+                            && record.fetch(0).is_some()
+                            && record.fetch(3).is_some()
+                    })
+                    .unwrap_or(false)
+            })
+            .collect();
+        sources.sort();
 
-    let path = build.join(format!("lib_axo.{}", DLL_EXTENSION));
-    unsafe { Library::new(path).ok() }
-}
+        let library = Self::load_library(session);
+        let start = core.code.len();
 
-fn bind_function(
-    core: &mut Interpreter,
-    function: &Function<Str, Analysis, Option<Box<Analysis>>, Option<Type>>,
-    library: &Option<Library>,
-) {
-    let name = function.target.as_str().unwrap_or_default();
-    let fallback = || -> DynamicFunction { Arc::new(|_: &[Value]| Err(ErrorKind::OutOfBounds)) };
+        for key in &sources {
+            let Some(record) = session.records.get(key) else {
+                continue;
+            };
 
-    let closure = if let Some(lib) = library {
-        unsafe {
-            if let Ok(symbol) = lib.get::<*mut CVoid>(name.as_bytes()) {
-                let pointer = *symbol;
-                let mut members = Vec::with_capacity(function.members.len());
-
-                for member in &function.members {
-                    members.push(match &member.typing.kind {
-                        TypeKind::Integer { .. } => NativeType::Integer,
-                        TypeKind::Float { .. } => NativeType::Float,
-                        TypeKind::Boolean => NativeType::Boolean,
-                        TypeKind::Character => NativeType::Character,
-                        TypeKind::String => NativeType::String,
-                        TypeKind::Pointer { .. } | TypeKind::Array { .. } | TypeKind::Structure(_) | TypeKind::Union(_) => NativeType::Pointer,
-                        _ => NativeType::Pointer,
-                    });
-                }
-
-                let output = match function.output.as_ref().map(|t| &t.kind) {
-                    Some(TypeKind::Float { .. }) => NativeType::Float,
-                    Some(TypeKind::Boolean) => NativeType::Boolean,
-                    Some(TypeKind::Integer { size: 8, signed: false }) => NativeType::U8,
-                    Some(TypeKind::String) => NativeType::String,
-                    Some(TypeKind::Void) | None => NativeType::Void,
-                    Some(TypeKind::Character) => NativeType::Character,
-                    _ => NativeType::Integer,
-                };
-
-                build_closure(CodePtr::from_ptr(pointer), members, output)
+            let analyses = if let Some(Artifact::Analyses(a)) = record.fetch(3) {
+                a.clone()
             } else {
-                fallback()
+                continue;
+            };
+
+            let Some(stem) = record.location.stem() else {
+                continue;
+            };
+
+            for analysis in &analyses {
+                if let AnalysisKind::Function(function) = &analysis.kind {
+                    if matches!(function.interface, Interface::C) {
+                        Self::bind_function(core, function, &library);
+                    }
+                }
+            }
+
+            let stem = Str::from(stem.to_string());
+            core.modules.insert(stem, analyses);
+        }
+
+        core.compile();
+
+        if session.errors.is_empty() && core.code.len() > start {
+            core.pointer = start;
+            core.frames.clear();
+            core.stack.clear();
+
+            if let Err(error) = core.run() {
+                session.errors.push(SessionError::Interpret(error));
             }
         }
-    } else {
-        fallback()
-    };
+    }
 
-    core.foreign.push(Foreign::Dynamic(closure));
-    let index = core.foreign.len() - 1;
-    core.native(name, index);
+    fn load_library(session: &Session) -> Option<Library> {
+        let discard = session.get_directive(Str::from("Discard")).is_some();
+        let build = if discard {
+            temp_dir().join("axo").join("build")
+        } else {
+            session.base().join("build")
+        };
+
+        let path = build.join(format!("lib_axo.{}", DLL_EXTENSION));
+        unsafe { Library::new(path).ok() }
+    }
+
+    fn bind_function(
+        core: &mut Interpreter,
+        function: &Function<Str, Analysis, Option<Box<Analysis>>, Option<Type>>,
+        library: &Option<Library>,
+    ) {
+        let name = function.target.as_str().unwrap_or_default();
+        let fallback = || -> DynamicFunction { Arc::new(|_: &[Value]| Err(ErrorKind::OutOfBounds)) };
+
+        let closure = if let Some(lib) = library {
+            unsafe {
+                if let Ok(symbol) = lib.get::<*mut CVoid>(name.as_bytes()) {
+                    let pointer = *symbol;
+                    let mut members = Vec::with_capacity(function.members.len());
+
+                    for member in &function.members {
+                        members.push(match &member.typing.kind {
+                            TypeKind::Integer { .. } => NativeType::Integer,
+                            TypeKind::Float { .. } => NativeType::Float,
+                            TypeKind::Boolean => NativeType::Boolean,
+                            TypeKind::Character => NativeType::Character,
+                            TypeKind::String => NativeType::String,
+                            TypeKind::Pointer { .. } | TypeKind::Array { .. } | TypeKind::Structure(_) | TypeKind::Union(_) => NativeType::Pointer,
+                            _ => NativeType::Pointer,
+                        });
+                    }
+
+                    let output = match function.output.as_ref().map(|t| &t.kind) {
+                        Some(TypeKind::Float { .. }) => NativeType::Float,
+                        Some(TypeKind::Boolean) => NativeType::Boolean,
+                        Some(TypeKind::Integer { size: 8, signed: false }) => NativeType::U8,
+                        Some(TypeKind::String) => NativeType::String,
+                        Some(TypeKind::Void) | None => NativeType::Void,
+                        Some(TypeKind::Character) => NativeType::Character,
+                        _ => NativeType::Integer,
+                    };
+
+                    build_closure(CodePtr::from_ptr(pointer), members, output)
+                } else {
+                    fallback()
+                }
+            }
+        } else {
+            fallback()
+        };
+
+        core.foreign.push(Foreign::Dynamic(closure));
+        let index = core.foreign.len() - 1;
+        core.native(name, index);
+    }
 }
 
 #[derive(Debug)]
@@ -321,42 +362,4 @@ fn build_closure(address: CodePtr, members: Vec<NativeType>, output: NativeType)
             }
         }
     })
-}
-
-impl<'source> Action<
-    'static,
-    Operator<Arc<Lock<Session<'source>>>>,
-    Operation<'source, Arc<Lock<Session<'source>>>>,
-> for InterpretAction<'source>
-{
-    fn action(
-        &self,
-        operator: &mut Operator<Arc<Lock<Session<'source>>>>,
-        operation: &mut Operation<'source, Arc<Lock<Session<'source>>>>,
-    ) {
-        let mut guard = operator.store.write().unwrap();
-        let session = &mut *guard;
-        let mut core = self.core.write().unwrap();
-
-        let initial = session.errors.len();
-        session.report_start("interpreting");
-
-        let mut sources: Vec<_> = session
-            .records
-            .iter()
-            .filter(|(_, r)| r.kind == RecordKind::Source && r.fetch(0).is_some())
-            .map(|(&k, _)| k)
-            .collect();
-        sources.sort();
-        interpret(session, &mut core, &sources);
-
-        let duration = Duration::from_nanos(session.timer.lap().unwrap_or_default());
-        session.report_finish("interpreting", duration, session.errors.len() - initial);
-
-        if session.errors.is_empty() {
-            operation.set_resolve(Vec::new());
-        } else {
-            operation.set_reject();
-        }
-    }
 }

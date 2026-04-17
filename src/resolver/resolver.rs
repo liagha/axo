@@ -1,4 +1,3 @@
-// src/resolver/resolver.rs
 use broccli::Color;
 use crate::{
     data::{memory::replace, Identity, Module, Str},

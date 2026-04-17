@@ -60,7 +60,6 @@ Action<
             .records
             .iter()
             .filter_map(|(&key, record)| {
-                // UPDATE: fetch(0) for Module
                 if record.kind == RecordKind::Source && record.fetch(0).is_some() {
                     Some(key)
                 } else {
@@ -78,14 +77,12 @@ Action<
             let schema = Session::schema(&base, location);
 
             if !record.dirty && schema.to_path().map(|p| p.exists()).unwrap_or(false) {
-                // UPDATE: store(4) for Output
                 record.store(4, Artifact::Output(schema));
                 continue;
             }
 
             let stem = Str::from(location.stem().unwrap().to_string());
 
-            // UPDATE: fetch(3) for Analyses
             if let Some(Artifact::Analyses(analysis_ref)) = record.fetch(3) {
                 let analysis = analysis_ref.clone();
                 let module = generator.context.create_module(stem.as_str().unwrap());
@@ -120,7 +117,6 @@ Action<
                                     operation.set_reject();
                                     return ();
                                 }
-                                // UPDATE: store(4) for Output
                                 record.store(4, Artifact::Output(schema));
                             }
                             Err(error) => {
@@ -190,7 +186,6 @@ Action<
 
             let target = match record.kind {
                 RecordKind::Source => {
-                    // UPDATE: fetch(4) for Output
                     if let Some(Artifact::Output(loc)) = record.fetch(4) {
                         Some(loc.to_string())
                     } else {
@@ -232,7 +227,6 @@ Action<
                 let parent = object.to_path().unwrap().parent().unwrap().to_path_buf();
                 _ = create_dir_all(&parent);
 
-                // UPDATE: store(5) for Object
                 record.store(5, Artifact::Object(object));
 
                 if !record.dirty && object.to_path().map(|p| p.exists()).unwrap_or(false) {
@@ -258,7 +252,6 @@ Action<
         let mut link = Command::new("cc");
 
         for &key in &keys {
-            // UPDATE: fetch(5) for Object
             if let Some(Artifact::Object(object)) = session.records.get(&key).unwrap().fetch(5) {
                 link.arg(object.to_string());
             }
@@ -272,7 +265,6 @@ Action<
 
         let record = session.records.get(&key).unwrap();
 
-        // UPDATE: fetch(4) for Output
         let location = if let Some(Artifact::Output(loc)) = record.fetch(4) {
             *loc
         } else {

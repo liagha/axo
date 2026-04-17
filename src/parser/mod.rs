@@ -1,4 +1,3 @@
-// src/parser/mod.rs
 mod classifier;
 mod element;
 pub mod error;

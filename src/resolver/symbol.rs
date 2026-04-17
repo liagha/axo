@@ -41,14 +41,8 @@ impl<'symbol> Resolvable<'symbol> for Symbol<'symbol> {
                     resolver.fresh()
                 };
 
-                let body = if let Some(body) = &mut function.body {
-                    body.resolve(resolver);
-
-                    body.typing.clone()
-                } else {
-                    Type::from(TypeKind::Void)
-                };
-
+                let body = resolver.fresh();
+                
                 let active = resolver.active;
                 resolver.exit();
                 self.scope = Box::from(resolver.scopes.remove(&active).unwrap());

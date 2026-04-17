@@ -1,4 +1,3 @@
-// src/parser/parser.rs
 use crate::{
     combinator::{Classifier, Form, Former},
     data::{Identity, Offset, Scale},

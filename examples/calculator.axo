@@ -118,8 +118,6 @@ func next_token(let lexer: Lexer): Token {
     return(Token { kind = "EOF", value = 0.0, next_position = lexer.position })
 }
 
-func parse_expression(let lexer: Lexer): ParseResult
-
 func parse_factor(let lexer: Lexer): ParseResult {
     let tok = next_token(lexer)
     lexer.position = tok.next_position

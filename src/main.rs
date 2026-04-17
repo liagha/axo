@@ -1,13 +1,12 @@
 #[cfg(feature = "interpreter")]
 mod dialog;
 
-use std::env::args;
 use axo::{
     data::{Identity, Module, Str},
     initializer::Initializer,
     internal::{
         hash::{DefaultHasher, Hash, Hasher, Map},
-        platform::read_dir,
+        platform::{read_dir, args},
         time::DefaultTimer,
         SessionError, RecordKind, Record, Session,
     },
@@ -16,9 +15,8 @@ use axo::{
     scanner::{Token, TokenKind},
     tracker::{ErrorKind as TrackErrorKind, Location, Span, TrackError},
 };
-
 #[cfg(feature = "interpreter")]
-use axo::interpreter::{Interpreter, interpret};
+use axo::interpreter::{Interpreter};
 
 pub const BASE: &[(&str, &str)] = &[
     ("./base/cast.axo", include_str!("../base/cast.axo")),
@@ -78,7 +76,7 @@ pub fn run<'a>(
         scanner::Scanner,
         parser::Parser,
         resolver::Resolver,
-        analyzer::analyze,
+        analyzer::Analyzer,
     };
 
     session.errors.clear();
@@ -91,8 +89,8 @@ pub fn run<'a>(
     Scanner::execute(session, keys);
     Parser::execute(session, keys);
     Resolver::execute(session, keys);
-    analyze(session, keys);
-    interpret(session, core, keys);
+    Analyzer::execute(session, keys);
+    Interpreter::execute(session, core, keys);
 
     session.report_all();
 }

@@ -1,4 +1,3 @@
-// src/scanner/scanner.rs
 use crate::{
     combinator::{Form, Former},
     data::{Identity, Offset, Scale, Str},

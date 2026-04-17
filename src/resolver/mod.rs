@@ -1,4 +1,3 @@
-// src/resolver/mod.rs
 mod element;
 mod error;
 mod primitives;

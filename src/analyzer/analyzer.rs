@@ -1,12 +1,13 @@
-use crate::format::Stencil;
 use crate::{
-    analyzer::AnalysisKind,
-    analyzer::{Analysis, AnalyzeError},
-    data::*,
-    format::Show,
+    analyzer::{Analysis, AnalysisKind, AnalyzeError},
+    data::Str,
+    format::{Show, Stencil},
+    internal::{Artifact, RecordKind, Session, SessionError},
     parser::{Element, Symbol, SymbolKind},
     resolver::Resolver,
+    data::{Identity, Binding, Aggregate, Function},
 };
+use broccli::Color;
 
 pub struct Analyzer<'analyzer> {
     pub input: Vec<Element<'analyzer>>,
@@ -26,13 +27,67 @@ impl<'analyzer> Analyzer<'analyzer> {
     pub fn analyze(&mut self, resolver: &mut Resolver<'analyzer>) {
         for element in self.input.iter_mut() {
             match element.analyze(resolver) {
-                Ok(analysis) => {
-                    self.output.push(analysis);
-                }
-                Err(error) => {
-                    self.errors.push(error);
-                }
+                Ok(analysis) => self.output.push(analysis),
+                Err(error) => self.errors.push(error),
             }
+        }
+    }
+
+    pub fn execute(session: &mut Session<'analyzer>, keys: &[Identity]) {
+        for &key in keys {
+            Self::process(session, key);
+        }
+    }
+
+    fn process(session: &mut Session<'analyzer>, key: Identity) {
+        let (kind, hash, dirty, elements) = {
+            let record = session.records.get(&key).unwrap();
+            let elements = if let Some(Artifact::Elements(elements)) = record.fetch(2) {
+                Some(elements.clone())
+            } else {
+                None
+            };
+            (record.kind.clone(), record.hash, record.dirty, elements)
+        };
+
+        if kind != RecordKind::Source {
+            return;
+        }
+
+        if !dirty {
+            if let Some(mut analyses) = session.cache::<Vec<Analysis>>("analyses", hash, None) {
+                analyses.shrink_to_fit();
+                let record = session.records.get_mut(&key).unwrap();
+                record.store(3, Artifact::Analyses(analyses));
+                record.artifacts.remove(&2);
+                return;
+            }
+        }
+
+        let mut analyzer = Analyzer::new(elements.unwrap_or_default());
+        analyzer.analyze(&mut session.resolver);
+
+        if let Some(stencil) = session.get_stencil() {
+            session.report_section(
+                "Analysis",
+                Color::Blue,
+                analyzer.output.format(stencil).to_string(),
+            );
+        }
+
+        analyzer.output.shrink_to_fit();
+
+        session.errors.extend(
+            analyzer
+                .errors
+                .iter()
+                .map(|error| SessionError::Analyze(error.clone())),
+        );
+
+        if let Some(analyses) = session.cache("analyses", hash, Some(analyzer.output)) {
+            let record = session.records.get_mut(&key).unwrap();
+            record.store(3, Artifact::Analyses(analyses));
+            record.artifacts.remove(&2);
         }
     }
 }
@@ -54,7 +109,7 @@ impl<'symbol> Analyzable<'symbol> for Symbol<'symbol> {
                 let value = binding
                     .value
                     .clone()
-                    .map(|value| value.analyze(resolver))
+                    .map(|v| v.analyze(resolver))
                     .transpose()?;
 
                 let head = binding.target.analyze(resolver)?;
@@ -72,19 +127,11 @@ impl<'symbol> Analyzable<'symbol> for Symbol<'symbol> {
                 let members: Result<Vec<Analysis<'symbol>>, AnalyzeError<'symbol>> = structure
                     .members
                     .iter()
-                    .map(|member| member.analyze(resolver))
+                    .map(|m| m.analyze(resolver))
                     .collect();
 
-                let analyzed = Aggregate::new(
-                    Str::from(
-                        structure
-                            .target
-                            .target()
-                            .unwrap()
-                            .format(Stencil::default()),
-                    ),
-                    members?,
-                );
+                let name = Str::from(structure.target.target().unwrap().format(Stencil::default()));
+                let analyzed = Aggregate::new(name, members?);
 
                 AnalysisKind::Structure(analyzed)
             }
@@ -92,13 +139,11 @@ impl<'symbol> Analyzable<'symbol> for Symbol<'symbol> {
                 let members: Result<Vec<Analysis<'symbol>>, AnalyzeError<'symbol>> = union
                     .members
                     .iter()
-                    .map(|member| member.analyze(resolver))
+                    .map(|m| m.analyze(resolver))
                     .collect();
 
-                let analyzed = Aggregate::new(
-                    Str::from(union.target.target().unwrap().format(Stencil::default())),
-                    members?,
-                );
+                let name = Str::from(union.target.target().unwrap().format(Stencil::default()));
+                let analyzed = Aggregate::new(name, members?);
 
                 AnalysisKind::Union(analyzed)
             }
@@ -106,18 +151,19 @@ impl<'symbol> Analyzable<'symbol> for Symbol<'symbol> {
                 let members: Result<Vec<Analysis<'symbol>>, AnalyzeError<'symbol>> = function
                     .members
                     .iter()
-                    .map(|member| member.analyze(resolver))
+                    .map(|m| m.analyze(resolver))
                     .collect();
 
                 let body = function
                     .body
                     .clone()
-                    .and_then(|body| body.analyze(resolver).ok().map(Box::new));
+                    .and_then(|b| b.analyze(resolver).ok().map(Box::new));
 
-                let output = function.output.clone().map(|output| output.typing);
+                let output = function.output.clone().map(|o| o.typing);
+                let name = Str::from(function.target.target().unwrap().format(Stencil::default()));
 
                 let analyzed = Function::new(
-                    Str::from(function.target.target().unwrap().format(Stencil::default())),
+                    name,
                     members?,
                     body,
                     output,
@@ -129,7 +175,7 @@ impl<'symbol> Analyzable<'symbol> for Symbol<'symbol> {
                 AnalysisKind::Function(analyzed)
             }
             SymbolKind::Module(_) => {
-                unimplemented!("module analyzing isn't implemented!")
+                unimplemented!()
             }
         };
 
