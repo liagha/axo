@@ -36,7 +36,6 @@ impl Clone for Resolver<'_> {
 pub trait Resolvable<'a> {
     fn declare(&mut self, resolver: &mut Resolver<'a>);
     fn resolve(&mut self, resolver: &mut Resolver<'a>);
-    fn reify(&mut self, resolver: &mut Resolver<'a>);
     fn is_instance(&self) -> bool {
         false
     }
@@ -178,7 +177,6 @@ impl<'a> Resolver<'a> {
         Self::run_declare(session, &source);
         Self::report(session);
         Self::run_resolve(session, &source);
-        Self::run_reify(session, &source);
 
         session
             .errors
@@ -292,27 +290,6 @@ impl<'a> Resolver<'a> {
             if let Some(Artifact::Elements(elements)) = session.records.get_mut(&key).unwrap().fetch_mut(2) {
                 for element in elements.iter_mut() {
                     element.resolve(&mut session.resolver);
-                }
-            }
-
-            let active = session.resolver.active;
-            session.resolver.exit();
-            module.scope = Box::from(session.resolver.scopes.remove(&active).unwrap());
-            session.resolver.insert(module);
-        }
-    }
-
-    fn run_reify(session: &mut Session<'a>, source: &[Identity]) {
-        for &key in source {
-            let target = if let Some(Artifact::Module(m)) = session.records.get(&key).unwrap().fetch(0) { *m } else { continue };
-            let mut module = session.resolver.registry.remove(&target).unwrap();
-            let scope = replace(&mut module.scope, Box::from(Scope::new(None)));
-
-            session.resolver.enter_scope(*scope);
-
-            if let Some(Artifact::Elements(elements)) = session.records.get_mut(&key).unwrap().fetch_mut(2) {
-                for element in elements.iter_mut() {
-                    element.reify(&mut session.resolver);
                 }
             }
 

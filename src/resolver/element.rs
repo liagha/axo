@@ -745,47 +745,6 @@ impl<'element> Resolvable<'element> for Element<'element> {
         };
     }
 
-    fn reify(&mut self, resolver: &mut Resolver<'element>) {
-        self.typing = resolver.reify(&self.typing);
-
-        match &mut self.kind {
-            ElementKind::Literal(_) => {}
-            ElementKind::Delimited(delimited) => {
-                for member in &mut delimited.members {
-                    member.reify(resolver);
-                }
-            }
-            ElementKind::Unary(unary) => {
-                unary.operand.reify(resolver);
-            }
-            ElementKind::Binary(binary) => {
-                binary.left.reify(resolver);
-                binary.right.reify(resolver);
-            }
-            ElementKind::Index(index) => {
-                index.target.reify(resolver);
-                for member in &mut index.members {
-                    member.reify(resolver);
-                }
-            }
-            ElementKind::Invoke(invoke) => {
-                invoke.target.reify(resolver);
-                for member in &mut invoke.members {
-                    member.reify(resolver);
-                }
-            }
-            ElementKind::Construct(construct) => {
-                construct.target.reify(resolver);
-                for member in &mut construct.members {
-                    member.reify(resolver);
-                }
-            }
-            ElementKind::Symbolize(symbol) => {
-                symbol.reify(resolver);
-            }
-        }
-    }
-
     fn is_instance(&self) -> bool {
         self.typing.kind.is_structure() || self.typing.kind.is_union()
     }

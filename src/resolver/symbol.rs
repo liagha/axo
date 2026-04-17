@@ -42,7 +42,7 @@ impl<'symbol> Resolvable<'symbol> for Symbol<'symbol> {
                 };
 
                 let body = resolver.fresh();
-                
+
                 let active = resolver.active;
                 resolver.exit();
                 self.scope = Box::from(resolver.scopes.remove(&active).unwrap());
@@ -215,7 +215,7 @@ impl<'symbol> Resolvable<'symbol> for Symbol<'symbol> {
                 let body = if let Some(body) = &mut function.body {
                     body.resolve(resolver);
                     resolver.unify(self.span, &expectation, &body.typing);
-                    
+
                     body.typing.clone()
                 } else {
                     Type::from(TypeKind::Void)
@@ -243,66 +243,6 @@ impl<'symbol> Resolvable<'symbol> for Symbol<'symbol> {
 
         let unified = resolver.unify(self.span, &expected, &typing);
         self.typing = unified;
-
-        resolver.insert(self.clone());
-    }
-
-    fn reify(&mut self, resolver: &mut Resolver<'symbol>) {
-        self.typing = resolver.reify(&self.typing);
-
-        match &mut self.kind {
-            SymbolKind::Binding(binding) => {
-                binding.target.reify(resolver);
-                if let Some(annotation) = &mut binding.annotation {
-                    annotation.reify(resolver);
-                }
-                if let Some(value) = &mut binding.value {
-                    value.reify(resolver);
-                }
-            }
-            SymbolKind::Structure(structure) => {
-                for member in &mut structure.members {
-                    member.reify(resolver);
-                }
-                let layout = structure
-                    .members
-                    .iter()
-                    .map(|member| member.typing.clone())
-                    .collect();
-                let head = structure.target.target().unwrap().into();
-                self.typing = Type::new(
-                    self.identity,
-                    TypeKind::Structure(Box::new(Aggregate::new(head, layout))),
-                );
-            }
-            SymbolKind::Union(union) => {
-                for member in &mut union.members {
-                    member.reify(resolver);
-                }
-                let layout = union
-                    .members
-                    .iter()
-                    .map(|member| member.typing.clone())
-                    .collect();
-                let head = union.target.target().unwrap().into();
-                self.typing = Type::new(self.identity, TypeKind::Union(Box::new(Aggregate::new(head, layout))));
-            }
-            SymbolKind::Function(function) => {
-                for member in &mut function.members {
-                    member.reify(resolver);
-                }
-                if let Some(output) = &mut function.output {
-                    output.reify(resolver);
-                }
-                if let Some(body) = &mut function.body {
-                    body.reify(resolver);
-                }
-            }
-            SymbolKind::Module(module) => {
-                let head = module.target.target().unwrap();
-                self.typing = Type::new(self.identity, TypeKind::Module(head.into()));
-            }
-        }
 
         resolver.insert(self.clone());
     }
