@@ -1,6 +1,6 @@
 use crate::{
     data::{Aggregate, Delimited, Function, Interface, Scale, Str},
-    parser::{Element, ElementKind, SymbolKind},
+    parser::{Element, ElementKind},
     resolver::{Error, ErrorKind, Resolvable, Resolver, Type, TypeKind},
     scanner::{OperatorKind, PunctuationKind, Token, TokenKind},
     tracker::Spanned,
@@ -635,6 +635,7 @@ impl<'element> Resolvable<'element> for Element<'element> {
                         }
 
                         let output = resolver.fresh();
+                        let body = resolver.fresh();
                         let mut members = Vec::new();
 
                         members.extend(invoke.members.iter().map(|member| member.typing.clone()));
@@ -642,7 +643,7 @@ impl<'element> Resolvable<'element> for Element<'element> {
                         let mut function = Type::from(TypeKind::Function(Box::new(Function::new(
                             Str::default(),
                             members,
-                            Type::from(TypeKind::Void),
+                            body,
                             Some(Box::new(output.clone())),
                             Interface::Axo,
                             false,
@@ -673,56 +674,27 @@ impl<'element> Resolvable<'element> for Element<'element> {
 
                 if let Some(reference) = construct.target.reference {
                     if let Some(symbol) = resolver.get_symbol(reference).cloned() {
-                        match symbol.kind {
-                            SymbolKind::Structure(mut structure) => {
-                                resolver.enter_scope(*symbol.scope.clone());
-
-                                for member in &mut structure.members {
-                                    if member.is_instance() {
-                                        member.resolve(resolver);
-                                        layout.push(member.typing.clone());
-                                    }
-                                }
-
-                                for (index, member) in construct.members.iter_mut().enumerate() {
-                                    member.resolve(resolver);
-
-                                    if let Some(expect) = layout.get(index) {
-                                        resolver.unify(member.span, &member.typing, expect);
-                                    }
-                                }
-
-                                resolver.exit();
-                                typing = Some(TypeKind::Structure(Box::from(Aggregate::new(
-                                    construct.target.target().unwrap_or_default(),
-                                    layout.clone(),
-                                ))));
+                        match &symbol.typing.kind {
+                            TypeKind::Structure(aggregate) => {
+                                layout = aggregate.members.clone();
+                                typing = Some(TypeKind::Structure(aggregate.clone()));
                             }
-                            SymbolKind::Union(mut structure) => {
-                                resolver.enter_scope(*symbol.scope.clone());
-
-                                for member in &mut structure.members {
-                                    if member.is_instance() {
-                                        member.resolve(resolver);
-                                        layout.push(member.typing.clone());
-                                    }
-                                }
-
-                                for (index, member) in construct.members.iter_mut().enumerate() {
-                                    member.resolve(resolver);
-
-                                    if let Some(expect) = layout.get(index) {
-                                        resolver.unify(member.span, &member.typing, expect);
-                                    }
-                                }
-
-                                resolver.exit();
-                                typing = Some(TypeKind::Union(Box::from(Aggregate::new(
-                                    construct.target.target().unwrap_or_default(),
-                                    layout.clone(),
-                                ))));
+                            TypeKind::Union(aggregate) => {
+                                layout = aggregate.members.clone();
+                                typing = Some(TypeKind::Union(aggregate.clone()));
                             }
                             _ => {}
+                        }
+
+                        if typing.is_some() {
+                            resolver.enter_scope(*symbol.scope.clone());
+                            for (index, member) in construct.members.iter_mut().enumerate() {
+                                member.resolve(resolver);
+                                if let Some(expect) = layout.get(index) {
+                                    resolver.unify(member.span, &member.typing, expect);
+                                }
+                            }
+                            resolver.exit();
                         }
                     }
                 }

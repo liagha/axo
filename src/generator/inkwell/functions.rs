@@ -205,7 +205,20 @@ impl<'backend> Generator<'backend> {
         }
 
         let name = function.target.as_str().unwrap_or("function");
-        let value = self.current_module().get_function(name).unwrap();
+
+        let value = if let Some(existing) = self.current_module().get_function(name) {
+            existing
+        } else {
+            self.declare_function(function.clone(), span.clone())?;
+            self.current_module().get_function(name).ok_or_else(|| {
+                GenerateError::new(
+                    ErrorKind::Function(FunctionError::Undefined {
+                        name: name.to_string(),
+                    }),
+                    span.clone(),
+                )
+            })?
+        };
 
         if value.get_basic_blocks().is_empty() {
             let entry = self.context.append_basic_block(value, "entry");

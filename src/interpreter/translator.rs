@@ -105,7 +105,7 @@ impl<'error> Interpreter<'error> {
         for analysis in analyses {
             match analysis.kind {
                 AnalysisKind::Structure(structure) => {
-                    let items = Self::members(structure.members);
+                    let items = Self::members(structure.members.clone());
                     self.insert_entity(
                         structure.target,
                         Entity::Structure {
@@ -113,9 +113,10 @@ impl<'error> Interpreter<'error> {
                             members: items,
                         },
                     );
+                    self.scope(structure.target, Self::declare, structure.members);
                 }
                 AnalysisKind::Union(union) => {
-                    let items = Self::members(union.members);
+                    let items = Self::members(union.members.clone());
                     self.insert_entity(
                         union.target,
                         Entity::Union {
@@ -123,6 +124,7 @@ impl<'error> Interpreter<'error> {
                             members: items,
                         },
                     );
+                    self.scope(union.target, Self::declare, union.members);
                 }
                 AnalysisKind::Function(function) => {
                     if !matches!(function.interface, crate::data::Interface::C) {
@@ -137,11 +139,17 @@ impl<'error> Interpreter<'error> {
 
     fn generate(&mut self, analyses: Vec<Analysis<'error>>) {
         for analysis in analyses {
-            match &analysis.kind {
+            match analysis.kind {
                 AnalysisKind::Function(function) => {
                     if !matches!(function.interface, crate::data::Interface::C) {
                         self.define(function.clone(), analysis.span.clone());
                     }
+                }
+                AnalysisKind::Structure(structure) => {
+                    self.scope(structure.target, Self::generate, structure.members);
+                }
+                AnalysisKind::Union(union) => {
+                    self.scope(union.target, Self::generate, union.members);
                 }
                 AnalysisKind::Module(stem, inner) => {
                     self.scope(stem.clone(), Self::generate, inner.clone());
@@ -656,6 +664,9 @@ impl Interpreter<'_> {
             AnalysisKind::Usage(name) => Some(*name),
             AnalysisKind::Assign(name, _) => Some(*name),
             AnalysisKind::Binding(binding) => Self::extract_name(binding.target.as_ref()),
+            AnalysisKind::Function(function) => Some(function.target),
+            AnalysisKind::Structure(structure) => Some(structure.target),
+            AnalysisKind::Union(union) => Some(union.target),
             _ => None,
         }
     }

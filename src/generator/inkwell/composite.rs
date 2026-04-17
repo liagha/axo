@@ -134,16 +134,14 @@ impl<'backend> Generator<'backend> {
         let mut types = Vec::with_capacity(structure.members.len());
         let mut members = Vec::with_capacity(structure.members.len());
 
-        for member in structure.members {
+        for member in &structure.members {
             if let AnalysisKind::Binding(binding) = &member.kind {
-                if let AnalysisKind::Usage(target) = binding.target.kind {
+                if let AnalysisKind::Usage(target) = &binding.target.kind {
                     let field = target.clone();
 
                     members.push(field.clone());
-                    types.push(self.to_basic_type(&binding.annotation, member.span)?);
+                    types.push(self.to_basic_type(&binding.annotation, member.span.clone())?);
                 }
-            } else {
-                self.analysis(member)?;
             }
         }
 
@@ -152,6 +150,12 @@ impl<'backend> Generator<'backend> {
         }
 
         self.update_entity(&identifier, Entity::Structure { shape, members });
+
+        for member in structure.members {
+            if !matches!(member.kind, AnalysisKind::Binding(_)) {
+                self.analysis(member)?;
+            }
+        }
 
         Ok(self.context.i64_type().const_zero().into())
     }
@@ -194,11 +198,11 @@ impl<'backend> Generator<'backend> {
         let mut maximum = 0;
         let mut largest: Option<BasicTypeEnum> = None;
 
-        for member in union.members {
+        for member in &union.members {
             if let AnalysisKind::Binding(binding) = &member.kind {
-                if let AnalysisKind::Usage(target) = binding.target.kind {
+                if let AnalysisKind::Usage(target) = &binding.target.kind {
                     let field = target.clone();
-                    let typing = self.to_basic_type(&binding.annotation, member.span)?;
+                    let typing = self.to_basic_type(&binding.annotation, member.span.clone())?;
 
                     members.push((field.clone(), typing));
 
@@ -209,8 +213,6 @@ impl<'backend> Generator<'backend> {
                         largest = Some(typing);
                     }
                 }
-            } else {
-                self.analysis(member)?;
             }
         }
 
@@ -223,6 +225,12 @@ impl<'backend> Generator<'backend> {
         }
 
         self.update_entity(&identifier, Entity::Union { shape, members });
+
+        for member in union.members {
+            if !matches!(member.kind, AnalysisKind::Binding(_)) {
+                self.analysis(member)?;
+            }
+        }
 
         Ok(self.context.i64_type().const_zero().into())
     }

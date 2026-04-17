@@ -1,0 +1,16 @@
+struct Point {
+    let x: Integer,
+    let y: Integer,
+
+    func print_position(let point: Point) {
+        print.print_integer(point.x)
+        print.print_newline()
+        print.print_integer(point.y)
+    }
+}
+
+func main() {
+    let point = Point { x = 3, y = 5 }
+
+    Point.print_position(point)
+}
