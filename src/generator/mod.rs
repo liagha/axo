@@ -12,6 +12,7 @@ use {
             },
             time::Duration,
             SessionError, RecordKind, Session,
+            Artifact,
         },
         data::{
             Str,
@@ -26,7 +27,6 @@ use {
 pub use {backend::Backend, inkwell::*};
 
 pub type GenerateError<'error> = Error<'error, ErrorKind<'error>>;
-
 
 pub struct GenerateAction;
 
@@ -60,7 +60,8 @@ Action<
             .records
             .iter()
             .filter_map(|(&key, record)| {
-                if record.kind == RecordKind::Source && record.module.is_some() {
+                // UPDATE: fetch(0) for Module
+                if record.kind == RecordKind::Source && record.fetch(0).is_some() {
                     Some(key)
                 } else {
                     None
@@ -77,13 +78,16 @@ Action<
             let schema = Session::schema(&base, location);
 
             if !record.dirty && schema.to_path().map(|p| p.exists()).unwrap_or(false) {
-                record.output = Some(schema);
+                // UPDATE: store(4) for Output
+                record.store(4, Artifact::Output(schema));
                 continue;
             }
 
             let stem = Str::from(location.stem().unwrap().to_string());
 
-            if let Some(analysis) = record.analyses.clone() {
+            // UPDATE: fetch(3) for Analyses
+            if let Some(Artifact::Analyses(analysis_ref)) = record.fetch(3) {
+                let analysis = analysis_ref.clone();
                 let module = generator.context.create_module(stem.as_str().unwrap());
 
                 module.set_triple(&triple);
@@ -116,7 +120,8 @@ Action<
                                     operation.set_reject();
                                     return ();
                                 }
-                                record.output = Some(schema);
+                                // UPDATE: store(4) for Output
+                                record.store(4, Artifact::Output(schema));
                             }
                             Err(error) => {
                                 let kind = TrackErrorKind::from_io(error, schema);
@@ -184,7 +189,14 @@ Action<
             let record = session.records.get_mut(&key).unwrap();
 
             let target = match record.kind {
-                RecordKind::Source => record.output.map(|loc| loc.to_string()),
+                RecordKind::Source => {
+                    // UPDATE: fetch(4) for Output
+                    if let Some(Artifact::Output(loc)) = record.fetch(4) {
+                        Some(loc.to_string())
+                    } else {
+                        None
+                    }
+                },
                 RecordKind::Schema => Some(record.location.to_string()),
                 RecordKind::C => {
                     if let Some(content) = &record.content {
@@ -220,7 +232,8 @@ Action<
                 let parent = object.to_path().unwrap().parent().unwrap().to_path_buf();
                 _ = create_dir_all(&parent);
 
-                record.object = Some(object);
+                // UPDATE: store(5) for Object
+                record.store(5, Artifact::Object(object));
 
                 if !record.dirty && object.to_path().map(|p| p.exists()).unwrap_or(false) {
                     continue;
@@ -245,7 +258,8 @@ Action<
         let mut link = Command::new("cc");
 
         for &key in &keys {
-            if let Some(object) = session.records.get(&key).unwrap().object {
+            // UPDATE: fetch(5) for Object
+            if let Some(Artifact::Object(object)) = session.records.get(&key).unwrap().fetch(5) {
                 link.arg(object.to_string());
             }
         }
@@ -257,7 +271,13 @@ Action<
         let key = *keys.last().expect("missing");
 
         let record = session.records.get(&key).unwrap();
-        let location = record.output.unwrap_or(record.location);
+
+        // UPDATE: fetch(4) for Output
+        let location = if let Some(Artifact::Output(loc)) = record.fetch(4) {
+            *loc
+        } else {
+            record.location
+        };
 
         let executable = Session::executable(&base, location, None);
         link.arg("-o").arg(executable.to_string());
