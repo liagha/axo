@@ -15,10 +15,10 @@ use {
             CString, Function, Identity, Interface, Str,
         },
         internal::{
-            foreign::{CStr, CVoid, CChar},
-            platform::{temp_dir, DLL_EXTENSION, Lock},
+            foreign::{CChar, CStr, CVoid},
+            platform::{temp_dir, Lock, DLL_EXTENSION},
             time::Duration,
-            RecordKind, Session, SessionError, Artifact,
+            Artifact, RecordKind, Session, SessionError,
         },
         reporter::Error,
         resolver::{Type, TypeKind},
@@ -83,7 +83,7 @@ impl<'source> Action<
         let now = session.timer.elapsed();
         let sum: Duration = session.laps.iter().copied().sum();
         let duration = now.saturating_sub(sum);
-        
+
         session.report_finish("interpreting", duration, session.errors.len() - initial);
 
         if session.errors.is_empty() {
@@ -178,40 +178,47 @@ impl<'source> Interpreter<'source> {
         library: &Option<Library>,
     ) {
         let name = function.target.as_str().unwrap_or_default();
-        let fallback = || -> DynamicFunction { Arc::new(|_: &[Value]| Err(ErrorKind::OutOfBounds)) };
+        let fallback =
+            || -> DynamicFunction { Arc::new(|_: &[Value]| Err(ErrorKind::OutOfBounds)) };
 
         let closure = if let Some(lib) = library {
-            unsafe {
-                if let Ok(symbol) = lib.get::<*mut CVoid>(name.as_bytes()) {
-                    let pointer = *symbol;
-                    let mut members = Vec::with_capacity(function.members.len());
+            let symbol_result = unsafe { lib.get::<*mut CVoid>(name.as_bytes()) };
 
-                    for member in &function.members {
-                        members.push(match &member.typing.kind {
-                            TypeKind::Integer { .. } => NativeType::Integer,
-                            TypeKind::Float { .. } => NativeType::Float,
-                            TypeKind::Boolean => NativeType::Boolean,
-                            TypeKind::Character => NativeType::Character,
-                            TypeKind::String => NativeType::String,
-                            TypeKind::Pointer { .. } | TypeKind::Array { .. } | TypeKind::Structure(_) | TypeKind::Union(_) => NativeType::Pointer,
-                            _ => NativeType::Pointer,
-                        });
-                    }
+            if let Ok(symbol) = symbol_result {
+                let pointer = *symbol;
+                let mut members = Vec::with_capacity(function.members.len());
 
-                    let output = match function.output.as_ref().map(|t| &t.kind) {
-                        Some(TypeKind::Float { .. }) => NativeType::Float,
-                        Some(TypeKind::Boolean) => NativeType::Boolean,
-                        Some(TypeKind::Integer { size: 8, signed: false }) => NativeType::U8,
-                        Some(TypeKind::String) => NativeType::String,
-                        Some(TypeKind::Void) | None => NativeType::Void,
-                        Some(TypeKind::Character) => NativeType::Character,
-                        _ => NativeType::Integer,
-                    };
-
-                    build_closure(CodePtr::from_ptr(pointer), members, output)
-                } else {
-                    fallback()
+                for member in &function.members {
+                    members.push(match &member.typing.kind {
+                        TypeKind::Integer { .. } => NativeType::Integer,
+                        TypeKind::Float { .. } => NativeType::Float,
+                        TypeKind::Boolean => NativeType::Boolean,
+                        TypeKind::Character => NativeType::Character,
+                        TypeKind::String => NativeType::String,
+                        TypeKind::Pointer { .. }
+                        | TypeKind::Array { .. }
+                        | TypeKind::Structure(_)
+                        | TypeKind::Union(_) => NativeType::Pointer,
+                        _ => NativeType::Pointer,
+                    });
                 }
+
+                let output = match function.output.as_ref().map(|t| &t.kind) {
+                    Some(TypeKind::Float { .. }) => NativeType::Float,
+                    Some(TypeKind::Boolean) => NativeType::Boolean,
+                    Some(TypeKind::Integer {
+                             size: 8,
+                             signed: false,
+                         }) => NativeType::U8,
+                    Some(TypeKind::String) => NativeType::String,
+                    Some(TypeKind::Void) | None => NativeType::Void,
+                    Some(TypeKind::Character) => NativeType::Character,
+                    _ => NativeType::Integer,
+                };
+
+                build_closure(CodePtr::from_ptr(pointer), members, output)
+            } else {
+                fallback()
             }
         } else {
             fallback()
@@ -232,7 +239,11 @@ enum FfiValue {
     Ptr(*mut CVoid),
 }
 
-fn build_closure(address: CodePtr, members: Vec<NativeType>, output: NativeType) -> DynamicFunction {
+fn build_closure(
+    address: CodePtr,
+    members: Vec<NativeType>,
+    output: NativeType,
+) -> DynamicFunction {
     let address = address.as_ptr() as usize;
 
     Arc::new(move |inputs: &[Value]| -> Result<Value, ErrorKind> {
@@ -281,7 +292,9 @@ fn build_closure(address: CodePtr, members: Vec<NativeType>, output: NativeType)
                     if let Value::Text(v) = input {
                         if let Ok(string) = CString::new(v.clone()) {
                             strings.push(string);
-                            values.push(FfiValue::Ptr(strings.last().unwrap().as_ptr() as *mut CVoid));
+                            values.push(FfiValue::Ptr(
+                                strings.last().unwrap().as_ptr() as *mut CVoid
+                            ));
                         } else {
                             values.push(FfiValue::Ptr(null_mut()));
                         }
@@ -327,41 +340,39 @@ fn build_closure(address: CodePtr, members: Vec<NativeType>, output: NativeType)
 
         let cif = Cif::new(types.into_iter(), result);
 
-        unsafe {
-            match output {
-                NativeType::Float => {
-                    let ret: f64 = cif.call(address, &args);
-                    Ok(Value::Float(ret))
+        match output {
+            NativeType::Float => {
+                let ret: f64 = unsafe { cif.call(address, &args) };
+                Ok(Value::Float(ret))
+            }
+            NativeType::Boolean => {
+                let ret: u8 = unsafe { cif.call(address, &args) };
+                Ok(Value::Boolean(ret != 0))
+            }
+            NativeType::U8 => {
+                let ret: u8 = unsafe { cif.call(address, &args) };
+                Ok(Value::Integer(ret as i64))
+            }
+            NativeType::String => {
+                let ret: *mut CChar = unsafe { cif.call(address, &args) };
+                if ret.is_null() {
+                    Ok(Value::Text(String::new()))
+                } else {
+                    let text = unsafe { CStr::from_ptr(ret) };
+                    Ok(Value::Text(text.to_string_lossy().into_owned()))
                 }
-                NativeType::Boolean => {
-                    let ret: u8 = cif.call(address, &args);
-                    Ok(Value::Boolean(ret != 0))
-                }
-                NativeType::U8 => {
-                    let ret: u8 = cif.call(address, &args);
-                    Ok(Value::Integer(ret as i64))
-                }
-                NativeType::String => {
-                    let ret: *mut CChar = cif.call(address, &args);
-                    if ret.is_null() {
-                        Ok(Value::Text(String::new()))
-                    } else {
-                        let text = CStr::from_ptr(ret);
-                        Ok(Value::Text(text.to_string_lossy().into_owned()))
-                    }
-                }
-                NativeType::Character => {
-                    let ret: u32 = cif.call(address, &args);
-                    Ok(Value::Character(char::from_u32(ret).unwrap_or('\0')))
-                }
-                NativeType::Void => {
-                    cif.call::<()>(address, &args);
-                    Ok(Value::Empty)
-                }
-                NativeType::Integer | NativeType::Pointer => {
-                    let ret: i64 = cif.call(address, &args);
-                    Ok(Value::Integer(ret))
-                }
+            }
+            NativeType::Character => {
+                let ret: u32 = unsafe { cif.call(address, &args) };
+                Ok(Value::Character(char::from_u32(ret).unwrap_or('\0')))
+            }
+            NativeType::Void => {
+                unsafe { cif.call::<()>(address, &args) };
+                Ok(Value::Empty)
+            }
+            NativeType::Integer | NativeType::Pointer => {
+                let ret: i64 = unsafe { cif.call(address, &args) };
+                Ok(Value::Integer(ret))
             }
         }
     })

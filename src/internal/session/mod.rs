@@ -10,12 +10,7 @@ use {
             memory::{transmute, Arc},
             Str,
         },
-        internal::{
-            platform::{
-                catch_unwind, create_dir_all, read, write,
-                AssertUnwindSafe, Lock,
-            },
-        },
+        internal::platform::{catch_unwind, create_dir_all, read, write, AssertUnwindSafe, Lock},
         parser::Parser,
         resolver::Resolver,
         scanner::Scanner,
@@ -25,10 +20,8 @@ use {
 
 #[cfg(feature = "interpreter")]
 use crate::{
+    internal::platform::{temp_dir, DLL_EXTENSION},
     interpreter::{InterpretAction, Interpreter},
-    internal::{
-        platform::{DLL_EXTENSION, temp_dir}
-    }
 };
 
 #[cfg(feature = "generator")]
@@ -47,7 +40,7 @@ Action<
         &self,
         operator: &mut Operator<Arc<Lock<Session<'source>>>>,
         operation: &mut Operation<'source, Arc<Lock<Session<'source>>>>,
-    ) -> () {
+    ) {
         let mut guard = operator.store.write().unwrap();
         let session = &mut *guard;
         if session.prepare() {
@@ -176,8 +169,8 @@ impl<'session> Session<'session> {
         }
 
         #[cfg(feature = "interpreter")]
-        unsafe {
-            use crate::{internal::platform::Command};
+        {
+            use crate::internal::platform::Command;
 
             let mut sources = Vec::new();
             let discard = self.get_directive(Str::from("Discard")).is_some();
@@ -232,7 +225,8 @@ impl<'session> Session<'session> {
                 }
 
                 if library.exists() {
-                    match libloading::Library::new(&library) {
+                    let loading = unsafe { libloading::Library::new(&library) };
+                    match loading {
                         Ok(lib) => std::mem::forget(lib),
                         Err(err) => panic!("failed to open library: {} - {}", library.display(), err),
                     }
