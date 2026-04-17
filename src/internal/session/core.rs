@@ -54,19 +54,24 @@ impl RecordKind {
     }
 }
 
+pub enum Artifact<'session> {
+    Module(Identity),
+    Tokens(Vec<Token<'session>>),
+    Elements(Vec<Element<'session>>),
+    Analyses(Vec<Analysis<'session>>),
+    Output(Location<'session>),
+    Object(Location<'session>),
+}
+
 pub struct Record<'session> {
     pub kind: RecordKind,
     pub location: Location<'session>,
-    pub module: Option<Identity>,
     pub content: Option<Str<'session>>,
     pub rows: Option<Vec<Offset>>,
-    pub tokens: Option<Vec<Token<'session>>>,
-    pub elements: Option<Vec<Element<'session>>>,
-    pub analyses: Option<Vec<Analysis<'session>>>,
-    pub output: Option<Location<'session>>,
-    pub object: Option<Location<'session>>,
     pub hash: u64,
     pub dirty: bool,
+    pub version: usize,
+    pub artifacts: Map<u8, Artifact<'session>>,
 }
 
 impl<'session> Record<'session> {
@@ -74,22 +79,33 @@ impl<'session> Record<'session> {
         Self {
             kind,
             location,
-            module: None,
             content: None,
             rows: None,
-            tokens: None,
-            elements: None,
-            analyses: None,
-            output: None,
-            object: None,
             hash: 0,
             dirty: true,
+            version: 0,
+            artifacts: Map::default(),
         }
     }
 
     pub fn set_content(&mut self, content: Str<'session>) {
         self.rows = Some(Self::rows(&content));
         self.content = Some(content);
+        self.version += 1;
+    }
+
+    pub fn store(&mut self, key: u8, artifact: Artifact<'session>) {
+        self.artifacts.insert(key, artifact);
+        self.version += 1;
+    }
+
+    pub fn fetch(&self, key: u8) -> Option<&Artifact<'session>> {
+        self.artifacts.get(&key)
+    }
+
+    pub fn fetch_mut(&mut self, key: u8) -> Option<&mut Artifact<'session>> {
+        self.version += 1;
+        self.artifacts.get_mut(&key)
     }
 
     pub fn rows(content: &str) -> Vec<Offset> {

@@ -18,7 +18,7 @@ use {
             foreign::{CStr, CVoid, CChar},
             platform::{temp_dir, DLL_EXTENSION, Lock},
             time::Duration,
-            RecordKind, Session, SessionError,
+            RecordKind, Session, SessionError, Artifact,
         },
         reporter::Error,
         resolver::{Type, TypeKind},
@@ -66,8 +66,8 @@ pub fn interpret<'source>(
                 .get(key)
                 .map(|record| {
                     record.kind == RecordKind::Source
-                        && record.module.is_some()
-                        && record.analyses.is_some()
+                        && record.fetch(0).is_some()
+                        && record.fetch(3).is_some()
                 })
                 .unwrap_or(false)
         })
@@ -81,7 +81,14 @@ pub fn interpret<'source>(
         let Some(record) = session.records.get(key) else {
             continue;
         };
-        let (Some(stem), Some(analyses)) = (record.location.stem(), record.analyses.clone()) else {
+
+        let analyses = if let Some(Artifact::Analyses(a)) = record.fetch(3) {
+            a.clone()
+        } else {
+            continue;
+        };
+
+        let Some(stem) = record.location.stem() else {
             continue;
         };
 
@@ -94,7 +101,7 @@ pub fn interpret<'source>(
         }
 
         let stem = Str::from(stem.to_string());
-        core.modules.insert(stem, analyses.clone());
+        core.modules.insert(stem, analyses);
     }
 
     core.compile();
@@ -337,7 +344,7 @@ impl<'source> Action<
         let mut sources: Vec<_> = session
             .records
             .iter()
-            .filter(|(_, r)| r.kind == RecordKind::Source && r.module.is_some())
+            .filter(|(_, r)| r.kind == RecordKind::Source && r.fetch(0).is_some())
             .map(|(&k, _)| k)
             .collect();
         sources.sort();

@@ -23,7 +23,7 @@ use {
         internal::{
             platform::Lock,
             time::Duration,
-            SessionError, RecordKind, Session,
+            SessionError, RecordKind, Session, Artifact,
         },
         reporter::Error,
     },
@@ -51,7 +51,8 @@ pub fn scan<'source>(session: &mut Session<'source>, keys: &[Identity]) {
         if !dirty {
             if let Some(mut tokens) = session.cache::<Vec<Token>>("tokens", hash, None) {
                 tokens.shrink_to_fit();
-                session.records.get_mut(&key).unwrap().tokens = Some(tokens);
+                let record = session.records.get_mut(&key).unwrap();
+                record.store(1, Artifact::Tokens(tokens));
                 continue;
             }
         }
@@ -91,8 +92,10 @@ pub fn scan<'source>(session: &mut Session<'source>, keys: &[Identity]) {
                 .map(|error| SessionError::Scan(error.clone())),
         );
 
-        session.records.get_mut(&key).unwrap().tokens =
-            session.cache("tokens", hash, Some(scanner.output));
+        if let Some(tokens) = session.cache("tokens", hash, Some(scanner.output)) {
+            let record = session.records.get_mut(&key).unwrap();
+            record.store(1, Artifact::Tokens(tokens));
+        }
     }
 }
 

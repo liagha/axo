@@ -25,7 +25,7 @@ use {
         internal::{
             platform::Lock,
             time::Duration,
-            SessionError, RecordKind, Session,
+            SessionError, RecordKind, Session, Artifact,
         },
         tracker::{Peekable, Location},
     },
@@ -39,12 +39,17 @@ pub fn parse<'source>(session: &mut Session<'source>, keys: &[Identity]) {
     for &key in keys {
         let (kind, hash, dirty, location, tokens) = {
             let record = session.records.get(&key).unwrap();
+            let tokens = if let Some(Artifact::Tokens(tokens)) = record.fetch(1) {
+                Some(tokens.clone())
+            } else {
+                None
+            };
             (
                 record.kind.clone(),
                 record.hash,
                 record.dirty,
                 record.location,
-                record.tokens.clone(),
+                tokens,
             )
         };
 
@@ -56,14 +61,16 @@ pub fn parse<'source>(session: &mut Session<'source>, keys: &[Identity]) {
             if let Some(mut elements) = session.cache::<Vec<Element>>("elements", hash, None) {
                 elements.shrink_to_fit();
                 let record = session.records.get_mut(&key).unwrap();
-                record.elements = Some(elements);
-                record.tokens = None;
+                record.store(2, Artifact::Elements(elements));
+                record.artifacts.remove(&1);
                 continue;
             }
         }
 
         let mut parser = Parser::new(location);
-        parser.set_input(tokens.unwrap());
+        if let Some(tokens) = tokens {
+            parser.set_input(tokens);
+        }
         parser.parse();
 
         if let Some(stencil) = session.get_stencil() {
@@ -83,10 +90,11 @@ pub fn parse<'source>(session: &mut Session<'source>, keys: &[Identity]) {
                 .map(|error| SessionError::Parse(error.clone())),
         );
 
-        let elements = session.cache("elements", hash, Some(parser.output));
-        let record = session.records.get_mut(&key).unwrap();
-        record.elements = elements;
-        record.tokens = None;
+        if let Some(elements) = session.cache("elements", hash, Some(parser.output)) {
+            let record = session.records.get_mut(&key).unwrap();
+            record.store(2, Artifact::Elements(elements));
+            record.artifacts.remove(&1);
+        }
     }
 }
 

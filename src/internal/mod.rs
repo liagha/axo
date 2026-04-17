@@ -3,6 +3,7 @@ mod session;
 pub use {
     session::{
         prepare,
+        Artifact,
         RecordKind,
         PrepareAction,
         Session,

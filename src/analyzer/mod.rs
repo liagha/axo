@@ -11,7 +11,7 @@ use {
         internal::{
             time::Duration,
             platform::Lock,
-            SessionError, RecordKind, Session,
+            SessionError, RecordKind, Session, Artifact,
         },
         data::{
             Identity,
@@ -31,20 +31,25 @@ pub fn analyze<'source>(session: &mut Session<'source>, keys: &[Identity]) {
     for &key in keys {
         let (hash, dirty, elements) = {
             let record = session.records.get(&key).unwrap();
-            (record.hash, record.dirty, record.elements.clone())
+            let elements = if let Some(Artifact::Elements(elements)) = record.fetch(2) {
+                Some(elements.clone())
+            } else {
+                None
+            };
+            (record.hash, record.dirty, elements)
         };
 
         if !dirty {
             if let Some(mut analyses) = session.cache::<Vec<Analysis>>("analyses", hash, None) {
                 analyses.shrink_to_fit();
                 let record = session.records.get_mut(&key).unwrap();
-                record.analyses = Some(analyses);
-                record.elements = None;
+                record.store(3, Artifact::Analyses(analyses));
+                record.artifacts.remove(&2);
                 continue;
             }
         }
 
-        let mut analyzer = Analyzer::new(elements.unwrap());
+        let mut analyzer = Analyzer::new(elements.unwrap_or_default());
         analyzer.analyze(&mut session.resolver);
 
         if let Some(stencil) = session.get_stencil() {
@@ -64,10 +69,11 @@ pub fn analyze<'source>(session: &mut Session<'source>, keys: &[Identity]) {
                 .map(|error| SessionError::Analyze(error.clone())),
         );
 
-        let analyses = session.cache("analyses", hash, Some(analyzer.output));
-        let record = session.records.get_mut(&key).unwrap();
-        record.analyses = analyses;
-        record.elements = None;
+        if let Some(analyses) = session.cache("analyses", hash, Some(analyzer.output)) {
+            let record = session.records.get_mut(&key).unwrap();
+            record.store(3, Artifact::Analyses(analyses));
+            record.artifacts.remove(&2);
+        }
     }
 }
 
@@ -93,7 +99,7 @@ Action<
             .records
             .iter()
             .filter_map(|(&key, record)| {
-                if record.kind == RecordKind::Source && record.module.is_some() {
+                if record.kind == RecordKind::Source && record.fetch(0).is_some() {
                     Some(key)
                 } else {
                     None

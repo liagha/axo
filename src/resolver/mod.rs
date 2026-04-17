@@ -20,7 +20,7 @@ use {
         internal::{
             time::Duration,
             platform::Lock,
-            SessionError, RecordKind, Session,
+            SessionError, RecordKind, Session, Artifact,
         },
         combinator::{Action, Operation, Operator},
         format::Show,
@@ -69,7 +69,7 @@ pub fn resolve<'source>(session: &mut Session<'source>, keys: &[Identity]) {
             });
 
             if let Some(target) = existing {
-                record.module = Some(target);
+                record.store(0, Artifact::Module(target));
                 return None;
             }
 
@@ -87,7 +87,7 @@ pub fn resolve<'source>(session: &mut Session<'source>, keys: &[Identity]) {
             );
 
             symbol.identity = identity;
-            record.module = Some(symbol.identity);
+            record.store(0, Artifact::Module(symbol.identity));
             Some(symbol)
         })
         .collect();
@@ -97,14 +97,15 @@ pub fn resolve<'source>(session: &mut Session<'source>, keys: &[Identity]) {
     }
 
     for &key in &source {
-        let target = session.records.get(&key).unwrap().module.unwrap();
+        let target = if let Some(Artifact::Module(m)) = session.records.get(&key).unwrap().fetch(0) { *m } else { continue };
         let mut module = session.resolver.registry.remove(&target).unwrap();
         let scope = replace(&mut module.scope, Box::from(Scope::new(None)));
         session.resolver.enter_scope(*scope);
 
-        let elements = session.records.get_mut(&key).unwrap().elements.as_mut().unwrap();
-        for element in elements.iter_mut() {
-            element.declare(&mut session.resolver);
+        if let Some(Artifact::Elements(elements)) = session.records.get_mut(&key).unwrap().fetch_mut(2) {
+            for element in elements.iter_mut() {
+                element.declare(&mut session.resolver);
+            }
         }
 
         let active = session.resolver.active;
@@ -143,14 +144,15 @@ pub fn resolve<'source>(session: &mut Session<'source>, keys: &[Identity]) {
     }
 
     for &key in &source {
-        let target = session.records.get(&key).unwrap().module.unwrap();
+        let target = if let Some(Artifact::Module(m)) = session.records.get(&key).unwrap().fetch(0) { *m } else { continue };
         let mut module = session.resolver.registry.remove(&target).unwrap();
         let scope = replace(&mut module.scope, Box::from(Scope::new(None)));
         session.resolver.enter_scope(*scope);
 
-        let elements = session.records.get_mut(&key).unwrap().elements.as_mut().unwrap();
-        for element in elements.iter_mut() {
-            element.resolve(&mut session.resolver);
+        if let Some(Artifact::Elements(elements)) = session.records.get_mut(&key).unwrap().fetch_mut(2) {
+            for element in elements.iter_mut() {
+                element.resolve(&mut session.resolver);
+            }
         }
 
         let active = session.resolver.active;
@@ -160,14 +162,15 @@ pub fn resolve<'source>(session: &mut Session<'source>, keys: &[Identity]) {
     }
 
     for &key in &source {
-        let target = session.records.get(&key).unwrap().module.unwrap();
+        let target = if let Some(Artifact::Module(m)) = session.records.get(&key).unwrap().fetch(0) { *m } else { continue };
         let mut module = session.resolver.registry.remove(&target).unwrap();
         let scope = replace(&mut module.scope, Box::from(Scope::new(None)));
         session.resolver.enter_scope(*scope);
 
-        let elements = session.records.get_mut(&key).unwrap().elements.as_mut().unwrap();
-        for element in elements.iter_mut() {
-            element.reify(&mut session.resolver);
+        if let Some(Artifact::Elements(elements)) = session.records.get_mut(&key).unwrap().fetch_mut(2) {
+            for element in elements.iter_mut() {
+                element.reify(&mut session.resolver);
+            }
         }
 
         let active = session.resolver.active;

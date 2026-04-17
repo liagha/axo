@@ -144,7 +144,7 @@ pub fn create<'a>(
     let mut flag_record = Record::new(RecordKind::Flag, Location::from("flag"));
     flag_record.set_content(flag);
     records.insert(0, flag_record);
-    
+
     if !bare {
         for &(path, content) in BASE {
             if let Some(kind) = RecordKind::from_path(path) {
