@@ -12,92 +12,13 @@ pub use {character::Character, operator::*, punctuation::*, scanner::Scanner, to
 pub type ScanError<'error> = Error<'error, ErrorKind<'error>>;
 
 use {
-    broccli::Color,
     crate::{
         combinator::{Action, Operation},
-        data::{
-            Identity,
-            memory::Arc,
-        },
-        format::Show,
-        internal::{
-            platform::Lock,
-            time::Duration,
-            SessionError, RecordKind, Session, Artifact,
-        },
-        reporter::Error,
+        data::memory::Arc,
+        internal::{platform::Lock, time::Duration, Session},
     },
 };
-
-pub fn scan<'source>(session: &mut Session<'source>, keys: &[Identity]) {
-    use crate::scanner::Scanner;
-
-    for &key in keys {
-        let (kind, hash, dirty, location, content) = {
-            let record = session.records.get(&key).unwrap();
-            (
-                record.kind.clone(),
-                record.hash,
-                record.dirty,
-                record.location,
-                record.content.clone(),
-            )
-        };
-
-        if kind != RecordKind::Source {
-            continue;
-        }
-
-        if !dirty {
-            if let Some(mut tokens) = session.cache::<Vec<Token>>("tokens", hash, None) {
-                tokens.shrink_to_fit();
-                let record = session.records.get_mut(&key).unwrap();
-                record.store(1, Artifact::Tokens(tokens));
-                continue;
-            }
-        }
-
-        let content = if let Some(content) = content {
-            crate::data::Str::from(content)
-        } else {
-            match location.get_value() {
-                Ok(content) => content,
-                Err(error) => {
-                    let kind = ErrorKind::Tracking(error.clone());
-                    let error = ScanError::new(kind, error.span);
-                    session.errors.push(SessionError::Scan(error));
-                    continue;
-                }
-            }
-        };
-
-        let position = crate::tracker::Position::new(key);
-        let mut scanner = Scanner::new(position, content);
-        scanner.scan();
-
-        if let Some(stencil) = session.get_stencil() {
-            session.report_section(
-                "Tokens",
-                Color::Cyan,
-                scanner.output.format(stencil).to_string(),
-            );
-        }
-
-        scanner.output.shrink_to_fit();
-
-        session.errors.extend(
-            scanner
-                .errors
-                .iter()
-                .map(|error| SessionError::Scan(error.clone())),
-        );
-
-        if let Some(tokens) = session.cache("tokens", hash, Some(scanner.output)) {
-            let record = session.records.get_mut(&key).unwrap();
-            record.store(1, Artifact::Tokens(tokens));
-        }
-    }
-}
+use crate::reporter::Error;
 
 impl<'source>
 Action<
@@ -110,14 +31,16 @@ Action<
         &self,
         operator: &mut crate::combinator::Operator<Arc<Lock<Session<'source>>>>,
         operation: &mut Operation<'source, Arc<Lock<Session<'source>>>>,
-    ) -> () {
+    ) {
         let mut session = operator.store.write().unwrap();
         let initial = session.errors.len();
+
         session.report_start("scanning");
 
         let mut keys: Vec<_> = session.records.keys().copied().collect();
         keys.sort();
-        scan(&mut session, &keys);
+
+        Scanner::execute(&mut session, &keys);
 
         let duration = Duration::from_nanos(session.timer.lap().unwrap());
         session.report_finish("scanning", duration, session.errors.len() - initial);

@@ -1,10 +1,13 @@
+// src/parser/parser.rs
 use crate::{
     combinator::{Classifier, Form, Former},
-    data::{Offset, Scale},
+    data::{Identity, Offset, Scale},
+    internal::{Artifact, RecordKind, Session, SessionError},
     parser::{Element, ErrorKind, ParseError},
     scanner::{PunctuationKind, Token, TokenKind},
     tracker::{Location, Peekable, Position},
 };
+use broccli::Color;
 
 pub struct Parser<'a> {
     pub index: Offset,
@@ -67,7 +70,7 @@ impl<'a> Peekable<'a, Token<'a>> for Parser<'a> {
 
 impl<'a: 'source, 'source> Parser<'a> {
     #[inline]
-    fn error_priority(error: &ParseError<'a>) -> u8 {
+    fn priority(error: &ParseError<'a>) -> u8 {
         match &error.kind {
             ErrorKind::UnclosedDelimiter(_) => 4,
             ErrorKind::MissingSeparator(_) => 3,
@@ -80,9 +83,9 @@ impl<'a: 'source, 'source> Parser<'a> {
     }
 
     #[inline]
-    fn prefer_error(candidate: &ParseError<'a>, current: &ParseError<'a>) -> bool {
-        (candidate.span.end, candidate.span.start, Self::error_priority(candidate))
-            > (current.span.end, current.span.start, Self::error_priority(current))
+    fn prefer(candidate: &ParseError<'a>, current: &ParseError<'a>) -> bool {
+        (candidate.span.end, candidate.span.start, Self::priority(candidate))
+            > (current.span.end, current.span.start, Self::priority(current))
     }
 
     pub fn new(_: Location<'a>) -> Self {
@@ -107,7 +110,7 @@ impl<'a: 'source, 'source> Parser<'a> {
                             | TokenKind::Comment(_)
                     )
                 })
-                .with_ignore(),
+                    .with_ignore(),
                 Classifier::predicate(|token: &Token| {
                     !matches!(
                         token.kind,
@@ -139,25 +142,93 @@ impl<'a: 'source, 'source> Parser<'a> {
             former.form(Self::parser()).flatten()
         };
 
-        let mut best_error: Option<ParseError<'a>> = None;
+        let mut error: Option<ParseError<'a>> = None;
         for form in forms {
             match form {
                 Form::Output(output) => self.output.push(output),
                 Form::Failure(failure) => {
-                    if best_error
+                    if error
                         .as_ref()
-                        .map(|current| Self::prefer_error(&failure, current))
+                        .map(|current| Self::prefer(&failure, current))
                         .unwrap_or(true)
                     {
-                        best_error = Some(failure);
+                        error = Some(failure);
                     }
                 }
                 _ => {}
             }
         }
 
-        if let Some(error) = best_error {
-            self.errors.push(error);
+        if let Some(err) = error {
+            self.errors.push(err);
+        }
+    }
+
+    pub fn execute(session: &mut Session<'a>, keys: &[Identity]) {
+        for &key in keys {
+            Self::process(session, key);
+        }
+    }
+
+    fn process(session: &mut Session<'a>, key: Identity) {
+        let (kind, hash, dirty, location, tokens) = {
+            let record = session.records.get(&key).unwrap();
+            let tokens = if let Some(Artifact::Tokens(tokens)) = record.fetch(1) {
+                Some(tokens.clone())
+            } else {
+                None
+            };
+            (
+                record.kind.clone(),
+                record.hash,
+                record.dirty,
+                record.location,
+                tokens,
+            )
+        };
+
+        if kind != RecordKind::Source {
+            return;
+        }
+
+        if !dirty {
+            if let Some(mut elements) = session.cache::<Vec<Element>>("elements", hash, None) {
+                elements.shrink_to_fit();
+                let record = session.records.get_mut(&key).unwrap();
+                record.store(2, Artifact::Elements(elements));
+                record.artifacts.remove(&1);
+                return;
+            }
+        }
+
+        let mut parser = Parser::new(location);
+        if let Some(tokens) = tokens {
+            parser.set_input(tokens);
+        }
+        parser.parse();
+
+        if let Some(stencil) = session.get_stencil() {
+            use crate::format::Show;
+            session.report_section(
+                "Elements",
+                Color::Cyan,
+                parser.output.format(stencil).to_string(),
+            );
+        }
+
+        parser.output.shrink_to_fit();
+
+        session.errors.extend(
+            parser
+                .errors
+                .iter()
+                .map(|error| SessionError::Parse(error.clone())),
+        );
+
+        if let Some(elements) = session.cache("elements", hash, Some(parser.output)) {
+            let record = session.records.get_mut(&key).unwrap();
+            record.store(2, Artifact::Elements(elements));
+            record.artifacts.remove(&1);
         }
     }
 }

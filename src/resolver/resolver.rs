@@ -1,8 +1,13 @@
+// src/resolver/resolver.rs
+use broccli::Color;
 use crate::{
-    data::Identity,
-    internal::hash::Map,
-    parser::{Element, Symbol},
+    data::{memory::replace, Identity, Module, Str},
+    internal::{hash::Map, Artifact, RecordKind, Session, SessionError},
+    format::Show,
+    parser::{Element, ElementKind, Symbol, SymbolKind, Visibility},
     resolver::{next_identity, scope::Scope, ErrorKind, ResolveError, Type},
+    scanner::{Token, TokenKind},
+    tracker::Span,
 };
 
 pub struct Resolver<'a> {
@@ -157,6 +162,165 @@ impl<'a> Resolver<'a> {
                 hints: Vec::new(),
                 phantom: Default::default(),
             }])
+        }
+    }
+
+    pub fn execute(session: &mut Session<'a>, keys: &[Identity]) {
+        let mut source: Vec<_> = keys
+            .iter()
+            .copied()
+            .filter(|key| {
+                session.records.get(key).map_or(false, |r| r.kind == RecordKind::Source)
+            })
+            .collect();
+        source.sort();
+
+        Self::prepare(session, &source);
+        Self::run_declare(session, &source);
+        Self::report(session);
+        Self::run_resolve(session, &source);
+        Self::run_reify(session, &source);
+
+        session
+            .errors
+            .extend(session.resolver.errors.drain(..).map(SessionError::Resolve));
+    }
+
+    fn prepare(session: &mut Session<'a>, source: &[Identity]) {
+        let modules: Vec<_> = source
+            .iter()
+            .filter_map(|&identity| {
+                let record = session.records.get_mut(&identity).unwrap();
+                let name = Str::from(record.location.stem().unwrap().to_string());
+
+                let existing = session.resolver.registry.iter().find_map(|(&id, symbol)| {
+                    if matches!(symbol.kind, SymbolKind::Module(_)) && symbol.target() == Some(name.clone()) {
+                        Some(id)
+                    } else {
+                        None
+                    }
+                });
+
+                if let Some(target) = existing {
+                    record.store(0, Artifact::Module(target));
+                    return None;
+                }
+
+                let end = record.content.as_ref().map(|value| value.len() as u32).unwrap_or(0);
+                let span = Span::range(identity, 0, end);
+                let head = Element::new(
+                    ElementKind::literal(Token::new(TokenKind::identifier(name), span)),
+                    span,
+                ).into();
+
+                let mut symbol = Symbol::new(
+                    SymbolKind::module(Module::new(head)),
+                    span,
+                    Visibility::Public,
+                );
+
+                symbol.identity = identity;
+                record.store(0, Artifact::Module(symbol.identity));
+                Some(symbol)
+            })
+            .collect();
+
+        for module in modules {
+            session.resolver.insert(module);
+        }
+    }
+
+    fn run_declare(session: &mut Session<'a>, source: &[Identity]) {
+        for &key in source {
+            let target = if let Some(Artifact::Module(m)) = session.records.get(&key).unwrap().fetch(0) { *m } else { continue };
+            let mut module = session.resolver.registry.remove(&target).unwrap();
+            let scope = replace(&mut module.scope, Box::from(Scope::new(None)));
+
+            session.resolver.enter_scope(*scope);
+
+            if let Some(Artifact::Elements(elements)) = session.records.get_mut(&key).unwrap().fetch_mut(2) {
+                for element in elements.iter_mut() {
+                    element.declare(&mut session.resolver);
+                }
+            }
+
+            let active = session.resolver.active;
+            session.resolver.exit();
+            module.set_scope(session.resolver.scopes.remove(&active).unwrap());
+            session.resolver.insert(module);
+        }
+    }
+
+    fn report(session: &mut Session<'a>) {
+        if let Some(stencil) = session.get_stencil() {
+            session.report_section(
+                "Symbols",
+                Color::Blue,
+                session
+                    .resolver
+                    .collect()
+                    .iter()
+                    .map(|symbol| {
+                        let children = symbol
+                            .scope
+                            .symbols
+                            .iter()
+                            .filter_map(|identity| session.resolver.get_symbol(*identity))
+                            .collect::<Vec<_>>()
+                            .format(stencil.clone())
+                            .to_string();
+
+                        format!(
+                            "{}\n{}\n",
+                            symbol.format(stencil.clone()),
+                            children.indent(stencil.clone())
+                        )
+                    })
+                    .collect::<Vec<String>>()
+                    .join("\n"),
+            )
+        }
+    }
+
+    fn run_resolve(session: &mut Session<'a>, source: &[Identity]) {
+        for &key in source {
+            let target = if let Some(Artifact::Module(m)) = session.records.get(&key).unwrap().fetch(0) { *m } else { continue };
+            let mut module = session.resolver.registry.remove(&target).unwrap();
+            let scope = replace(&mut module.scope, Box::from(Scope::new(None)));
+
+            session.resolver.enter_scope(*scope);
+
+            if let Some(Artifact::Elements(elements)) = session.records.get_mut(&key).unwrap().fetch_mut(2) {
+                for element in elements.iter_mut() {
+                    element.resolve(&mut session.resolver);
+                }
+            }
+
+            let active = session.resolver.active;
+            session.resolver.exit();
+            module.scope = Box::from(session.resolver.scopes.remove(&active).unwrap());
+            session.resolver.insert(module);
+        }
+    }
+
+    fn run_reify(session: &mut Session<'a>, source: &[Identity]) {
+        for &key in source {
+            let target = if let Some(Artifact::Module(m)) = session.records.get(&key).unwrap().fetch(0) { *m } else { continue };
+            let mut module = session.resolver.registry.remove(&target).unwrap();
+            let scope = replace(&mut module.scope, Box::from(Scope::new(None)));
+
+            session.resolver.enter_scope(*scope);
+
+            if let Some(Artifact::Elements(elements)) = session.records.get_mut(&key).unwrap().fetch_mut(2) {
+                for element in elements.iter_mut() {
+                    element.reify(&mut session.resolver);
+                }
+            }
+
+            let active = session.resolver.active;
+            session.resolver.exit();
+            module.scope = Box::from(session.resolver.scopes.remove(&active).unwrap());
+            session.resolver.insert(module);
         }
     }
 }

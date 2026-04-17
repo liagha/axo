@@ -1,9 +1,12 @@
+// src/scanner/scanner.rs
 use crate::{
     combinator::{Form, Former},
-    data::{Offset, Scale, Str},
-    scanner::{Character, ScanError, Token},
+    data::{Identity, Offset, Scale, Str},
+    internal::{Artifact, RecordKind, Session, SessionError},
+    scanner::{Character, ErrorKind, ScanError, Token},
     tracker::{Peekable, Position},
 };
+use broccli::Color;
 
 pub struct Scanner<'scanner> {
     pub index: Offset,
@@ -91,6 +94,79 @@ impl<'scanner> Scanner<'scanner> {
                 Form::Failure(failure) => self.errors.push(failure),
                 _ => {}
             }
+        }
+    }
+
+    pub fn execute(session: &mut Session<'scanner>, keys: &[Identity]) {
+        for &key in keys {
+            Self::process(session, key);
+        }
+    }
+
+    fn process(session: &mut Session<'scanner>, key: Identity) {
+        let (kind, hash, dirty, location, content) = {
+            let record = session.records.get(&key).unwrap();
+            (
+                record.kind.clone(),
+                record.hash,
+                record.dirty,
+                record.location,
+                record.content.clone(),
+            )
+        };
+
+        if kind != RecordKind::Source {
+            return;
+        }
+
+        if !dirty {
+            if let Some(mut tokens) = session.cache::<Vec<Token>>("tokens", hash, None) {
+                tokens.shrink_to_fit();
+                let record = session.records.get_mut(&key).unwrap();
+                record.store(1, Artifact::Tokens(tokens));
+                return;
+            }
+        }
+
+        let content = if let Some(content) = content {
+            crate::data::Str::from(content)
+        } else {
+            match location.get_value() {
+                Ok(content) => content,
+                Err(error) => {
+                    let kind = ErrorKind::Tracking(error.clone());
+                    let scan_error = ScanError::new(kind, error.span);
+                    session.errors.push(SessionError::Scan(scan_error));
+                    return;
+                }
+            }
+        };
+
+        let position = Position::new(key);
+        let mut scanner = Scanner::new(position, content);
+        scanner.scan();
+
+        if let Some(stencil) = session.get_stencil() {
+            use crate::format::Show;
+            session.report_section(
+                "Tokens",
+                Color::Cyan,
+                scanner.output.format(stencil).to_string(),
+            );
+        }
+
+        scanner.output.shrink_to_fit();
+
+        session.errors.extend(
+            scanner
+                .errors
+                .iter()
+                .map(|error| SessionError::Scan(error.clone())),
+        );
+
+        if let Some(tokens) = session.cache("tokens", hash, Some(scanner.output)) {
+            let record = session.records.get_mut(&key).unwrap();
+            record.store(1, Artifact::Tokens(tokens));
         }
     }
 }

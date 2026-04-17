@@ -75,9 +75,9 @@ pub fn run<'a>(
 ) {
     use axo::{
         internal::prepare,
-        scanner::scan,
-        parser::parse,
-        resolver::resolve,
+        scanner::Scanner,
+        parser::Parser,
+        resolver::Resolver,
         analyzer::analyze,
     };
 
@@ -88,9 +88,9 @@ pub fn run<'a>(
         return;
     }
 
-    scan(session, keys);
-    parse(session, keys);
-    resolve(session, keys);
+    Scanner::execute(session, keys);
+    Parser::execute(session, keys);
+    Resolver::execute(session, keys);
     analyze(session, keys);
     interpret(session, core, keys);
 
