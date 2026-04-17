@@ -1,34 +1,10 @@
 use crate::{
-    data::{Delimited, Function, Interface, Str},
-    parser::{Element, ElementKind, Symbol, SymbolKind, Visibility},
+    boolean, character, delimited, function, identifier, integer, literal, punctuation, string,
+    data::{Delimited, Function, Interface},
+    parser::{Element, Symbol, Visibility},
     resolver::Resolver,
-    scanner::{PunctuationKind, Token, TokenKind},
-    tracker::Span,
+    scanner::PunctuationKind,
 };
-
-#[allow(dead_code)]
-pub enum Primitive {
-    Import = 0,
-    If = 1,
-    While = 2,
-    Continue = 3,
-    Break = 4,
-    Return = 5,
-    Int8 = 6,
-    Int16 = 7,
-    Int32 = 8,
-    Int64 = 9,
-    UInt8 = 10,
-    UInt16 = 11,
-    UInt32 = 12,
-    UInt64 = 13,
-    Float32 = 14,
-    Float64 = 15,
-    Boolean = 16,
-    Character = 17,
-    String = 18,
-    Void = 19,
-}
 
 impl<'resolver> Resolver<'resolver> {
     pub fn builtin(target: &Element<'resolver>) -> Option<Symbol<'resolver>> {
@@ -40,59 +16,37 @@ impl<'resolver> Resolver<'resolver> {
             "Int32" => Some(Resolver::function("Int32", "Integer")),
             "Int64" => Some(Resolver::function("Int64", "Integer")),
             "Integer" => Some(Resolver::function("Integer", "Integer")),
-
             "UInt8" => Some(Resolver::function("UInt8", "Integer")),
             "UInt16" => Some(Resolver::function("UInt16", "Integer")),
             "UInt32" => Some(Resolver::function("UInt32", "Integer")),
             "UInt64" => Some(Resolver::function("UInt64", "Integer")),
-
             "Float32" => Some(Resolver::function("Float32", "Float")),
             "Float64" => Some(Resolver::function("Float64", "Float")),
             "Float" => Some(Resolver::function("Float", "Float")),
-
             "Boolean" => Some(Resolver::function("Boolean", "Boolean")),
             "Character" => Some(Resolver::function("Character", "Character")),
             "String" => Some(Resolver::function("String", "String")),
-
             "Void" => Some(Resolver::function("Void", "Void")),
-
             "if" => Some(Resolver::statement("if")),
             "while" => Some(Resolver::statement("while")),
             "break" => Some(Resolver::statement("break")),
             "continue" => Some(Resolver::statement("continue")),
             "return" => Some(Resolver::statement("return")),
-
             _ => None,
         }
     }
 
     fn statement(name: &'static str) -> Symbol<'resolver> {
-        let target = Element::new(
-            ElementKind::literal(Token::new(
-                TokenKind::string(Str::from(name)),
-                Span::void(),
-            )),
-            Span::void(),
-        );
+        let target = literal!(string!(name));
+        let body = delimited!(Delimited::new(
+            punctuation!(PunctuationKind::LeftBrace),
+            Vec::new(),
+            None,
+            punctuation!(PunctuationKind::RightBrace),
+        ));
 
-        let body = Element::new(
-            ElementKind::Delimited(Box::new(Delimited::new(
-                Token::new(
-                    TokenKind::Punctuation(PunctuationKind::LeftBrace),
-                    Span::void(),
-                ),
-                Vec::new(),
-                None,
-                Token::new(
-                    TokenKind::Punctuation(PunctuationKind::RightBrace),
-                    Span::void(),
-                ),
-            ))),
-            Span::void(),
-        );
-
-        Symbol::new(
-            SymbolKind::function(Function::new(
+        function!(
+            Function::new(
                 target,
                 Vec::new(),
                 Some(body),
@@ -100,94 +54,40 @@ impl<'resolver> Resolver<'resolver> {
                 Interface::Compiler,
                 false,
                 false,
-            )),
-            Span::void(),
-            Visibility::Public,
+            ),
+            Visibility::Public
         )
     }
 
     fn function(name: &'static str, output: &'static str) -> Symbol<'resolver> {
-        let target = Element::new(
-            ElementKind::literal(Token::new(
-                TokenKind::identifier(Str::from(name)),
-                Span::void(),
-            )),
-            Span::void(),
-        );
-
-        let output_annotation = Element::new(
-            ElementKind::literal(Token::new(
-                TokenKind::string(Str::from(output)),
-                Span::void(),
-            )),
-            Span::void(),
-        );
+        let target = literal!(identifier!(name));
+        let annotation = literal!(string!(output));
 
         let body = match output {
-            "Integer" => Element::new(
-                ElementKind::literal(Token::new(TokenKind::integer(0), Span::void())),
-                Span::void(),
-            ),
-            "Float" => Element::new(
-                ElementKind::literal(Token::new(TokenKind::integer(0), Span::void())),
-                Span::void(),
-            ),
-            "Boolean" => Element::new(
-                ElementKind::literal(Token::new(TokenKind::Boolean(false), Span::void())),
-                Span::void(),
-            ),
-            "Character" => Element::new(
-                ElementKind::literal(Token::new(TokenKind::character('a'), Span::void())),
-                Span::void(),
-            ),
-            "String" => Element::new(
-                ElementKind::literal(Token::new(TokenKind::string(Str::from("")), Span::void())),
-                Span::void(),
-            ),
-            "Unit" => Element::new(
-                ElementKind::Delimited(Box::new(Delimited::new(
-                    Token::new(
-                        TokenKind::Punctuation(PunctuationKind::LeftBrace),
-                        Span::void(),
-                    ),
-                    Vec::new(),
-                    None,
-                    Token::new(
-                        TokenKind::Punctuation(PunctuationKind::RightBrace),
-                        Span::void(),
-                    ),
-                ))),
-                Span::void(),
-            ),
-            _ => Element::new(
-                ElementKind::Delimited(Box::new(Delimited::new(
-                    Token::new(
-                        TokenKind::Punctuation(PunctuationKind::LeftBrace),
-                        Span::void(),
-                    ),
-                    Vec::new(),
-                    None,
-                    Token::new(
-                        TokenKind::Punctuation(PunctuationKind::RightBrace),
-                        Span::void(),
-                    ),
-                ))),
-                Span::void(),
-            ),
+            "Integer" => literal!(integer!(0)),
+            "Float" => literal!(integer!(0)),
+            "Boolean" => literal!(boolean!(false)),
+            "Character" => literal!(character!('a')),
+            "String" => literal!(string!("")),
+            _ => delimited!(Delimited::new(
+                punctuation!(PunctuationKind::LeftBrace),
+                Vec::new(),
+                None,
+                punctuation!(PunctuationKind::RightBrace),
+            )),
         };
 
-        Symbol::new(
-            SymbolKind::function(Function::new(
+        function!(
+            Function::new(
                 target,
                 Vec::new(),
                 Some(body),
-                Some(output_annotation),
+                Some(annotation),
                 Interface::Compiler,
                 false,
                 false,
-            )),
-            Span::void(),
-            Visibility::Public,
+            ),
+            Visibility::Public
         )
     }
 }

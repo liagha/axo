@@ -4,7 +4,6 @@ struct Point {
 
     func print_position(let point: Point) {
         print.print_integer(point.x)
-        print.print_newline()
         print.print_integer(point.y)
     }
 }

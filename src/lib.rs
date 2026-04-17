@@ -23,4 +23,5 @@ pub mod text;
 pub mod tracker;
 
 pub mod data;
+mod macros;
 mod format;

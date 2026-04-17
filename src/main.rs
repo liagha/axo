@@ -3,20 +3,22 @@ mod dialog;
 
 use axo::{
     data::{Identity, Module, Str},
+    identifier,
     initializer::Initializer,
     internal::{
         hash::{DefaultHasher, Hash, Hasher, Map},
-        platform::{read_dir, args},
+        platform::{args, read_dir},
         time::DefaultTimer,
-        SessionError, RecordKind, Record, Session,
+        Record, RecordKind, Session, SessionError,
     },
-    parser::{Element, ElementKind, Symbol, SymbolKind, Visibility},
-    resolver::{Resolver},
-    scanner::{Token, TokenKind},
+    literal, module,
+    parser::{ElementKind, Symbol, SymbolKind, Visibility},
+    resolver::Resolver,
+    scanner::TokenKind,
     tracker::{ErrorKind as TrackErrorKind, Location, Span, TrackError},
 };
 #[cfg(feature = "interpreter")]
-use axo::interpreter::{Interpreter};
+use axo::interpreter::Interpreter;
 
 pub const BASE: &[(&str, &str)] = &[
     ("./base/cast.axo", include_str!("../base/cast.axo")),
@@ -66,17 +68,9 @@ fn main() {
 }
 
 #[cfg(feature = "interpreter")]
-pub fn run<'a>(
-    session: &mut Session<'a>,
-    core: &mut Interpreter<'a>,
-    keys: &[Identity],
-) {
+pub fn run<'a>(session: &mut Session<'a>, core: &mut Interpreter<'a>, keys: &[Identity]) {
     use axo::{
-        internal::prepare,
-        scanner::Scanner,
-        parser::Parser,
-        resolver::Resolver,
-        analyzer::Analyzer,
+        analyzer::Analyzer, internal::prepare, parser::Parser, resolver::Resolver, scanner::Scanner,
     };
 
     session.errors.clear();
@@ -100,9 +94,9 @@ fn build(
     bare: bool,
     directives: Vec<Symbol>,
     failures: Vec<SessionError<'static>>,
-    flag_content: Str<'static>,
+    flag: Str<'static>,
 ) {
-    let mut session = create(bare, directives, failures, flag_content);
+    let mut session = create(bare, directives, failures, flag);
 
     targets.iter().for_each(|(target, span)| {
         if !traverse(target, &mut session.records) {
@@ -139,9 +133,9 @@ pub fn create<'a>(
     let mut records = Map::new();
     let cache = Map::new();
 
-    let mut flag_record = Record::new(RecordKind::Flag, Location::from("flag"));
-    flag_record.set_content(flag);
-    records.insert(0, flag_record);
+    let mut record = Record::new(RecordKind::Flag, Location::from("flag"));
+    record.set_content(flag);
+    records.insert(0, record);
 
     if !bare {
         for &(path, content) in BASE {
@@ -151,9 +145,9 @@ pub fn create<'a>(
                 let mut hasher = DefaultHasher::new();
                 Hash::hash(&string, &mut hasher);
                 let identity = (hasher.finish() as Identity) & 0x3FFFFFFF;
-                let mut record = Record::new(kind, location);
-                record.set_content(Str::from(content));
-                records.insert(identity, record);
+                let mut base = Record::new(kind, location);
+                base.set_content(Str::from(content));
+                records.insert(identity, base);
             }
         }
     }
@@ -162,17 +156,7 @@ pub fn create<'a>(
         resolver.registry.insert(symbol.identity, symbol);
     }
 
-    let directive = Symbol::new(
-        SymbolKind::module(Module::new(Element::new(
-            ElementKind::literal(Token::new(
-                TokenKind::identifier(Str::from("directive")),
-                Span::void(),
-            )),
-            Span::void(),
-        ))),
-        Span::void(),
-        Visibility::Public,
-    )
+    let directive = module!(Module::new(literal!(identifier!("directive"))), Visibility::Public)
         .with_members(directives);
 
     resolver.insert(directive);
