@@ -2,7 +2,6 @@ mod session;
 
 pub use {
     session::{
-        prepare,
         Artifact,
         RecordKind,
         PrepareAction,
@@ -11,7 +10,19 @@ pub use {
     }
 };
 
-pub mod time;
+pub mod time {
+    pub use {
+        core::time::{
+            Duration,
+        },
+        std::{
+            time::{
+                SystemTime,
+                Instant,
+            },
+        }
+    };
+}
 
 pub mod hash {
     pub use {

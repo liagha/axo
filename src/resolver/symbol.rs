@@ -6,8 +6,7 @@ use crate::{
 
 impl<'symbol> Resolvable<'symbol> for Symbol<'symbol> {
     fn declare(&mut self, resolver: &mut Resolver<'symbol>) {
-        // Phase 1: Pre-declare aggregates and modules to make their types available to members
-        let pre_typing = match &self.kind {
+        let initial = match &self.kind {
             SymbolKind::Structure(structure) => {
                 let head = structure.target.target().unwrap();
                 Some(Type::new(
@@ -29,12 +28,11 @@ impl<'symbol> Resolvable<'symbol> for Symbol<'symbol> {
             _ => None,
         };
 
-        if let Some(typing) = pre_typing {
+        if let Some(typing) = initial {
             self.typing = typing;
             resolver.insert(self.clone());
         }
 
-        // Phase 2: Declare members and resolve internal scopes
         self.typing = match &mut self.kind {
             SymbolKind::Binding(binding) => {
                 binding.target.declare(resolver);
@@ -70,7 +68,6 @@ impl<'symbol> Resolvable<'symbol> for Symbol<'symbol> {
                     resolver.fresh()
                 };
 
-                // Adjust AST in case the parser accidentally placed the body block into the output annotation
                 if move_to_body && function.body.is_none() {
                     function.body = function.output.take();
                 }

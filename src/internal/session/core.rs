@@ -3,13 +3,15 @@ use {
         analyzer::Analysis,
         data::*,
         format::{Display, Show, Stencil},
+        identifier,
         initializer::Initializer,
         internal::{
             hash::Map,
             platform::PathBuf,
-            time::{DefaultTimer, Duration},
+            time::{Instant, Duration},
             SessionError,
         },
+        literal,
         parser::{Element, ElementKind, SymbolKind},
         reporter::Error,
         resolver::Resolver,
@@ -135,7 +137,8 @@ impl<'session> Record<'session> {
 }
 
 pub struct Session<'session> {
-    pub timer: DefaultTimer,
+    pub timer: Instant,
+    pub laps: Vec<Duration>,
     pub records: Map<Identity, Record<'session>>,
     pub initializer: Initializer<'session>,
     pub resolver: Resolver<'session>,
@@ -154,10 +157,7 @@ impl<'session> Session<'session> {
             .find(|symbol| symbol.target() == Some(Str::from("directive")))?
             .clone();
 
-        let identifier = Element::new(
-            ElementKind::literal(Token::new(TokenKind::identifier(key), Span::void())),
-            Span::void(),
-        );
+        let identifier = literal!(identifier!(key));
 
         let scope = directive.scope;
         let result = scope.lookup(&identifier, &self.resolver).ok()?;

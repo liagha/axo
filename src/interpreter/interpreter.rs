@@ -14,7 +14,7 @@ use {
     libloading::{Library, Symbol},
 };
 
-pub type Native<'error> = fn(&[Value], Span) -> Result<Value, InterpretError<'error>>;
+pub type Native<'a> = fn(&[Value], Span) -> Result<Value, InterpretError<'a>>;
 pub type Address = usize;
 pub type Index = usize;
 pub type Tag = usize;
@@ -24,8 +24,8 @@ thread_local! {
 }
 
 #[derive(Clone)]
-pub enum Foreign<'error> {
-    Rust(Native<'error>),
+pub enum Foreign<'a> {
+    Rust(Native<'a>),
     Dynamic(Arc<dyn Fn(&[Value]) -> Result<Value, ErrorKind> + Send + Sync>),
 }
 
@@ -93,20 +93,20 @@ pub struct Instruction {
 }
 
 #[derive(Clone, Debug)]
-pub enum Entity<'error> {
+pub enum Entity<'a> {
     Variable {
         address: Address,
-        typing: Type<'error>,
+        typing: Type<'a>,
     },
     Foreign(Index),
     Function(Option<Address>),
     Structure {
         identity: Identity,
-        members: Vec<Str<'error>>,
+        members: Vec<Str<'a>>,
     },
     Union {
         identity: Identity,
-        members: Vec<Str<'error>>,
+        members: Vec<Str<'a>>,
     },
     Module,
 }
@@ -118,24 +118,24 @@ pub struct Frame {
     pub locals: Vec<Value>,
 }
 
-pub struct Interpreter<'error> {
+pub struct Interpreter<'a> {
     pub stack: Vec<Value>,
     pub frames: Vec<Frame>,
     pub memory: Vec<Value>,
     pub code: Vec<Instruction>,
-    pub foreign: Vec<Foreign<'error>>,
-    pub entities: Map<Str<'error>, Entity<'error>>,
+    pub foreign: Vec<Foreign<'a>>,
+    pub entities: Map<Str<'a>, Entity<'a>>,
     pub function_frames: Map<Address, (Address, Scale)>,
-    pub modules: Map<Str<'error>, Vec<Analysis<'error>>>,
-    pub current_module: Str<'error>,
-    pub calls: Vec<(Address, Str<'error>)>,
+    pub modules: Map<Str<'a>, Vec<Analysis<'a>>>,
+    pub current_module: Str<'a>,
+    pub calls: Vec<(Address, Str<'a>)>,
     pub loops: Vec<(Address, Vec<Address>)>,
     pub memory_top: Address,
     pub pointer: Address,
     pub running: bool,
 }
 
-impl<'error> Interpreter<'error> {
+impl<'a> Interpreter<'a> {
     pub fn new(capacity: Scale) -> Self {
         Self {
             stack: Vec::new(),
@@ -155,7 +155,7 @@ impl<'error> Interpreter<'error> {
         }
     }
 
-    fn error(&self, kind: ErrorKind, span: Span) -> InterpretError<'error> {
+    fn error(&self, kind: ErrorKind, span: Span) -> InterpretError<'a> {
         Error::new(kind, span)
     }
 
@@ -163,15 +163,15 @@ impl<'error> Interpreter<'error> {
         self.code[self.pointer.saturating_sub(1)].span
     }
 
-    pub fn get_entity(&self, name: &Str<'error>) -> Option<&Entity<'error>> {
+    pub fn get_entity(&self, name: &Str<'a>) -> Option<&Entity<'a>> {
         self.entities.get(name)
     }
 
-    pub fn insert_entity(&mut self, name: Str<'error>, entity: Entity<'error>) {
+    pub fn insert_entity(&mut self, name: Str<'a>, entity: Entity<'a>) {
         self.entities.insert(name, entity);
     }
 
-    pub fn update_entity(&mut self, name: &Str<'error>, entity: Entity<'error>) -> bool {
+    pub fn update_entity(&mut self, name: &Str<'a>, entity: Entity<'a>) -> bool {
         if self.entities.contains_key(name) {
             self.entities.insert(*name, entity);
             true
@@ -180,11 +180,11 @@ impl<'error> Interpreter<'error> {
         }
     }
 
-    pub fn has_module(&self, name: &Str<'error>) -> bool {
+    pub fn has_module(&self, name: &Str<'a>) -> bool {
         self.modules.contains_key(name)
     }
 
-    pub fn run(&mut self) -> Result<(), InterpretError<'error>> {
+    pub fn run(&mut self) -> Result<(), InterpretError<'a>> {
         if self.frames.is_empty() {
             self.frames.push(Frame {
                 pointer: self.code.len(),
@@ -200,7 +200,7 @@ impl<'error> Interpreter<'error> {
         Ok(())
     }
 
-    fn step(&mut self) -> Result<(), InterpretError<'error>> {
+    fn step(&mut self) -> Result<(), InterpretError<'a>> {
         let instruction = self.code[self.pointer].clone();
         self.pointer += 1;
 
@@ -249,13 +249,13 @@ impl<'error> Interpreter<'error> {
         Ok(())
     }
 
-    fn pop(&mut self) -> Result<(), InterpretError<'error>> {
+    fn pop(&mut self) -> Result<(), InterpretError<'a>> {
         let span = self.current();
         self.stack.pop().ok_or_else(|| self.error(ErrorKind::StackUnderflow, span))?;
         Ok(())
     }
 
-    fn add(&mut self) -> Result<(), InterpretError<'error>> {
+    fn add(&mut self) -> Result<(), InterpretError<'a>> {
         let span = self.current();
         let right = self.stack.pop().ok_or_else(|| self.error(ErrorKind::StackUnderflow, span))?;
         let left = self.stack.pop().ok_or_else(|| self.error(ErrorKind::StackUnderflow, span))?;
@@ -272,7 +272,7 @@ impl<'error> Interpreter<'error> {
         Ok(())
     }
 
-    fn subtract(&mut self) -> Result<(), InterpretError<'error>> {
+    fn subtract(&mut self) -> Result<(), InterpretError<'a>> {
         let span = self.current();
         let right = self.stack.pop().ok_or_else(|| self.error(ErrorKind::StackUnderflow, span))?;
         let left = self.stack.pop().ok_or_else(|| self.error(ErrorKind::StackUnderflow, span))?;
@@ -289,7 +289,7 @@ impl<'error> Interpreter<'error> {
         Ok(())
     }
 
-    fn multiply(&mut self) -> Result<(), InterpretError<'error>> {
+    fn multiply(&mut self) -> Result<(), InterpretError<'a>> {
         let span = self.current();
         let right = self.stack.pop().ok_or_else(|| self.error(ErrorKind::StackUnderflow, span))?;
         let left = self.stack.pop().ok_or_else(|| self.error(ErrorKind::StackUnderflow, span))?;
@@ -306,7 +306,7 @@ impl<'error> Interpreter<'error> {
         Ok(())
     }
 
-    fn divide(&mut self) -> Result<(), InterpretError<'error>> {
+    fn divide(&mut self) -> Result<(), InterpretError<'a>> {
         let span = self.current();
         let right = self.stack.pop().ok_or_else(|| self.error(ErrorKind::StackUnderflow, span))?;
         let left = self.stack.pop().ok_or_else(|| self.error(ErrorKind::StackUnderflow, span))?;
@@ -328,7 +328,7 @@ impl<'error> Interpreter<'error> {
         Ok(())
     }
 
-    fn modulus(&mut self) -> Result<(), InterpretError<'error>> {
+    fn modulus(&mut self) -> Result<(), InterpretError<'a>> {
         let span = self.current();
         let right = self.stack.pop().ok_or_else(|| self.error(ErrorKind::StackUnderflow, span))?;
         let left = self.stack.pop().ok_or_else(|| self.error(ErrorKind::StackUnderflow, span))?;
@@ -350,7 +350,7 @@ impl<'error> Interpreter<'error> {
         Ok(())
     }
 
-    fn negate(&mut self) -> Result<(), InterpretError<'error>> {
+    fn negate(&mut self) -> Result<(), InterpretError<'a>> {
         let span = self.current();
         let value = self.stack.pop().ok_or_else(|| self.error(ErrorKind::StackUnderflow, span))?;
 
@@ -364,7 +364,7 @@ impl<'error> Interpreter<'error> {
         Ok(())
     }
 
-    fn equal(&mut self) -> Result<(), InterpretError<'error>> {
+    fn equal(&mut self) -> Result<(), InterpretError<'a>> {
         let span = self.current();
         let right = self.stack.pop().ok_or_else(|| self.error(ErrorKind::StackUnderflow, span))?;
         let left = self.stack.pop().ok_or_else(|| self.error(ErrorKind::StackUnderflow, span))?;
@@ -381,7 +381,7 @@ impl<'error> Interpreter<'error> {
         Ok(())
     }
 
-    fn not_equal(&mut self) -> Result<(), InterpretError<'error>> {
+    fn not_equal(&mut self) -> Result<(), InterpretError<'a>> {
         let span = self.current();
         let right = self.stack.pop().ok_or_else(|| self.error(ErrorKind::StackUnderflow, span))?;
         let left = self.stack.pop().ok_or_else(|| self.error(ErrorKind::StackUnderflow, span))?;
@@ -398,7 +398,7 @@ impl<'error> Interpreter<'error> {
         Ok(())
     }
 
-    fn less(&mut self) -> Result<(), InterpretError<'error>> {
+    fn less(&mut self) -> Result<(), InterpretError<'a>> {
         let span = self.current();
         let right = self.stack.pop().ok_or_else(|| self.error(ErrorKind::StackUnderflow, span))?;
         let left = self.stack.pop().ok_or_else(|| self.error(ErrorKind::StackUnderflow, span))?;
@@ -415,7 +415,7 @@ impl<'error> Interpreter<'error> {
         Ok(())
     }
 
-    fn greater(&mut self) -> Result<(), InterpretError<'error>> {
+    fn greater(&mut self) -> Result<(), InterpretError<'a>> {
         let span = self.current();
         let right = self.stack.pop().ok_or_else(|| self.error(ErrorKind::StackUnderflow, span))?;
         let left = self.stack.pop().ok_or_else(|| self.error(ErrorKind::StackUnderflow, span))?;
@@ -432,7 +432,7 @@ impl<'error> Interpreter<'error> {
         Ok(())
     }
 
-    fn less_equal(&mut self) -> Result<(), InterpretError<'error>> {
+    fn less_equal(&mut self) -> Result<(), InterpretError<'a>> {
         let span = self.current();
         let right = self.stack.pop().ok_or_else(|| self.error(ErrorKind::StackUnderflow, span))?;
         let left = self.stack.pop().ok_or_else(|| self.error(ErrorKind::StackUnderflow, span))?;
@@ -449,7 +449,7 @@ impl<'error> Interpreter<'error> {
         Ok(())
     }
 
-    fn greater_equal(&mut self) -> Result<(), InterpretError<'error>> {
+    fn greater_equal(&mut self) -> Result<(), InterpretError<'a>> {
         let span = self.current();
         let right = self.stack.pop().ok_or_else(|| self.error(ErrorKind::StackUnderflow, span))?;
         let left = self.stack.pop().ok_or_else(|| self.error(ErrorKind::StackUnderflow, span))?;
@@ -466,7 +466,7 @@ impl<'error> Interpreter<'error> {
         Ok(())
     }
 
-    fn logic_and(&mut self) -> Result<(), InterpretError<'error>> {
+    fn logic_and(&mut self) -> Result<(), InterpretError<'a>> {
         let span = self.current();
         let right = self.stack.pop().ok_or_else(|| self.error(ErrorKind::StackUnderflow, span))?;
         let left = self.stack.pop().ok_or_else(|| self.error(ErrorKind::StackUnderflow, span))?;
@@ -480,7 +480,7 @@ impl<'error> Interpreter<'error> {
         Ok(())
     }
 
-    fn logic_or(&mut self) -> Result<(), InterpretError<'error>> {
+    fn logic_or(&mut self) -> Result<(), InterpretError<'a>> {
         let span = self.current();
         let right = self.stack.pop().ok_or_else(|| self.error(ErrorKind::StackUnderflow, span))?;
         let left = self.stack.pop().ok_or_else(|| self.error(ErrorKind::StackUnderflow, span))?;
@@ -494,7 +494,7 @@ impl<'error> Interpreter<'error> {
         Ok(())
     }
 
-    fn logic_not(&mut self) -> Result<(), InterpretError<'error>> {
+    fn logic_not(&mut self) -> Result<(), InterpretError<'a>> {
         let span = self.current();
         let value = self.stack.pop().ok_or_else(|| self.error(ErrorKind::StackUnderflow, span))?;
 
@@ -507,7 +507,7 @@ impl<'error> Interpreter<'error> {
         Ok(())
     }
 
-    fn logic_xor(&mut self) -> Result<(), InterpretError<'error>> {
+    fn logic_xor(&mut self) -> Result<(), InterpretError<'a>> {
         let span = self.current();
         let right = self.stack.pop().ok_or_else(|| self.error(ErrorKind::StackUnderflow, span))?;
         let left = self.stack.pop().ok_or_else(|| self.error(ErrorKind::StackUnderflow, span))?;
@@ -521,7 +521,7 @@ impl<'error> Interpreter<'error> {
         Ok(())
     }
 
-    fn bit_and(&mut self) -> Result<(), InterpretError<'error>> {
+    fn bit_and(&mut self) -> Result<(), InterpretError<'a>> {
         let span = self.current();
         let right = self.stack.pop().ok_or_else(|| self.error(ErrorKind::StackUnderflow, span))?;
         let left = self.stack.pop().ok_or_else(|| self.error(ErrorKind::StackUnderflow, span))?;
@@ -535,7 +535,7 @@ impl<'error> Interpreter<'error> {
         Ok(())
     }
 
-    fn bit_or(&mut self) -> Result<(), InterpretError<'error>> {
+    fn bit_or(&mut self) -> Result<(), InterpretError<'a>> {
         let span = self.current();
         let right = self.stack.pop().ok_or_else(|| self.error(ErrorKind::StackUnderflow, span))?;
         let left = self.stack.pop().ok_or_else(|| self.error(ErrorKind::StackUnderflow, span))?;
@@ -549,7 +549,7 @@ impl<'error> Interpreter<'error> {
         Ok(())
     }
 
-    fn bit_not(&mut self) -> Result<(), InterpretError<'error>> {
+    fn bit_not(&mut self) -> Result<(), InterpretError<'a>> {
         let span = self.current();
         let value = self.stack.pop().ok_or_else(|| self.error(ErrorKind::StackUnderflow, span))?;
 
@@ -562,7 +562,7 @@ impl<'error> Interpreter<'error> {
         Ok(())
     }
 
-    fn bit_xor(&mut self) -> Result<(), InterpretError<'error>> {
+    fn bit_xor(&mut self) -> Result<(), InterpretError<'a>> {
         let span = self.current();
         let right = self.stack.pop().ok_or_else(|| self.error(ErrorKind::StackUnderflow, span))?;
         let left = self.stack.pop().ok_or_else(|| self.error(ErrorKind::StackUnderflow, span))?;
@@ -576,7 +576,7 @@ impl<'error> Interpreter<'error> {
         Ok(())
     }
 
-    fn shift_left(&mut self) -> Result<(), InterpretError<'error>> {
+    fn shift_left(&mut self) -> Result<(), InterpretError<'a>> {
         let span = self.current();
         let right = self.stack.pop().ok_or_else(|| self.error(ErrorKind::StackUnderflow, span))?;
         let left = self.stack.pop().ok_or_else(|| self.error(ErrorKind::StackUnderflow, span))?;
@@ -590,7 +590,7 @@ impl<'error> Interpreter<'error> {
         Ok(())
     }
 
-    fn shift_right(&mut self) -> Result<(), InterpretError<'error>> {
+    fn shift_right(&mut self) -> Result<(), InterpretError<'a>> {
         let span = self.current();
         let right = self.stack.pop().ok_or_else(|| self.error(ErrorKind::StackUnderflow, span))?;
         let left = self.stack.pop().ok_or_else(|| self.error(ErrorKind::StackUnderflow, span))?;
@@ -604,7 +604,7 @@ impl<'error> Interpreter<'error> {
         Ok(())
     }
 
-    fn jump(&mut self, target: Address) -> Result<(), InterpretError<'error>> {
+    fn jump(&mut self, target: Address) -> Result<(), InterpretError<'a>> {
         let span = self.current();
         if target > self.code.len() {
             return Err(self.error(ErrorKind::OutOfBounds, span));
@@ -613,7 +613,7 @@ impl<'error> Interpreter<'error> {
         Ok(())
     }
 
-    fn jump_true(&mut self, target: Address) -> Result<(), InterpretError<'error>> {
+    fn jump_true(&mut self, target: Address) -> Result<(), InterpretError<'a>> {
         let span = self.current();
         let condition = self.stack.pop().ok_or_else(|| self.error(ErrorKind::StackUnderflow, span))?;
 
@@ -626,7 +626,7 @@ impl<'error> Interpreter<'error> {
         Ok(())
     }
 
-    fn jump_false(&mut self, target: Address) -> Result<(), InterpretError<'error>> {
+    fn jump_false(&mut self, target: Address) -> Result<(), InterpretError<'a>> {
         let span = self.current();
         let condition = self.stack.pop().ok_or_else(|| self.error(ErrorKind::StackUnderflow, span))?;
 
@@ -639,7 +639,7 @@ impl<'error> Interpreter<'error> {
         Ok(())
     }
 
-    fn load(&mut self, address: Address) -> Result<(), InterpretError<'error>> {
+    fn load(&mut self, address: Address) -> Result<(), InterpretError<'a>> {
         let span = self.current();
         if address >= self.memory.len() {
             return Err(self.error(ErrorKind::MemoryAccessViolation, span));
@@ -649,7 +649,7 @@ impl<'error> Interpreter<'error> {
         Ok(())
     }
 
-    fn store(&mut self, address: Address) -> Result<(), InterpretError<'error>> {
+    fn store(&mut self, address: Address) -> Result<(), InterpretError<'a>> {
         let span = self.current();
         if address >= self.memory.len() {
             return Err(self.error(ErrorKind::MemoryAccessViolation, span));
@@ -659,7 +659,7 @@ impl<'error> Interpreter<'error> {
         Ok(())
     }
 
-    fn store_field(&mut self, address: Address, index: Index) -> Result<(), InterpretError<'error>> {
+    fn store_field(&mut self, address: Address, index: Index) -> Result<(), InterpretError<'a>> {
         let span = self.current();
         if address >= self.memory.len() {
             return Err(self.error(ErrorKind::MemoryAccessViolation, span));
@@ -676,7 +676,7 @@ impl<'error> Interpreter<'error> {
         Ok(())
     }
 
-    fn call_foreign(&mut self, target: Index, count: Scale) -> Result<(), InterpretError<'error>> {
+    fn call_foreign(&mut self, target: Index, count: Scale) -> Result<(), InterpretError<'a>> {
         let span = self.current();
         let routine = self.foreign.get(target).ok_or_else(|| self.error(ErrorKind::OutOfBounds, span))?.clone();
 
@@ -702,7 +702,7 @@ impl<'error> Interpreter<'error> {
         Ok(())
     }
 
-    fn call(&mut self, target: Address) -> Result<(), InterpretError<'error>> {
+    fn call(&mut self, target: Address) -> Result<(), InterpretError<'a>> {
         let span = self.current();
         if target >= self.code.len() {
             return Err(self.error(ErrorKind::OutOfBounds, span));
@@ -728,7 +728,7 @@ impl<'error> Interpreter<'error> {
         Ok(())
     }
 
-    fn finish(&mut self) -> Result<(), InterpretError<'error>> {
+    fn finish(&mut self) -> Result<(), InterpretError<'a>> {
         let span = self.current();
 
         if self.frames.len() == 1 {
@@ -744,7 +744,7 @@ impl<'error> Interpreter<'error> {
         Ok(())
     }
 
-    fn make_sequence(&mut self, size: Scale) -> Result<(), InterpretError<'error>> {
+    fn make_sequence(&mut self, size: Scale) -> Result<(), InterpretError<'a>> {
         let span = self.current();
         if self.stack.len() < size {
             return Err(self.error(ErrorKind::StackUnderflow, span));
@@ -755,7 +755,7 @@ impl<'error> Interpreter<'error> {
         Ok(())
     }
 
-    fn make_structure(&mut self, size: Scale) -> Result<(), InterpretError<'error>> {
+    fn make_structure(&mut self, size: Scale) -> Result<(), InterpretError<'a>> {
         let span = self.current();
         if self.stack.len() < size {
             return Err(self.error(ErrorKind::StackUnderflow, span));
@@ -766,7 +766,7 @@ impl<'error> Interpreter<'error> {
         Ok(())
     }
 
-    fn extract_field(&mut self, index: Index) -> Result<(), InterpretError<'error>> {
+    fn extract_field(&mut self, index: Index) -> Result<(), InterpretError<'a>> {
         let span = self.current();
         let target = self.stack.pop().ok_or_else(|| self.error(ErrorKind::StackUnderflow, span))?;
 
@@ -780,7 +780,7 @@ impl<'error> Interpreter<'error> {
         Ok(())
     }
 
-    fn index(&mut self) -> Result<(), InterpretError<'error>> {
+    fn index(&mut self) -> Result<(), InterpretError<'a>> {
         let span = self.current();
         let position = self.stack.pop().ok_or_else(|| self.error(ErrorKind::StackUnderflow, span))?;
         let target = self.stack.pop().ok_or_else(|| self.error(ErrorKind::StackUnderflow, span))?;
@@ -803,7 +803,7 @@ impl<'error> Interpreter<'error> {
     }
 }
 
-impl<'error> Default for Interpreter<'error> {
+impl<'a> Default for Interpreter<'a> {
     fn default() -> Self {
         Interpreter::new(1024)
     }

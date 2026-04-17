@@ -15,7 +15,6 @@ use {
                 catch_unwind, create_dir_all, read, write,
                 AssertUnwindSafe, Lock,
             },
-            time::Duration,
         },
         parser::Parser,
         resolver::Resolver,
@@ -37,157 +36,6 @@ use crate::generator::{EmitAction, GenerateAction, RunAction};
 
 pub struct PrepareAction;
 
-pub fn prepare<'source>(session: &mut Session<'source>) -> bool {
-    use crate::{
-        internal::hash::{DefaultHasher, Hash, Hasher, Map},
-        tracker::Location,
-    };
-
-    let manifest = session.manifest();
-    if session.cache.is_empty() && session.get_directive(Str::from("Discard")).is_none() {
-        if let Ok(mut data) = read(&manifest) {
-            data.shrink_to_fit();
-            session.buffers.push(data);
-            let raw = session.buffers.last().unwrap().as_slice();
-            let extended: &'source [u8] = unsafe { transmute(raw) };
-
-            if let Some(cache) =
-                Session::decode::<Option<Map<Location<'source>, u64>>>(extended).flatten()
-            {
-                session.cache = cache;
-            } else {
-                session.buffers.pop();
-            }
-        }
-    }
-
-    let mut keys: Vec<_> = session.records.keys().copied().collect();
-    keys.sort();
-
-    for key in &keys {
-        let record = session.records.get_mut(key).unwrap();
-
-        if record.kind == RecordKind::Source || record.kind == RecordKind::C {
-            let location = record.location;
-            let mut hash = None;
-
-            if let Some(value) = &record.content {
-                let mut hasher = DefaultHasher::new();
-                value.hash(&mut hasher);
-                hash = Some(hasher.finish());
-            } else if let Ok(path) = location.to_path() {
-                if let Ok(metadata) = path.metadata() {
-                    let mut hasher = DefaultHasher::new();
-                    if let Ok(modified) = metadata.modified() {
-                        if let Ok(duration) = modified.duration_since(std::time::UNIX_EPOCH) {
-                            duration.as_secs().hash(&mut hasher);
-                            duration.subsec_nanos().hash(&mut hasher);
-                        }
-                    }
-                    metadata.len().hash(&mut hasher);
-                    hash = Some(hasher.finish());
-                }
-            }
-
-            if let Some(value) = hash {
-                record.hash = value;
-
-                if let Some(&prior) = session.cache.get(&location) {
-                    record.dirty = prior != value;
-                } else {
-                    record.dirty = true;
-                }
-
-                session.cache.insert(location, value);
-
-                if record.dirty {
-                    if record.content.is_none() {
-                        if let Ok(text) = location.get_value() {
-                            record.set_content(Str::from(text));
-                        }
-                    }
-                    record.sync_rows();
-                }
-            }
-        }
-    }
-
-    #[cfg(feature = "interpreter")]
-    unsafe {
-        use crate::{internal::platform::Command};
-
-        let mut sources = Vec::new();
-        let discard = session.get_directive(Str::from("Discard")).is_some();
-
-        let build = if discard {
-            temp_dir().join("axo").join("build")
-        } else {
-            session.base().join("build")
-        };
-
-        let mut dirty = false;
-
-        for key in &keys {
-            let record = session.records.get(key).unwrap();
-            if record.kind == RecordKind::C {
-                if let Ok(path) = record.location.to_path() {
-                    if let Some(content) = &record.content {
-                        _ = create_dir_all(&build);
-                        if let Some(name) = path.file_name() {
-                            let build_path = build.join(name);
-                            if !build_path.exists() || record.dirty {
-                                _ = write(build_path.clone(), content.as_bytes().to_vec());
-                            }
-                            sources.push(build_path);
-                        }
-                    } else {
-                        sources.push(path);
-                    }
-
-                    if record.dirty {
-                        dirty = true;
-                    }
-                }
-            }
-        }
-
-        if !sources.is_empty() {
-            let library = build.join(format!("lib_axo.{}", DLL_EXTENSION));
-            let recompile = dirty || !library.exists();
-
-            if recompile {
-                let mut command = Command::new("cc");
-                command.arg("-shared").arg("-fPIC").arg("-o").arg(&library);
-
-                for source in sources {
-                    command.arg(source);
-                }
-
-                if !command.status().expect("cc not found").success() {
-                    panic!("failed to compile dynamic library");
-                }
-            }
-
-            if library.exists() {
-                match libloading::Library::new(&library) {
-                    Ok(lib) => std::mem::forget(lib),
-                    Err(err) => panic!("dlopen failed: {} - {}", library.display(), err),
-                }
-            }
-        }
-    }
-
-    if session.get_directive(Str::from("Discard")).is_none() {
-        if let Some(parent) = manifest.parent() {
-            _ = create_dir_all(parent);
-        }
-        let buffer = Some(session.cache.clone()).serialize();
-        _ = write(manifest, buffer);
-    }
-
-    session.errors.is_empty()
-}
-
 impl<'source>
 Action<
     'static,
@@ -202,7 +50,7 @@ Action<
     ) -> () {
         let mut guard = operator.store.write().unwrap();
         let session = &mut *guard;
-        if prepare(session) {
+        if session.prepare() {
             operation.set_resolve(Vec::new());
         } else {
             operation.set_reject();
@@ -252,6 +100,157 @@ impl<'session> Session<'session> {
         }
     }
 
+    pub fn prepare(&mut self) -> bool {
+        use crate::{
+            internal::hash::{DefaultHasher, Hash, Hasher, Map},
+            tracker::Location,
+        };
+
+        let manifest = self.manifest();
+        if self.cache.is_empty() && self.get_directive(Str::from("Discard")).is_none() {
+            if let Ok(mut data) = read(&manifest) {
+                data.shrink_to_fit();
+                self.buffers.push(data);
+                let raw = self.buffers.last().unwrap().as_slice();
+                let extended: &'session [u8] = unsafe { transmute(raw) };
+
+                if let Some(cache) =
+                    Session::decode::<Option<Map<Location<'session>, u64>>>(extended).flatten()
+                {
+                    self.cache = cache;
+                } else {
+                    self.buffers.pop();
+                }
+            }
+        }
+
+        let mut keys: Vec<_> = self.records.keys().copied().collect();
+        keys.sort();
+
+        for key in &keys {
+            let record = self.records.get_mut(key).unwrap();
+
+            if record.kind == RecordKind::Source || record.kind == RecordKind::C {
+                let location = record.location;
+                let mut hash = None;
+
+                if let Some(value) = &record.content {
+                    let mut hasher = DefaultHasher::new();
+                    value.hash(&mut hasher);
+                    hash = Some(hasher.finish());
+                } else if let Ok(path) = location.to_path() {
+                    if let Ok(metadata) = path.metadata() {
+                        let mut hasher = DefaultHasher::new();
+                        if let Ok(modified) = metadata.modified() {
+                            if let Ok(duration) = modified.duration_since(std::time::UNIX_EPOCH) {
+                                duration.as_secs().hash(&mut hasher);
+                                duration.subsec_nanos().hash(&mut hasher);
+                            }
+                        }
+                        metadata.len().hash(&mut hasher);
+                        hash = Some(hasher.finish());
+                    }
+                }
+
+                if let Some(value) = hash {
+                    record.hash = value;
+
+                    if let Some(&prior) = self.cache.get(&location) {
+                        record.dirty = prior != value;
+                    } else {
+                        record.dirty = true;
+                    }
+
+                    self.cache.insert(location, value);
+
+                    if record.dirty {
+                        if record.content.is_none() {
+                            if let Ok(text) = location.get_value() {
+                                record.set_content(Str::from(text));
+                            }
+                        }
+                        record.sync_rows();
+                    }
+                }
+            }
+        }
+
+        #[cfg(feature = "interpreter")]
+        unsafe {
+            use crate::{internal::platform::Command};
+
+            let mut sources = Vec::new();
+            let discard = self.get_directive(Str::from("Discard")).is_some();
+
+            let build = if discard {
+                temp_dir().join("axo").join("build")
+            } else {
+                self.base().join("build")
+            };
+
+            let mut dirty = false;
+
+            for key in &keys {
+                let record = self.records.get(key).unwrap();
+                if record.kind == RecordKind::C {
+                    if let Ok(path) = record.location.to_path() {
+                        if let Some(content) = &record.content {
+                            _ = create_dir_all(&build);
+                            if let Some(name) = path.file_name() {
+                                let build_path = build.join(name);
+                                if !build_path.exists() || record.dirty {
+                                    _ = write(build_path.clone(), content.as_bytes().to_vec());
+                                }
+                                sources.push(build_path);
+                            }
+                        } else {
+                            sources.push(path);
+                        }
+
+                        if record.dirty {
+                            dirty = true;
+                        }
+                    }
+                }
+            }
+
+            if !sources.is_empty() {
+                let library = build.join(format!("lib_axo.{}", DLL_EXTENSION));
+                let recompile = dirty || !library.exists();
+
+                if recompile {
+                    let mut command = Command::new("cc");
+                    command.arg("-shared").arg("-fPIC").arg("-o").arg(&library);
+
+                    for source in sources {
+                        command.arg(source);
+                    }
+
+                    if !command.status().expect("cc not found").success() {
+                        panic!("failed to compile dynamic library");
+                    }
+                }
+
+                if library.exists() {
+                    match libloading::Library::new(&library) {
+                        Ok(lib) => std::mem::forget(lib),
+                        Err(err) => panic!("failed to open library: {} - {}", library.display(), err),
+                    }
+                }
+            }
+        }
+
+        if self.get_directive(Str::from("Discard")).is_none() {
+            if let Some(parent) = manifest.parent() {
+                _ = create_dir_all(parent);
+            }
+            let buffer = Some(self.cache.clone()).serialize();
+            _ = write(manifest, buffer);
+        }
+
+        self.errors.is_empty()
+    }
+
     pub fn add_path(&mut self, path: &'session str) {
         use crate::tracker::Location;
         let location = Location::from(path);
@@ -271,7 +270,8 @@ impl<'session> Session<'session> {
     }
 
     pub fn run(mut self, mut pipeline: Operation<'session, Arc<Lock<Session<'session>>>>) -> Self {
-        _ = self.timer.start();
+        self.timer = std::time::Instant::now();
+        self.laps.clear();
 
         if !self.errors.is_empty() {
             self.report_all();
@@ -283,12 +283,14 @@ impl<'session> Session<'session> {
         operator.execute(&mut pipeline);
 
         let mut session = store.write().unwrap();
-        _ = session.timer.lap();
-        let sum = session.timer.laps().iter().copied().sum::<u64>();
-        let internal = Duration::from_nanos(sum);
+
+        let elapsed = session.timer.elapsed();
+        session.laps.push(elapsed);
+
+        let internal = session.laps.iter().copied().sum::<std::time::Duration>();
 
         session.report_finish("pipeline", internal, session.errors.len());
-        let total = Duration::from_nanos(session.timer.stop().unwrap());
+        let total = session.timer.elapsed();
         session.report_finish("compilation", total, session.errors.len());
 
         session.report_all();

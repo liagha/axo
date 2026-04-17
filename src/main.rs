@@ -8,7 +8,7 @@ use axo::{
     internal::{
         hash::{DefaultHasher, Hash, Hasher, Map},
         platform::{args, read_dir},
-        time::DefaultTimer,
+        time::Instant,
         Record, RecordKind, Session, SessionError,
     },
     literal, module,
@@ -70,12 +70,12 @@ fn main() {
 #[cfg(feature = "interpreter")]
 pub fn run<'a>(session: &mut Session<'a>, core: &mut Interpreter<'a>, keys: &[Identity]) {
     use axo::{
-        analyzer::Analyzer, internal::prepare, parser::Parser, resolver::Resolver, scanner::Scanner,
+        analyzer::Analyzer, parser::Parser, resolver::Resolver, scanner::Scanner,
     };
 
     session.errors.clear();
 
-    if !prepare(session) {
+    if !session.prepare() {
         session.report_all();
         return;
     }
@@ -126,8 +126,8 @@ pub fn create<'a>(
     failures: Vec<SessionError<'a>>,
     flag: Str<'a>,
 ) -> Session<'a> {
-    let mut timer = DefaultTimer::new_default();
-    _ = timer.start();
+    let timer = Instant::now();
+    let mut laps = Vec::new();
 
     let mut resolver = Resolver::new();
     let mut records = Map::new();
@@ -160,10 +160,12 @@ pub fn create<'a>(
         .with_members(directives);
 
     resolver.insert(directive);
-    _ = timer.lap();
+
+    laps.push(timer.elapsed());
 
     Session {
         timer,
+        laps,
         records,
         initializer: Initializer::new(arguments()),
         resolver,

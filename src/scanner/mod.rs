@@ -42,7 +42,10 @@ Action<
 
         Scanner::execute(&mut session, &keys);
 
-        let duration = Duration::from_nanos(session.timer.lap().unwrap());
+        let now = session.timer.elapsed();
+        let sum: Duration = session.laps.iter().copied().sum();
+        let duration = now.saturating_sub(sum);
+        
         session.report_finish("scanning", duration, session.errors.len() - initial);
 
         if session.errors.is_empty() {

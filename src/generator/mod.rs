@@ -131,7 +131,10 @@ Action<
             }
         }
 
-        let duration = Duration::from_nanos(session.timer.lap().unwrap());
+        let now = session.timer.elapsed();
+        let sum: Duration = session.laps.iter().copied().sum();
+        let duration = now.saturating_sub(sum);
+        
         session.report_finish("generating", duration, session.errors.len() - initial);
 
         session.errors.extend(generator
@@ -282,7 +285,10 @@ Action<
 
         session.target = Some(executable);
 
-        let duration = Duration::from_nanos(session.timer.lap().unwrap());
+        let now = session.timer.elapsed();
+        let sum: Duration = session.laps.iter().copied().sum();
+        let duration = now.saturating_sub(sum);
+        
         session.report_external("emitting", duration);
 
         if session.errors.is_empty() {
@@ -332,7 +338,10 @@ Action<
             panic!("{}", status);
         }
 
-        let duration = Duration::from_nanos(session.timer.lap().unwrap());
+        let now = session.timer.elapsed();
+        let sum: Duration = session.laps.iter().copied().sum();
+        let duration = now.saturating_sub(sum);
+        
         session.report_external("running", duration);
 
         if session.errors.is_empty() {

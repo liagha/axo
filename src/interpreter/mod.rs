@@ -80,7 +80,10 @@ impl<'source> Action<
 
         Interpreter::execute(session, &mut core, &sources);
 
-        let duration = Duration::from_nanos(session.timer.lap().unwrap_or_default());
+        let now = session.timer.elapsed();
+        let sum: Duration = session.laps.iter().copied().sum();
+        let duration = now.saturating_sub(sum);
+        
         session.report_finish("interpreting", duration, session.errors.len() - initial);
 
         if session.errors.is_empty() {
