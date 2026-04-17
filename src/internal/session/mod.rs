@@ -113,8 +113,8 @@ pub fn prepare<'source>(session: &mut Session<'source>) -> bool {
     }
 
     #[cfg(feature = "interpreter")]
-    {
-        use crate::{data::CString, internal::platform::Command};
+    unsafe {
+        use crate::{internal::platform::Command};
 
         let mut sources = Vec::new();
         let discard = session.get_directive(Str::from("Discard")).is_some();
@@ -169,12 +169,9 @@ pub fn prepare<'source>(session: &mut Session<'source>) -> bool {
             }
 
             if library.exists() {
-                let string = library.to_str().unwrap();
-                let path = CString::new(string).unwrap();
-                unsafe {
-                    if libc::dlopen(path.as_ptr(), libc::RTLD_NOW | libc::RTLD_GLOBAL).is_null() {
-                        panic!("dlopen failed: {}", string);
-                    }
+                match libloading::Library::new(&library) {
+                    Ok(lib) => std::mem::forget(lib),
+                    Err(err) => panic!("dlopen failed: {} - {}", library.display(), err),
                 }
             }
         }
