@@ -3,7 +3,7 @@ use crate::{
     data::{memory::replace, Identity, Module, Str},
     internal::{hash::Map, Artifact, RecordKind, Session, SessionError},
     format::Show,
-    parser::{Element, ElementKind, Symbol, SymbolKind, Visibility},
+    parser::{Element, ElementKind, Symbol, SymbolKind},
     resolver::{next_identity, scope::Scope, ErrorKind, ResolveError, Type},
     scanner::{Token, TokenKind},
     tracker::Span,
@@ -213,7 +213,6 @@ impl<'a> Resolver<'a> {
                 let mut symbol = Symbol::new(
                     SymbolKind::module(Module::new(head)),
                     span,
-                    Visibility::Public,
                 );
 
                 symbol.identity = identity;

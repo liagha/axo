@@ -1,7 +1,7 @@
 use crate::{
     combinator::{Classifier, Form},
     data::*,
-    parser::{Element, ElementKind, ErrorKind, ParseError, Parser, Symbol, SymbolKind, Visibility},
+    parser::{Element, ElementKind, ErrorKind, ParseError, Parser, Symbol, SymbolKind},
     scanner::{OperatorKind, Token, TokenKind},
     tracker::{Span, Spanned},
 };
@@ -47,7 +47,6 @@ impl<'a> Parser<'a> {
                     match identifier.as_str().unwrap() {
                         "static" => BindingKind::Static,
                         "let" => BindingKind::Let,
-                        "meta" => BindingKind::Meta,
                         _ => BindingKind::Let,
                     }
                 } else {
@@ -106,7 +105,6 @@ impl<'a> Parser<'a> {
                     ElementKind::Symbolize(Box::from(Symbol::new(
                         SymbolKind::binding(Binding::new(body, value, annotation, kind)),
                         span,
-                        Visibility::Private,
                     ))),
                     span,
                 ));
@@ -158,29 +156,10 @@ impl<'a> Parser<'a> {
 
                 let body = sequence[1].unwrap_output().clone();
 
-                let mut visibility = Visibility::Public;
-
                 let members: Vec<_> = Self::get_body(body.clone())
                     .into_iter()
                     .filter_map(|element| match element.kind {
                         ElementKind::Symbolize(symbol) => Some(*symbol),
-                        ElementKind::Literal(token) => {
-                            if let Some(identifier) = token.kind.try_unwrap_identifier() {
-                                match identifier.as_str().unwrap().to_lowercase().as_str() {
-                                    "public" => {
-                                        visibility = Visibility::Public;
-                                    }
-
-                                    "private" => {
-                                        visibility = Visibility::Private;
-                                    }
-
-                                    _ => {}
-                                }
-                            }
-
-                            None
-                        }
                         _ => None,
                     })
                     .collect();
@@ -191,7 +170,6 @@ impl<'a> Parser<'a> {
                     ElementKind::Symbolize(Box::new(Symbol::new(
                         SymbolKind::structure(Aggregate::new(name, members)),
                         span,
-                        visibility,
                     ))),
                     span,
                 ));
@@ -243,29 +221,10 @@ impl<'a> Parser<'a> {
 
                 let body = sequence[1].unwrap_output().clone();
 
-                let mut visibility = Visibility::Public;
-
                 let members: Vec<_> = Self::get_body(body.clone())
                     .into_iter()
                     .filter_map(|element| match element.kind {
                         ElementKind::Symbolize(symbol) => Some(*symbol),
-                        ElementKind::Literal(token) => {
-                            if let Some(identifier) = token.kind.try_unwrap_identifier() {
-                                match identifier.as_str().unwrap().to_lowercase().as_str() {
-                                    "public" => {
-                                        visibility = Visibility::Public;
-                                    }
-
-                                    "private" => {
-                                        visibility = Visibility::Private;
-                                    }
-
-                                    _ => {}
-                                }
-                            }
-
-                            None
-                        }
                         _ => None,
                     })
                     .collect();
@@ -276,7 +235,6 @@ impl<'a> Parser<'a> {
                     ElementKind::Symbolize(Box::from(Symbol::new(
                         SymbolKind::union(Aggregate::new(name, members)),
                         span,
-                        visibility,
                     ))),
                     span,
                 ));
@@ -412,7 +370,6 @@ impl<'a> Parser<'a> {
                         false
                     };
 
-                    let mut visibility = Visibility::Private;
                     let mut interface = Interface::Axo;
                     let mut variadic = false;
 
@@ -423,8 +380,6 @@ impl<'a> Parser<'a> {
                             ElementKind::Literal(token) => {
                                 if let Some(identifier) = token.kind.try_unwrap_identifier() {
                                     match identifier.as_str().unwrap() {
-                                        "public" => visibility = Visibility::Public,
-                                        "private" => visibility = Visibility::Private,
                                         "C" => interface = Interface::C,
                                         "Axo" => interface = Interface::Axo,
                                         "Compiler" => interface = Interface::Compiler,
@@ -459,7 +414,6 @@ impl<'a> Parser<'a> {
                                 variadic,
                             )),
                             span,
-                            visibility,
                         ))),
                         span,
                     ));
@@ -536,7 +490,6 @@ impl<'a> Parser<'a> {
                         false
                     };
 
-                    let mut visibility = Visibility::Private;
                     let mut interface = Interface::Axo;
                     let mut variadic = false;
 
@@ -547,8 +500,6 @@ impl<'a> Parser<'a> {
                             ElementKind::Literal(token) => {
                                 if let Some(identifier) = token.kind.try_unwrap_identifier() {
                                     match identifier.as_str().unwrap() {
-                                        "public" => visibility = Visibility::Public,
-                                        "private" => visibility = Visibility::Private,
                                         "C" => interface = Interface::C,
                                         "Axo" => interface = Interface::Axo,
                                         "Compiler" => interface = Interface::Compiler,
@@ -581,7 +532,6 @@ impl<'a> Parser<'a> {
                                 variadic,
                             )),
                             span,
-                            visibility,
                         ))),
                         span,
                     ));

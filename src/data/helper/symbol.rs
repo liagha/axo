@@ -18,7 +18,6 @@ pub struct Binding<Target, Value, Type> {
 pub enum BindingKind {
     Static,
     Let,
-    Meta,
 }
 
 #[derive(Debug, Eq, Orbyte)]

@@ -1,7 +1,6 @@
 use orbyte::Orbyte;
 use crate::{
     data::*,
-    format::Debug,
     internal::hash::{Hash, Set},
     parser::{Element, ElementKind},
     resolver::{next_identity, scope::Scope, Type, TypeKind},
@@ -15,7 +14,6 @@ pub struct Symbol<'symbol> {
     pub kind: SymbolKind<'symbol>,
     pub span: Span,
     pub scope: Box<Scope>,
-    pub visibility: Visibility,
     pub typing: Type<'symbol>,
 }
 
@@ -28,20 +26,13 @@ pub enum SymbolKind<'symbol> {
     Module(Box<Module<Element<'symbol>>>),
 }
 
-#[derive(Clone, Copy, Debug, Orbyte)]
-pub enum Visibility {
-    Public,
-    Private,
-}
-
 impl<'symbol> Symbol<'symbol> {
-    pub fn new(kind: SymbolKind<'symbol>, span: Span, visibility: Visibility) -> Self {
+    pub fn new(kind: SymbolKind<'symbol>, span: Span) -> Self {
         Self {
             identity: next_identity(),
             kind,
             span,
             scope: Box::from(Scope::new(None)),
-            visibility,
             typing: Type::from(TypeKind::Unknown),
         }
     }

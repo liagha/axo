@@ -125,35 +125,35 @@ macro_rules! symbolize {
 
 #[macro_export]
 macro_rules! binding {
-    ($value:expr, $visibility:expr) => {
-        $crate::parser::Symbol::new($crate::parser::SymbolKind::binding($value), $crate::span!($value), $visibility)
+    ($value:expr) => {
+        $crate::parser::Symbol::new($crate::parser::SymbolKind::binding($value), $crate::span!($value))
     };
 }
 
 #[macro_export]
 macro_rules! structure {
-    ($value:expr, $visibility:expr) => {
-        $crate::parser::Symbol::new($crate::parser::SymbolKind::structure($value), $crate::span!($value), $visibility)
+    ($value:expr) => {
+        $crate::parser::Symbol::new($crate::parser::SymbolKind::structure($value), $crate::span!($value))
     };
 }
 
 #[macro_export]
 macro_rules! union {
-    ($value:expr, $visibility:expr) => {
-        $crate::parser::Symbol::new($crate::parser::SymbolKind::union($value), $crate::span!($value), $visibility)
+    ($value:expr) => {
+        $crate::parser::Symbol::new($crate::parser::SymbolKind::union($value), $crate::span!($value))
     };
 }
 
 #[macro_export]
 macro_rules! function {
-    ($value:expr, $visibility:expr) => {
-        $crate::parser::Symbol::new($crate::parser::SymbolKind::function($value), $crate::span!($value), $visibility)
+    ($value:expr) => {
+        $crate::parser::Symbol::new($crate::parser::SymbolKind::function($value), $crate::span!($value))
     };
 }
 
 #[macro_export]
 macro_rules! module {
-    ($value:expr, $visibility:expr) => {
-        $crate::parser::Symbol::new($crate::parser::SymbolKind::module($value), $crate::span!($value), $visibility)
+    ($value:expr) => {
+        $crate::parser::Symbol::new($crate::parser::SymbolKind::module($value), $crate::span!($value))
     };
 }

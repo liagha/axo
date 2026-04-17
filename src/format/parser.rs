@@ -34,7 +34,6 @@ impl<'symbol> Show<'symbol> for Symbol<'symbol> {
             .clone()
             .new("Symbol")
             .field("kind", self.kind.format(config.clone()))
-            .field("visibility", format!("{:?}", self.visibility))
     }
 }
 

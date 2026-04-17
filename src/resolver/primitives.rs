@@ -1,7 +1,7 @@
 use crate::{
     boolean, character, delimited, function, identifier, integer, literal, punctuation, string,
     data::{Delimited, Function, Interface},
-    parser::{Element, Symbol, Visibility},
+    parser::{Element, Symbol},
     resolver::Resolver,
     scanner::PunctuationKind,
 };
@@ -54,8 +54,7 @@ impl<'resolver> Resolver<'resolver> {
                 Interface::Compiler,
                 false,
                 false,
-            ),
-            Visibility::Public
+            )
         )
     }
 
@@ -86,8 +85,7 @@ impl<'resolver> Resolver<'resolver> {
                 Interface::Compiler,
                 false,
                 false,
-            ),
-            Visibility::Public
+            )
         )
     }
 }

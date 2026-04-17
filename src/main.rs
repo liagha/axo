@@ -12,7 +12,7 @@ use axo::{
         Record, RecordKind, Session, SessionError,
     },
     literal, module,
-    parser::{ElementKind, Symbol, SymbolKind, Visibility},
+    parser::{ElementKind, Symbol, SymbolKind},
     resolver::Resolver,
     scanner::TokenKind,
     tracker::{ErrorKind as TrackErrorKind, Location, Span, TrackError},
@@ -156,7 +156,7 @@ pub fn create<'a>(
         resolver.registry.insert(symbol.identity, symbol);
     }
 
-    let directive = module!(Module::new(literal!(identifier!("directive"))), Visibility::Public)
+    let directive = module!(Module::new(literal!(identifier!("directive"))))
         .with_members(directives);
 
     resolver.insert(directive);

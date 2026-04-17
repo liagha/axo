@@ -141,7 +141,6 @@ impl<'symbol> Clone for Symbol<'symbol> {
             kind: self.kind.clone(),
             span: self.span.clone(),
             scope: self.scope.clone(),
-            visibility: self.visibility.clone(),
             typing: self.typing.clone(),
         }
     }

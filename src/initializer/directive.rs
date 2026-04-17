@@ -2,7 +2,7 @@ use crate::{
     combinator::{Classifier, Form},
     data::{Binding, BindingKind, Str},
     initializer::{InitializeError, Initializer},
-    parser::{Element, ElementKind, Symbol, SymbolKind, Visibility},
+    parser::{Element, ElementKind, Symbol, SymbolKind},
     scanner::{OperatorKind, Token, TokenKind},
     tracker::Spanned,
 };
@@ -121,9 +121,8 @@ impl<'a> Initializer<'a> {
                 );
 
                 let symbol = Symbol::new(
-                    SymbolKind::binding(Binding::new(target, Some(value), None, BindingKind::Meta)),
+                    SymbolKind::binding(Binding::new(target, Some(value), None, BindingKind::Static)),
                     identifier.span().merge(&path.span()),
-                    Visibility::Public,
                 );
 
                 *form = Form::Output(symbol);
@@ -179,9 +178,8 @@ impl<'a> Initializer<'a> {
                 );
 
                 let symbol = Symbol::new(
-                    SymbolKind::binding(Binding::new(target, Some(value), None, BindingKind::Meta)),
+                    SymbolKind::binding(Binding::new(target, Some(value), None, BindingKind::Static)),
                     span,
-                    Visibility::Public,
                 );
 
                 *form = Form::Output(symbol);
@@ -228,9 +226,8 @@ impl<'a> Initializer<'a> {
                 let value = Element::new(ElementKind::literal(value.clone()), value.span);
 
                 let symbol = Symbol::new(
-                    SymbolKind::binding(Binding::new(target, Some(value), None, BindingKind::Meta)),
+                    SymbolKind::binding(Binding::new(target, Some(value), None, BindingKind::Static)),
                     span,
-                    Visibility::Public,
                 );
 
                 *form = Form::Output(symbol);
@@ -281,9 +278,8 @@ impl<'a> Initializer<'a> {
             let value = Element::new(ElementKind::literal(value.clone()), value.span);
 
             let symbol = Symbol::new(
-                SymbolKind::binding(Binding::new(target, Some(value), None, BindingKind::Meta)),
+                SymbolKind::binding(Binding::new(target, Some(value), None, BindingKind::Static)),
                 span,
-                Visibility::Public,
             );
 
             *form = Form::Output(symbol);
