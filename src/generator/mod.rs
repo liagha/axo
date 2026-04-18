@@ -184,7 +184,9 @@ Action<
         keys.sort();
 
         let mut build = cc::Build::new();
+        build.compiler("clang");
         build.opt_level(0);
+        build.host(Session::get_host());
 
         if let Some(target) = session.get_target() {
             build.target(target.as_str().unwrap());

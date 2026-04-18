@@ -1,6 +1,7 @@
 use crate::{
+    internal::platform::{ARCH, OS},
     combinator::{Form, Formation, Former},
-    data::{Offset, Scale, Str},
+    data::{Binding, BindingKind, Offset, Scale, Str},
     initializer::InitializeError,
     parser::{Element, ElementKind, ParseError, Symbol, SymbolKind},
     scanner::{PunctuationKind, Scanner, Token, TokenKind},
@@ -152,18 +153,47 @@ impl<'a> Initializer<'a> {
             }
         }
 
-        let targets = directives
-            .iter()
-            .filter_map(|symbol| {
-                let name = target_name(symbol)?;
-                if name == Str::from("Input") || name.starts_with("Input(") {
-                    let value = value_name(symbol)?;
-                    Some((value, symbol.span))
-                } else {
-                    None
+        let mut has_target = false;
+        let mut targets = Vec::new();
+
+        for symbol in &directives {
+            if let Some(name) = target_name(symbol) {
+                if name == Str::from("Target") {
+                    has_target = true;
+                } else if name == Str::from("Input") || name.starts_with("Input(") {
+                    if let Some(value) = value_name(symbol) {
+                        targets.push((value, symbol.span));
+                    }
                 }
-            })
-            .collect();
+            }
+        }
+
+        if !has_target {
+            let target_str = match (ARCH, OS) {
+                ("x86_64", "windows") => "x86_64-pc-windows-msvc",
+                ("aarch64", "windows") => "aarch64-pc-windows-msvc",
+                ("x86_64", "macos") => "x86_64-apple-darwin",
+                ("aarch64", "macos") => "aarch64-apple-darwin",
+                ("x86_64", "linux") => "x86_64-unknown-linux-gnu",
+                ("aarch64", "linux") => "aarch64-unknown-linux-gnu",
+                _ => "unknown",
+            };
+
+            let span = Span::void();
+            let target = Element::new(
+                ElementKind::literal(Token::new(TokenKind::identifier(Str::from("Target")), span)),
+                span,
+            );
+            let value = Element::new(
+                ElementKind::literal(Token::new(TokenKind::identifier(Str::from(target_str)), span)),
+                span,
+            );
+            let symbol = Symbol::new(
+                SymbolKind::binding(Binding::new(target, Some(value), None, BindingKind::Static)),
+                span,
+            );
+            directives.push(symbol);
+        }
 
         self.output = directives;
         targets

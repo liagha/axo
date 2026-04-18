@@ -19,6 +19,7 @@ pub mod time {
             time::{
                 SystemTime,
                 Instant,
+                UNIX_EPOCH,
             },
         }
     };
@@ -47,7 +48,7 @@ pub mod operation {
 pub mod platform {
     pub use std::{
         alloc::{alloc, dealloc, realloc, Layout},
-        env::{args, temp_dir, set_current_dir, current_dir, current_exe, var, consts::DLL_EXTENSION},
+        env::{args, temp_dir, set_current_dir, current_dir, current_exe, var, consts::{DLL_EXTENSION, OS, ARCH}},
         ffi::{OsStr, OsString},
         fs::{canonicalize, create_dir_all, read, read_dir, read_to_string, write, metadata, File},
         io::{

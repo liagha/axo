@@ -65,7 +65,7 @@ pub mod memory {
         borrow::Borrow,
         iter::Copied,
         marker::PhantomData,
-        mem::{discriminant, replace, swap, take, transmute, zeroed},
+        mem::{discriminant, replace, swap, take, transmute, zeroed, forget},
     };
     pub use std::{
         sync::{Arc, Mutex},

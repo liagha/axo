@@ -7,10 +7,13 @@ use {
         analyzer::Analyzer,
         combinator::{Action, Operation, Operator},
         data::{
-            memory::{transmute, Arc},
+            memory::{transmute, forget, Arc},
             Str,
         },
-        internal::platform::{catch_unwind, create_dir_all, read, write, AssertUnwindSafe, Lock},
+        internal::{
+            platform::{catch_unwind, create_dir_all, read, write, AssertUnwindSafe, Lock},
+            time::{UNIX_EPOCH, Instant, Duration},
+        },
         parser::Parser,
         resolver::Resolver,
         scanner::Scanner,
@@ -135,7 +138,7 @@ impl<'session> Session<'session> {
                     if let Ok(metadata) = path.metadata() {
                         let mut hasher = DefaultHasher::new();
                         if let Ok(modified) = metadata.modified() {
-                            if let Ok(duration) = modified.duration_since(std::time::UNIX_EPOCH) {
+                            if let Ok(duration) = modified.duration_since(UNIX_EPOCH) {
                                 duration.as_secs().hash(&mut hasher);
                                 duration.subsec_nanos().hash(&mut hasher);
                             }
@@ -211,7 +214,9 @@ impl<'session> Session<'session> {
 
                 if recompile {
                     let mut build = cc::Build::new();
+                    build.compiler("clang");
                     build.opt_level(0);
+                    build.host(Session::get_host());
 
                     if let Some(target) = self.get_target() {
                         build.target(target.as_str().unwrap());
@@ -238,7 +243,7 @@ impl<'session> Session<'session> {
                 if library.exists() {
                     let loading = unsafe { libloading::Library::new(&library) };
                     match loading {
-                        Ok(lib) => std::mem::forget(lib),
+                        Ok(lib) => forget(lib),
                         Err(err) => panic!("failed to open library: {} - {}", library.display(), err),
                     }
                 }
@@ -275,7 +280,7 @@ impl<'session> Session<'session> {
     }
 
     pub fn run(mut self, mut pipeline: Operation<'session, Arc<Lock<Session<'session>>>>) -> Self {
-        self.timer = std::time::Instant::now();
+        self.timer = Instant::now();
         self.laps.clear();
 
         if !self.errors.is_empty() {
@@ -292,7 +297,7 @@ impl<'session> Session<'session> {
         let elapsed = session.timer.elapsed();
         session.laps.push(elapsed);
 
-        let internal = session.laps.iter().copied().sum::<std::time::Duration>();
+        let internal = session.laps.iter().copied().sum::<Duration>();
 
         session.report_finish("pipeline", internal, session.errors.len());
         let total = session.timer.elapsed();
