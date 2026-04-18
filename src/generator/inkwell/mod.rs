@@ -20,7 +20,7 @@ use {
     crate::{
         analyzer::{Analysis, AnalysisKind},
         data::Str,
-        generator::{Backend, GenerateError},
+        generator::{GenerateError},
         internal::hash::Map,
         resolver::{Type, TypeKind},
         tracker::Span,
@@ -390,10 +390,8 @@ impl<'backend> Generator<'backend> {
     pub fn current_module(&self) -> &Module<'backend> {
         self.modules.get(&self.current_module).unwrap()
     }
-}
 
-impl<'backend> Backend<'backend> for Generator<'backend> {
-    fn generate(&mut self, analyses: Vec<Analysis<'backend>>) {
+    pub fn generate(&mut self, analyses: Vec<Analysis<'backend>>) {
         for analysis in &analyses {
             match &analysis.kind {
                 AnalysisKind::Structure(structure) => {
@@ -468,7 +466,7 @@ impl<'backend> Backend<'backend> for Generator<'backend> {
             if block.get_terminator().is_none() {
                 if self.errors.is_empty() {
                     self.errors.push(GenerateError::new(
-                        ErrorKind::Function(error::FunctionError::MissingReturn),
+                        ErrorKind::Function(FunctionError::MissingReturn),
                         Span::void(),
                     ));
                 }
@@ -486,7 +484,7 @@ impl<'backend> Backend<'backend> for Generator<'backend> {
         }
     }
 
-    fn analysis(
+    pub fn analysis(
         &mut self,
         analysis: Analysis<'backend>,
     ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {

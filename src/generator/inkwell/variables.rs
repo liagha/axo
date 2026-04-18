@@ -4,7 +4,7 @@ use {
         data::Str,
         data::*,
         generator::{
-            inkwell::{error::VariableError, Backend, Entity},
+            inkwell::{error::VariableError, Entity},
             ErrorKind, GenerateError, Generator,
         },
         resolver::{Type, TypeKind},

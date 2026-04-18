@@ -17,6 +17,7 @@ resolver = ["combinator", "scanner", "parser"]
 analyzer = ["combinator", "parser", "resolver"]
 interpreter = ["combinator", "analyzer", "resolver", "libloading", "libffi"]
 generator = ["combinator", "analyzer", "resolver", "inkwell"]
+dialog = ["interpreter"]
 
 [dependencies]
 broccli = { version = "0.0.22" }

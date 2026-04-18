@@ -1,4 +1,3 @@
-mod backend;
 mod generator;
 mod inkwell;
 
@@ -24,7 +23,7 @@ use {
     },
 };
 
-pub use {backend::Backend, inkwell::*};
+pub use {inkwell::*};
 
 pub type GenerateError<'error> = Error<'error, ErrorKind<'error>>;
 

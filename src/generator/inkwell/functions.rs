@@ -7,7 +7,7 @@ use {
                 error::{ControlFlowError, FunctionError},
                 Entity,
             },
-            Backend, ErrorKind, GenerateError, Generator,
+            ErrorKind, GenerateError, Generator,
         },
         resolver::{Type, TypeKind},
         tracker::Span,

@@ -3,7 +3,7 @@ use {
         analyzer::{Analysis, AnalysisKind},
         data::{Aggregate, Index, Str},
         generator::{
-            inkwell::{Backend, Entity, GenerateError, Generator},
+            inkwell::{Entity, GenerateError, Generator},
             BuilderError, DataStructureError, ErrorKind,
         },
         resolver::TypeKind,
