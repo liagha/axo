@@ -213,6 +213,10 @@ impl<'session> Session<'session> {
                     let mut build = cc::Build::new();
                     build.opt_level(0);
 
+                    if let Some(target) = self.get_target() {
+                        build.target(target.as_str().unwrap());
+                    }
+
                     let compiler = build.get_compiler();
                     let mut command = compiler.to_command();
 

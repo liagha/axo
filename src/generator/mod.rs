@@ -186,8 +186,12 @@ Action<
         let mut build = cc::Build::new();
         build.opt_level(0);
 
+        if let Some(target) = session.get_target() {
+            build.target(target.as_str().unwrap());
+        }
+
         let compiler = build.get_compiler();
-        
+
         for &key in &keys {
             let record = session.records.get_mut(&key).unwrap();
 

@@ -189,6 +189,10 @@ impl<'session> Session<'session> {
                      kind: TokenKind::Identifier(value),
                      ..
                  }) => Some(*value),
+            Some(Token {
+                     kind: TokenKind::String(value),
+                     ..
+                 }) => Some(*value),
             _ => None,
         }
     }
