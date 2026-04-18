@@ -170,8 +170,6 @@ impl<'session> Session<'session> {
 
         #[cfg(feature = "interpreter")]
         {
-            use crate::internal::platform::Command;
-
             let mut sources = Vec::new();
             let discard = self.get_directive(Str::from("Discard")).is_some();
 
@@ -212,8 +210,14 @@ impl<'session> Session<'session> {
                 let recompile = dirty || !library.exists();
 
                 if recompile {
-                    let mut command = Command::new("cc");
-                    command.arg("-shared").arg("-fPIC").arg("-o").arg(&library);
+                    let compiler = cc::Build::new().get_compiler();
+                    let mut command = compiler.to_command();
+
+                    if compiler.is_like_msvc() {
+                        command.arg("/nologo").arg("/LD").arg(format!("/Fe{}", library.display()));
+                    } else {
+                        command.arg("-shared").arg("-fPIC").arg("-o").arg(&library);
+                    }
 
                     for source in sources {
                         command.arg(source);

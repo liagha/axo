@@ -23,7 +23,7 @@ use {
     },
 };
 
-pub use {inkwell::*};
+pub use inkwell::*;
 
 pub type GenerateError<'error> = Error<'error, ErrorKind<'error>>;
 
@@ -40,7 +40,7 @@ Action<
         &self,
         operator: &mut Operator<Arc<Lock<Session<'source>>>>,
         operation: &mut Operation<'source, Arc<Lock<Session<'source>>>>,
-    ) -> () {
+    ) {
         let mut guard = operator.store.write().unwrap();
         let session = &mut *guard;
 
@@ -114,7 +114,7 @@ Action<
                                     let track = TrackError::new(kind, Span::void());
                                     session.errors.push(SessionError::Track(track));
                                     operation.set_reject();
-                                    return ();
+                                    return;
                                 }
                                 record.store(4, Artifact::Output(schema));
                             }
@@ -133,13 +133,14 @@ Action<
         let now = session.timer.elapsed();
         let sum: Duration = session.laps.iter().copied().sum();
         let duration = now.saturating_sub(sum);
-        
+
         session.report_finish("generating", duration, session.errors.len() - initial);
 
-        session.errors.extend(generator
-                                  .errors
-                                  .iter()
-                                  .map(|error| SessionError::Generate(error.clone())),
+        session.errors.extend(
+            generator
+                .errors
+                .iter()
+                .map(|error| SessionError::Generate(error.clone())),
         );
 
         if session.errors.is_empty() {
@@ -147,7 +148,6 @@ Action<
         } else {
             operation.set_reject();
         }
-        ()
     }
 }
 
@@ -164,7 +164,7 @@ Action<
         &self,
         operator: &mut Operator<Arc<Lock<Session<'source>>>>,
         operation: &mut Operation<'source, Arc<Lock<Session<'source>>>>,
-    ) -> () {
+    ) {
         let mut session = operator.store.write().unwrap();
         if session.get_directive(Str::from("Discard")).is_some() {
             if session.errors.is_empty() {
@@ -172,7 +172,7 @@ Action<
             } else {
                 operation.set_reject();
             }
-            return ();
+            return;
         }
 
         session.report_start("emitting");
@@ -182,6 +182,8 @@ Action<
 
         let mut keys: Vec<_> = session.records.keys().copied().collect();
         keys.sort();
+
+        let compiler = cc::Build::new().get_compiler();
 
         for &key in &keys {
             let record = session.records.get_mut(&key).unwrap();
@@ -193,7 +195,7 @@ Action<
                     } else {
                         None
                     }
-                },
+                }
                 RecordKind::Schema => Some(record.location.to_string()),
                 RecordKind::C => {
                     if let Some(content) = &record.content {
@@ -219,9 +221,7 @@ Action<
                     direct.push(record.location);
                     None
                 }
-                RecordKind::Flag => {
-                    None
-                }
+                RecordKind::Flag => None,
             };
 
             if let Some(path) = target {
@@ -235,13 +235,13 @@ Action<
                     continue;
                 }
 
-                let mut command = Command::new("clang");
+                let mut command = compiler.to_command();
 
-                command
-                    .arg("-c")
-                    .arg(path.clone())
-                    .arg("-o")
-                    .arg(object.to_string());
+                if compiler.is_like_msvc() {
+                    command.arg("/nologo").arg("/c").arg(path.clone()).arg(format!("/Fo{}", object));
+                } else {
+                    command.arg("-c").arg(path.clone()).arg("-o").arg(object.to_string());
+                }
 
                 let status = command.status().expect("failed");
 
@@ -251,7 +251,11 @@ Action<
             }
         }
 
-        let mut link = Command::new("cc");
+        let mut link = compiler.to_command();
+
+        if compiler.is_like_msvc() {
+            link.arg("/nologo");
+        }
 
         for &key in &keys {
             if let Some(Artifact::Object(object)) = session.records.get(&key).unwrap().fetch(5) {
@@ -274,7 +278,12 @@ Action<
         };
 
         let executable = Session::executable(&base, location, None);
-        link.arg("-o").arg(executable.to_string());
+
+        if compiler.is_like_msvc() {
+            link.arg(format!("/Fe{}", executable));
+        } else {
+            link.arg("-o").arg(executable.to_string());
+        }
 
         let status = link.status().expect("failed");
 
@@ -287,7 +296,7 @@ Action<
         let now = session.timer.elapsed();
         let sum: Duration = session.laps.iter().copied().sum();
         let duration = now.saturating_sub(sum);
-        
+
         session.report_external("emitting", duration);
 
         if session.errors.is_empty() {
@@ -295,7 +304,6 @@ Action<
         } else {
             operation.set_reject();
         }
-        ()
     }
 }
 
@@ -312,7 +320,7 @@ Action<
         &self,
         operator: &mut Operator<Arc<Lock<Session<'source>>>>,
         operation: &mut Operation<'source, Arc<Lock<Session<'source>>>>,
-    ) -> () {
+    ) {
         let session = operator.store.write().unwrap();
         if session.get_directive(Str::from("Discard")).is_some() {
             if session.errors.is_empty() {
@@ -320,7 +328,7 @@ Action<
             } else {
                 operation.set_reject();
             }
-            return ();
+            return;
         }
 
         session.report_start("running");
@@ -340,7 +348,7 @@ Action<
         let now = session.timer.elapsed();
         let sum: Duration = session.laps.iter().copied().sum();
         let duration = now.saturating_sub(sum);
-        
+
         session.report_external("running", duration);
 
         if session.errors.is_empty() {
@@ -348,6 +356,5 @@ Action<
         } else {
             operation.set_reject();
         }
-        ()
     }
 }
