@@ -183,8 +183,11 @@ Action<
         let mut keys: Vec<_> = session.records.keys().copied().collect();
         keys.sort();
 
-        let compiler = cc::Build::new().get_compiler();
+        let mut build = cc::Build::new();
+        build.opt_level(0);
 
+        let compiler = build.get_compiler();
+        
         for &key in &keys {
             let record = session.records.get_mut(&key).unwrap();
 

@@ -8,7 +8,7 @@ use {
         internal::{
             hash::Map,
             platform::PathBuf,
-            time::{Instant, Duration},
+            time::{Duration, Instant},
             SessionError,
         },
         literal,
@@ -179,6 +179,16 @@ impl<'session> Session<'session> {
                      kind: TokenKind::Integer(_),
                      ..
                  }) => Some(Stencil::default()),
+            _ => None,
+        }
+    }
+
+    pub fn get_target(&self) -> Option<Str<'session>> {
+        match self.get_directive(Str::from("Target")) {
+            Some(Token {
+                     kind: TokenKind::Identifier(value),
+                     ..
+                 }) => Some(*value),
             _ => None,
         }
     }

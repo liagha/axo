@@ -1,5 +1,5 @@
 use crate::{
-    combinator::{Formation, Form, Former},
+    combinator::{Form, Formation, Former},
     data::{Offset, Scale, Str},
     initializer::InitializeError,
     parser::{Element, ElementKind, ParseError, Symbol, SymbolKind},
@@ -37,7 +37,10 @@ impl<'a> Peekable<'a, Token<'a>> for Initializer<'a> {
 
     fn next(&self, index: &mut Offset, state: &mut Self::State) -> Option<Token<'a>> {
         let token = self.get(*index)?;
-        *state = Position { identity: token.span.identity, offset: token.span.end };
+        *state = Position {
+            identity: token.span.identity,
+            offset: token.span.end,
+        };
         *index += 1;
         Some(token.clone())
     }
@@ -79,7 +82,9 @@ impl<'a> Initializer<'a> {
         }
     }
 
-    pub fn filter<'source>(length: Scale) -> Formation<'a, 'source, Self, Token<'a>, Element<'a>, ParseError<'a>> {
+    pub fn filter<'source>(
+        length: Scale,
+    ) -> Formation<'a, 'source, Self, Token<'a>, Element<'a>, ParseError<'a>> {
         Formation::repetition(
             Formation::alternative([
                 Formation::predicate(is_ignored).with_ignore(),
@@ -90,11 +95,13 @@ impl<'a> Initializer<'a> {
         )
     }
 
-    pub fn directive<'source>() -> Formation<'a, 'source, Self, Token<'a>, Symbol<'a>, InitializeError<'a>> {
+    pub fn directive<'source>(
+    ) -> Formation<'a, 'source, Self, Token<'a>, Symbol<'a>, InitializeError<'a>> {
         Formation::alternative([
             Self::verbosity(),
             Self::input(),
             Self::output(),
+            Self::target(),
             Self::discard(),
             Self::bare(),
             Self::implicit_input(),
@@ -102,7 +109,8 @@ impl<'a> Initializer<'a> {
         ])
     }
 
-    pub fn formation<'source>() -> Formation<'a, 'source, Self, Token<'a>, Symbol<'a>, InitializeError<'a>> {
+    pub fn formation<'source>(
+    ) -> Formation<'a, 'source, Self, Token<'a>, Symbol<'a>, InitializeError<'a>> {
         Formation::repetition(Self::directive(), 0, None)
     }
 

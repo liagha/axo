@@ -210,7 +210,10 @@ impl<'session> Session<'session> {
                 let recompile = dirty || !library.exists();
 
                 if recompile {
-                    let compiler = cc::Build::new().get_compiler();
+                    let mut build = cc::Build::new();
+                    build.opt_level(0);
+
+                    let compiler = build.get_compiler();
                     let mut command = compiler.to_command();
 
                     if compiler.is_like_msvc() {

@@ -1,5 +1,5 @@
 use crate::{
-    combinator::{Formation, Form},
+    combinator::{Form, Formation},
     data::{Binding, BindingKind, Str},
     initializer::{InitializeError, Initializer},
     parser::{Element, ElementKind, Symbol, SymbolKind},
@@ -30,7 +30,8 @@ impl<'a> Initializer<'a> {
         result
     }
 
-    fn separator<'source>() -> Formation<'a, 'source, Self, Token<'a>, Symbol<'a>, InitializeError<'a>> {
+    fn separator<'source>(
+    ) -> Formation<'a, 'source, Self, Token<'a>, Symbol<'a>, InitializeError<'a>> {
         Formation::predicate(|token: &Token| {
             matches!(
                 token.kind.try_unwrap_operator(),
@@ -44,13 +45,15 @@ impl<'a> Initializer<'a> {
         })
     }
 
-    fn segment<'source>() -> Formation<'a, 'source, Self, Token<'a>, Symbol<'a>, InitializeError<'a>> {
+    fn segment<'source>(
+    ) -> Formation<'a, 'source, Self, Token<'a>, Symbol<'a>, InitializeError<'a>> {
         Formation::predicate(|token: &Token| {
             token.kind.is_identifier() || token.kind.is_string() || token.kind.is_integer()
         })
     }
 
-    fn path_value<'source>() -> Formation<'a, 'source, Self, Token<'a>, Symbol<'a>, InitializeError<'a>> {
+    fn path_value<'source>(
+    ) -> Formation<'a, 'source, Self, Token<'a>, Symbol<'a>, InitializeError<'a>> {
         Formation::sequence([
             Formation::repetition(Self::separator(), 0, None),
             Formation::repetition(
@@ -121,7 +124,12 @@ impl<'a> Initializer<'a> {
                 );
 
                 let symbol = Symbol::new(
-                    SymbolKind::binding(Binding::new(target, Some(value), None, BindingKind::Static)),
+                    SymbolKind::binding(Binding::new(
+                        target,
+                        Some(value),
+                        None,
+                        BindingKind::Static,
+                    )),
                     identifier.span().merge(&path.span()),
                 );
 
@@ -188,7 +196,8 @@ impl<'a> Initializer<'a> {
             })
     }
 
-    pub fn verbosity<'source>() -> Formation<'a, 'source, Self, Token<'a>, Symbol<'a>, InitializeError<'a>> {
+    pub fn verbosity<'source>(
+    ) -> Formation<'a, 'source, Self, Token<'a>, Symbol<'a>, InitializeError<'a>> {
         Formation::sequence([
             Formation::repetition(
                 Formation::predicate(|token: &Token| {
@@ -210,7 +219,10 @@ impl<'a> Initializer<'a> {
                     let identifier = form.collect_inputs()[0].clone();
                     let span = identifier.span();
 
-                    *form = Form::Input(Token::new(TokenKind::identifier(Str::from("Verbosity")), span));
+                    *form = Form::Input(Token::new(
+                        TokenKind::identifier(Str::from("Verbosity")),
+                        span,
+                    ));
 
                     Ok(())
                 }),
@@ -236,27 +248,39 @@ impl<'a> Initializer<'a> {
             })
     }
 
-    pub fn input<'source>() -> Formation<'a, 'source, Self, Token<'a>, Symbol<'a>, InitializeError<'a>> {
+    pub fn target<'source>(
+    ) -> Formation<'a, 'source, Self, Token<'a>, Symbol<'a>, InitializeError<'a>> {
+        Self::path_directive(Str::from("Target"), |identifier| {
+            *identifier == "t" || *identifier == "target"
+        })
+    }
+
+    pub fn input<'source>(
+    ) -> Formation<'a, 'source, Self, Token<'a>, Symbol<'a>, InitializeError<'a>> {
         Self::path_directive(Str::from("Input"), |identifier| {
-            identifier == "i" || identifier == "input"
+            *identifier == "i" || *identifier == "input"
         })
     }
 
-    pub fn output<'source>() -> Formation<'a, 'source, Self, Token<'a>, Symbol<'a>, InitializeError<'a>> {
+    pub fn output<'source>(
+    ) -> Formation<'a, 'source, Self, Token<'a>, Symbol<'a>, InitializeError<'a>> {
         Self::path_directive(Str::from("Output"), |identifier| {
-            identifier == "o" || identifier == "output"
+            *identifier == "o" || *identifier == "output"
         })
     }
 
-    pub fn discard<'source>() -> Formation<'a, 'source, Self, Token<'a>, Symbol<'a>, InitializeError<'a>> {
-        Self::boolean_directive(Str::from("Discard"), |identifier| identifier == "discard")
+    pub fn discard<'source>(
+    ) -> Formation<'a, 'source, Self, Token<'a>, Symbol<'a>, InitializeError<'a>> {
+        Self::boolean_directive(Str::from("Discard"), |identifier| *identifier == "discard")
     }
 
-    pub fn bare<'source>() -> Formation<'a, 'source, Self, Token<'a>, Symbol<'a>, InitializeError<'a>> {
-        Self::boolean_directive(Str::from("Bare"), |identifier| identifier == "bare")
+    pub fn bare<'source>(
+    ) -> Formation<'a, 'source, Self, Token<'a>, Symbol<'a>, InitializeError<'a>> {
+        Self::boolean_directive(Str::from("Bare"), |identifier| *identifier == "bare")
     }
 
-    pub fn implicit_input<'source>() -> Formation<'a, 'source, Self, Token<'a>, Symbol<'a>, InitializeError<'a>> {
+    pub fn implicit_input<'source>(
+    ) -> Formation<'a, 'source, Self, Token<'a>, Symbol<'a>, InitializeError<'a>> {
         Formation::with_transform(Self::path_value(), |former, formation| {
             let form = former.forms.get_mut(formation.form).unwrap();
             let inputs = form.collect_inputs();
