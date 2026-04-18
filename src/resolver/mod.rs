@@ -7,12 +7,16 @@ mod symbol;
 mod traits;
 mod typing;
 
-pub use {resolver::*, scope::*, typing::*, error::*};
+pub use {error::*, resolver::*, scope::*, typing::*};
 
 use crate::{
     combinator::{Action, Operation, Operator},
-    data::{memory::Arc, sync::{AtomicUsize, Ordering}, Identity},
-    internal::{platform::Lock, time::Duration, Session},
+    data::{
+        memory::Arc,
+        sync::{AtomicUsize, Ordering},
+        Identity,
+    },
+    internal::{platform::Lock, Session},
     reporter::Error,
 };
 
@@ -38,20 +42,11 @@ Action<
     ) {
         let mut guard = operator.store.write().unwrap();
         let session = &mut *guard;
-        let initial = session.errors.len();
-
-        session.report_start("resolving");
 
         let mut keys: Vec<_> = session.records.keys().copied().collect();
         keys.sort();
 
         Resolver::execute(session, &keys);
-
-        let now = session.timer.elapsed();
-        let sum: Duration = session.laps.iter().copied().sum();
-        let duration = now.saturating_sub(sum);
-
-        session.report_finish("resolving", duration, session.errors.len() - initial);
 
         if session.errors.is_empty() {
             operation.set_resolve(Vec::new());

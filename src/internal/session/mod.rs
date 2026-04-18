@@ -12,7 +12,7 @@ use {
         },
         internal::{
             platform::{catch_unwind, create_dir_all, read, write, AssertUnwindSafe, Lock},
-            time::{UNIX_EPOCH, Instant, Duration},
+            time::{Duration, Instant, UNIX_EPOCH},
         },
         parser::Parser,
         resolver::Resolver,
@@ -30,14 +30,14 @@ use crate::{
 #[cfg(feature = "generator")]
 use crate::generator::{EmitAction, GenerateAction, RunAction};
 
-pub struct PrepareAction;
+pub struct Prepare;
 
 impl<'source>
 Action<
     'static,
     Operator<Arc<Lock<Session<'source>>>>,
     Operation<'source, Arc<Lock<Session<'source>>>>,
-> for PrepareAction
+> for Prepare
 {
     fn action(
         &self,
@@ -51,6 +51,53 @@ Action<
         } else {
             operation.set_reject();
         }
+    }
+}
+
+pub struct Stage<A> {
+    name: &'static str,
+    inner: A,
+}
+
+impl<A> Stage<A> {
+    pub fn new(name: &'static str, inner: A) -> Self {
+        Self { name, inner }
+    }
+}
+
+impl<'source, A>
+Action<
+    'static,
+    Operator<Arc<Lock<Session<'source>>>>,
+    Operation<'source, Arc<Lock<Session<'source>>>>,
+> for Stage<A>
+where
+    A: Action<
+        'static,
+        Operator<Arc<Lock<Session<'source>>>>,
+        Operation<'source, Arc<Lock<Session<'source>>>>,
+    >,
+{
+    fn action(
+        &self,
+        operator: &mut Operator<Arc<Lock<Session<'source>>>>,
+        operation: &mut Operation<'source, Arc<Lock<Session<'source>>>>,
+    ) {
+        let initial = {
+            let session = operator.store.write().unwrap();
+            session.report_start(self.name);
+            session.errors.len()
+        };
+
+        self.inner.action(operator, operation);
+
+        let mut session = operator.store.write().unwrap();
+        let now = session.timer.elapsed();
+        let sum: Duration = session.laps.iter().copied().sum();
+        let duration = now.saturating_sub(sum);
+
+        session.laps.push(duration);
+        session.report_finish(self.name, duration, session.errors.len() - initial);
     }
 }
 
@@ -244,7 +291,7 @@ impl<'session> Session<'session> {
 
                 if library.exists() {
                     use crate::data::memory::forget;
-                    
+
                     let loading = unsafe { libloading::Library::new(&library) };
                     match loading {
                         Ok(instance) => forget(instance),
@@ -323,19 +370,19 @@ impl<'session> Session<'session> {
         let engine = Arc::new(Lock::new(Interpreter::new(1024)));
 
         self.run(Operation::sequence([
-            Operation::new(Arc::new(PrepareAction)),
-            Operation::new(Arc::new(Scanner::default())),
-            Operation::new(Arc::new(Parser::default())),
-            Operation::new(Arc::new(Resolver::default())),
-            Operation::new(Arc::new(Analyzer::default())),
+            Operation::new(Arc::new(Stage::new("preparation", Prepare))),
+            Operation::new(Arc::new(Stage::new("scanning", Scanner::default()))),
+            Operation::new(Arc::new(Stage::new("parsing", Parser::default()))),
+            Operation::new(Arc::new(Stage::new("resolving", Resolver::default()))),
+            Operation::new(Arc::new(Stage::new("analyzing", Analyzer::default()))),
             #[cfg(feature = "interpreter")]
-            Operation::new(Arc::new(InterpretAction::new(engine))),
+            Operation::new(Arc::new(Stage::new("interpreting", InterpretAction::new(engine)))),
             #[cfg(feature = "generator")]
-            Operation::new(Arc::new(GenerateAction)),
+            Operation::new(Arc::new(Stage::new("generating", GenerateAction))),
             #[cfg(feature = "generator")]
-            Operation::new(Arc::new(EmitAction)),
+            Operation::new(Arc::new(Stage::new("emitting", EmitAction))),
             #[cfg(feature = "generator")]
-            Operation::new(Arc::new(RunAction)),
+            Operation::new(Arc::new(Stage::new("running", RunAction))),
         ]))
     }
 }

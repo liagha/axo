@@ -4,7 +4,7 @@ pub use {
     session::{
         Artifact,
         RecordKind,
-        PrepareAction,
+        Prepare,
         Session,
         Record,
     }

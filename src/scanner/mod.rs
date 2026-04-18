@@ -1,24 +1,24 @@
 mod character;
-mod formation;
 mod error;
+mod formation;
 mod operator;
 mod punctuation;
 mod scanner;
 mod token;
 mod traits;
 
-pub use {character::Character, operator::*, punctuation::*, scanner::Scanner, token::*, error::*};
+pub use {
+    character::Character, error::*, operator::*, punctuation::*, scanner::Scanner, token::*,
+};
 
 pub type ScanError<'error> = Error<'error, ErrorKind<'error>>;
 
-use {
-    crate::{
-        combinator::{Action, Operation},
-        data::memory::Arc,
-        internal::{platform::Lock, time::Duration, Session},
-    },
+use crate::{
+    combinator::{Action, Operation},
+    data::memory::Arc,
+    internal::{platform::Lock, Session},
+    reporter::Error,
 };
-use crate::reporter::Error;
 
 impl<'source>
 Action<
@@ -33,20 +33,10 @@ Action<
         operation: &mut Operation<'source, Arc<Lock<Session<'source>>>>,
     ) {
         let mut session = operator.store.write().unwrap();
-        let initial = session.errors.len();
-
-        session.report_start("scanning");
-
         let mut keys: Vec<_> = session.records.keys().copied().collect();
         keys.sort();
 
         Scanner::execute(&mut session, &keys);
-
-        let now = session.timer.elapsed();
-        let sum: Duration = session.laps.iter().copied().sum();
-        let duration = now.saturating_sub(sum);
-        
-        session.report_finish("scanning", duration, session.errors.len() - initial);
 
         if session.errors.is_empty() {
             operation.set_resolve(Vec::new());

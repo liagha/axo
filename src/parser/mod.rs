@@ -1,21 +1,21 @@
-mod formation;
 mod element;
 pub mod error;
+mod formation;
 mod parser;
 mod symbol;
 mod traits;
 
 pub use {
     element::{Element, ElementKind},
+    error::*,
     parser::Parser,
     symbol::{Symbol, SymbolKind},
-    error::*,
 };
 
 use crate::{
     combinator::{Action, Operation, Operator},
     data::memory::Arc,
-    internal::{platform::Lock, time::Duration, Session},
+    internal::{platform::Lock, Session},
     reporter::Error,
     tracker::Location,
 };
@@ -35,22 +35,10 @@ Action<
         operation: &mut Operation<'source, Arc<Lock<Session<'source>>>>,
     ) {
         let mut session = operator.store.write().unwrap();
-        let initial = session.errors.len();
-
-        session.report_start("parsing");
-
         let mut keys: Vec<_> = session.records.keys().copied().collect();
         keys.sort();
 
         Parser::execute(&mut session, &keys);
-
-        let now = session.timer.elapsed();
-        let sum: Duration = session.laps.iter().copied().sum();
-        let duration = now.saturating_sub(sum);
-
-        session.laps.push(duration);
-
-        session.report_finish("parsing", duration, session.errors.len() - initial);
 
         if session.errors.is_empty() {
             operation.set_resolve(Vec::new());
@@ -201,7 +189,9 @@ mod tests {
         let parser = parse("(2 [1,2 {3,4");
         assert!(matches!(
             kind(&parser),
-            ErrorKind::UnclosedDelimiter(_) | ErrorKind::ExpectedBody | ErrorKind::UnexpectedToken(_)
+            ErrorKind::UnclosedDelimiter(_)
+                | ErrorKind::ExpectedBody
+                | ErrorKind::UnexpectedToken(_)
         ));
     }
 
@@ -217,7 +207,9 @@ mod tests {
             assert!(!parser.errors.is_empty());
             assert!(matches!(
                 kind(&parser),
-                ErrorKind::UnclosedDelimiter(_) | ErrorKind::ExpectedBody | ErrorKind::UnexpectedToken(_)
+                ErrorKind::UnclosedDelimiter(_)
+                    | ErrorKind::ExpectedBody
+                    | ErrorKind::UnexpectedToken(_)
             ));
         }
     }
