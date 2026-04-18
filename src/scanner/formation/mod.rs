@@ -2,7 +2,7 @@ mod escape;
 mod number;
 
 use crate::{
-    combinator::{Classifier, Form},
+    combinator::{Formation, Form},
     data::Str,
     scanner::{
         Character, CharacterError, ErrorKind, Operator, Punctuation, PunctuationKind, ScanError,
@@ -12,21 +12,21 @@ use crate::{
 };
 
 impl<'a> Scanner<'a> {
-    fn string<'source>() -> Classifier<'a, 'source, Self, Character, Token<'a>, ScanError<'a>> {
-        Classifier::sequence([
-            Classifier::literal('"').with_ignore(),
-            Classifier::repetition(
-                Classifier::alternative([
-                    Classifier::predicate(|c: &Character| !matches!(c.value, '"' | '\\')),
+    fn string<'source>() -> Formation<'a, 'source, Self, Character, Token<'a>, ScanError<'a>> {
+        Formation::sequence([
+            Formation::literal('"').with_ignore(),
+            Formation::repetition(
+                Formation::alternative([
+                    Formation::predicate(|c: &Character| !matches!(c.value, '"' | '\\')),
                     Self::escape_sequence(),
                 ]),
                 0,
                 None,
             ),
-            Classifier::literal('"').with_ignore(),
+            Formation::literal('"').with_ignore(),
         ])
-            .with_transform(move |former, classifier| {
-                let form = former.forms.get_mut(classifier.form).unwrap();
+            .with_transform(move |former, formation| {
+                let form = former.forms.get_mut(formation.form).unwrap();
                 let inputs = form.collect_inputs();
                 let span = inputs.span().clone();
                 let content = inputs.into_iter().collect::<Str>();
@@ -37,22 +37,22 @@ impl<'a> Scanner<'a> {
             })
     }
 
-    fn backtick<'source>() -> Classifier<'a, 'source, Self, Character, Token<'a>, ScanError<'a>>
+    fn backtick<'source>() -> Formation<'a, 'source, Self, Character, Token<'a>, ScanError<'a>>
     {
-        Classifier::sequence([
-            Classifier::literal('`').with_ignore(),
-            Classifier::repetition(
-                Classifier::alternative([
-                    Classifier::predicate(|c: &Character| !matches!(c.value, '`' | '\\')),
+        Formation::sequence([
+            Formation::literal('`').with_ignore(),
+            Formation::repetition(
+                Formation::alternative([
+                    Formation::predicate(|c: &Character| !matches!(c.value, '`' | '\\')),
                     Self::escape_sequence(),
                 ]),
                 0,
                 None,
             ),
-            Classifier::literal('`').with_ignore(),
+            Formation::literal('`').with_ignore(),
         ])
-            .with_transform(move |former, classifier| {
-                let form = former.forms.get_mut(classifier.form).unwrap();
+            .with_transform(move |former, formation| {
+                let form = former.forms.get_mut(formation.form).unwrap();
                 let inputs = form.collect_inputs();
                 let span = inputs.span().clone();
                 let content = inputs.into_iter().collect::<Str>();
@@ -63,18 +63,18 @@ impl<'a> Scanner<'a> {
             })
     }
 
-    fn character<'source>() -> Classifier<'a, 'source, Self, Character, Token<'a>, ScanError<'a>>
+    fn character<'source>() -> Formation<'a, 'source, Self, Character, Token<'a>, ScanError<'a>>
     {
-        Classifier::sequence([
-            Classifier::literal('\''),
-            Classifier::alternative([
-                Classifier::predicate(|c: &Character| !matches!(c.value, '\'' | '\\')),
+        Formation::sequence([
+            Formation::literal('\''),
+            Formation::alternative([
+                Formation::predicate(|c: &Character| !matches!(c.value, '\'' | '\\')),
                 Self::escape_sequence(),
             ]),
-            Classifier::literal('\''),
+            Formation::literal('\''),
         ])
-            .with_transform(|former, classifier| {
-                let form = former.forms.get_mut(classifier.form).unwrap();
+            .with_transform(|former, formation| {
+                let form = former.forms.get_mut(formation.form).unwrap();
                 let inputs = form.collect_inputs();
                 let character = inputs[1];
 
@@ -88,18 +88,18 @@ impl<'a> Scanner<'a> {
     }
 
     fn identifier<'source>(
-    ) -> Classifier<'a, 'source, Self, Character, Token<'a>, ScanError<'a>> {
-        Classifier::with_transform(
-            Classifier::sequence([
-                Classifier::predicate(|c: &Character| c.is_alphabetic() || *c == '_'),
-                Classifier::persistence(
-                    Classifier::predicate(|c: &Character| c.is_alphanumeric() || *c == '_'),
+    ) -> Formation<'a, 'source, Self, Character, Token<'a>, ScanError<'a>> {
+        Formation::with_transform(
+            Formation::sequence([
+                Formation::predicate(|c: &Character| c.is_alphabetic() || *c == '_'),
+                Formation::persistence(
+                    Formation::predicate(|c: &Character| c.is_alphanumeric() || *c == '_'),
                     0,
                     None,
                 ),
             ]),
-            |former, classifier| {
-                let form = former.forms.get_mut(classifier.form).unwrap();
+            |former, formation| {
+                let form = former.forms.get_mut(formation.form).unwrap();
                 let inputs = form.collect_inputs();
                 let span = inputs.span().clone();
                 let content = inputs.into_iter().collect::<Str>();
@@ -117,16 +117,16 @@ impl<'a> Scanner<'a> {
         )
     }
 
-    fn operator<'source>() -> Classifier<'a, 'source, Self, Character, Token<'a>, ScanError<'a>>
+    fn operator<'source>() -> Formation<'a, 'source, Self, Character, Token<'a>, ScanError<'a>>
     {
-        Classifier::with_transform(
-            Classifier::persistence(
-                Classifier::predicate(|c: &Character| c.is_operator()),
+        Formation::with_transform(
+            Formation::persistence(
+                Formation::predicate(|c: &Character| c.is_operator()),
                 1,
                 Some(3),
             ),
-            |former, classifier| {
-                let form = former.forms.get_mut(classifier.form).unwrap();
+            |former, formation| {
+                let form = former.forms.get_mut(formation.form).unwrap();
                 let inputs = form.collect_inputs();
                 let span = inputs.span().clone();
                 let content = inputs.into_iter().collect::<Str>();
@@ -139,11 +139,11 @@ impl<'a> Scanner<'a> {
     }
 
     fn punctuation<'source>(
-    ) -> Classifier<'a, 'source, Self, Character, Token<'a>, ScanError<'a>> {
-        Classifier::with_transform(
-            Classifier::predicate(|c: &Character| c.is_punctuation()),
-            |former, classifier| {
-                let form = former.forms.get_mut(classifier.form).unwrap();
+    ) -> Formation<'a, 'source, Self, Character, Token<'a>, ScanError<'a>> {
+        Formation::with_transform(
+            Formation::predicate(|c: &Character| c.is_punctuation()),
+            |former, formation| {
+                let form = former.forms.get_mut(formation.form).unwrap();
                 let inputs = form.collect_inputs();
                 let span = inputs.span().clone();
                 let content = inputs.into_iter().collect::<Str>();
@@ -159,11 +159,11 @@ impl<'a> Scanner<'a> {
     }
 
     fn whitespace<'source>(
-    ) -> Classifier<'a, 'source, Self, Character, Token<'a>, ScanError<'a>> {
-        Classifier::with_transform(
-            Classifier::predicate(|c: &Character| c.is_whitespace() && *c != '\n'),
-            |former, classifier| {
-                let form = former.forms.get_mut(classifier.form).unwrap();
+    ) -> Formation<'a, 'source, Self, Character, Token<'a>, ScanError<'a>> {
+        Formation::with_transform(
+            Formation::predicate(|c: &Character| c.is_whitespace() && *c != '\n'),
+            |former, formation| {
+                let form = former.forms.get_mut(formation.form).unwrap();
                 let input = form.unwrap_input();
                 let span = input.span().clone();
 
@@ -174,33 +174,33 @@ impl<'a> Scanner<'a> {
         )
     }
 
-    fn comment<'source>() -> Classifier<'a, 'source, Self, Character, Token<'a>, ScanError<'a>>
+    fn comment<'source>() -> Formation<'a, 'source, Self, Character, Token<'a>, ScanError<'a>>
     {
-        Classifier::with_transform(
-            Classifier::sequence([Classifier::alternative([
-                Classifier::sequence([
-                    Classifier::sequence([Classifier::literal('/'), Classifier::literal('/')])
+        Formation::with_transform(
+            Formation::sequence([Formation::alternative([
+                Formation::sequence([
+                    Formation::sequence([Formation::literal('/'), Formation::literal('/')])
                         .with_ignore(),
-                    Classifier::persistence(
-                        Classifier::predicate(|c: &Character| *c != '\n'),
+                    Formation::persistence(
+                        Formation::predicate(|c: &Character| *c != '\n'),
                         0,
                         None,
                     ),
                 ]),
-                Classifier::sequence([
-                    Classifier::sequence([Classifier::literal('/'), Classifier::literal('*')])
+                Formation::sequence([
+                    Formation::sequence([Formation::literal('/'), Formation::literal('*')])
                         .with_ignore(),
-                    Classifier::persistence(
-                        Classifier::predicate(|c: &Character| *c != '*'),
+                    Formation::persistence(
+                        Formation::predicate(|c: &Character| *c != '*'),
                         0,
                         None,
                     ),
-                    Classifier::sequence([Classifier::literal('*'), Classifier::literal('/')])
+                    Formation::sequence([Formation::literal('*'), Formation::literal('/')])
                         .with_ignore(),
                 ]),
             ])]),
-            |former, classifier| {
-                let form = former.forms.get_mut(classifier.form).unwrap();
+            |former, formation| {
+                let form = former.forms.get_mut(formation.form).unwrap();
                 let inputs = form.collect_inputs();
                 let span = inputs.span().clone();
                 let content = inputs.into_iter().collect::<Str>();
@@ -212,12 +212,12 @@ impl<'a> Scanner<'a> {
         )
     }
 
-    fn fallback<'source>() -> Classifier<'a, 'source, Self, Character, Token<'a>, ScanError<'a>>
+    fn fallback<'source>() -> Formation<'a, 'source, Self, Character, Token<'a>, ScanError<'a>>
     {
-        Classifier::with_action(
-            Classifier::anything(),
-            Classifier::fail(|former, classifier| {
-                let form = former.forms.get_mut(classifier.form).unwrap();
+        Formation::with_action(
+            Formation::anything(),
+            Formation::fail(|former, formation| {
+                let form = former.forms.get_mut(formation.form).unwrap();
                 let ch: &Character = form.unwrap_input();
 
                 ScanError::new(
@@ -228,10 +228,10 @@ impl<'a> Scanner<'a> {
         )
     }
 
-    pub fn classifier<'source>(
-    ) -> Classifier<'a, 'source, Self, Character, Token<'a>, ScanError<'a>> {
-        Classifier::persistence(
-            Classifier::alternative([
+    pub fn formation<'source>(
+    ) -> Formation<'a, 'source, Self, Character, Token<'a>, ScanError<'a>> {
+        Formation::persistence(
+            Formation::alternative([
                 Self::whitespace(),
                 Self::comment(),
                 Self::identifier(),

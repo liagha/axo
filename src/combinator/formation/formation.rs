@@ -11,7 +11,7 @@ use crate::{
     tracker::Peekable,
 };
 
-pub struct Classifier<'a: 'source, 'source, Source, Input, Output, Failure>
+pub struct Formation<'a: 'source, 'source, Source, Input, Output, Failure>
 where
     Source: Peekable<'a, Input>,
     Source::State: Default,
@@ -32,7 +32,7 @@ where
 }
 
 impl<'a: 'source, 'source, Source, Input, Output, Failure>
-Classifier<'a, 'source, Source, Input, Output, Failure>
+Formation<'a, 'source, Source, Input, Output, Failure>
 where
     Source: Peekable<'a, Input>,
     Source::State: Default,
@@ -244,10 +244,10 @@ where
     }
 
     #[inline]
-    pub fn optional(classifier: Self) -> Self {
+    pub fn optional(formation: Self) -> Self {
         Self::new(
             Arc::new(Optional {
-                state: Box::new(classifier),
+                state: Box::new(formation),
             }),
             0,
             Default::default(),
@@ -255,10 +255,10 @@ where
     }
 
     #[inline]
-    pub fn persistence(classifier: Self, minimum: Scale, maximum: Option<Scale>) -> Self {
+    pub fn persistence(formation: Self, minimum: Scale, maximum: Option<Scale>) -> Self {
         Self::new(
             Arc::new(Repetition {
-                state: Box::new(classifier),
+                state: Box::new(formation),
                 minimum,
                 maximum,
                 halt: |state| state.is_blank(),
@@ -270,10 +270,10 @@ where
     }
 
     #[inline]
-    pub fn repetition(classifier: Self, minimum: Scale, maximum: Option<Scale>) -> Self {
+    pub fn repetition(formation: Self, minimum: Scale, maximum: Option<Scale>) -> Self {
         Self::new(
             Arc::new(Repetition {
-                state: Box::new(classifier),
+                state: Box::new(formation),
                 minimum,
                 maximum,
                 halt: |state| state.is_failed() || state.is_panicked() || state.is_blank(),
@@ -320,7 +320,7 @@ where
     where
         F: Fn(
             &mut Former<'a, 'source, Source, Input, Output, Failure>,
-            Classifier<'a, 'source, Source, Input, Output, Failure>,
+            Formation<'a, 'source, Source, Input, Output, Failure>,
         ) -> Failure
         + Send
         + Sync
@@ -352,7 +352,7 @@ where
     where
         F: Fn(
             &mut Former<'a, 'source, Source, Input, Output, Failure>,
-            Classifier<'a, 'source, Source, Input, Output, Failure>,
+            Formation<'a, 'source, Source, Input, Output, Failure>,
         ) -> Failure
         + Send
         + Sync
@@ -367,7 +367,7 @@ where
         S: Fn(&Input) -> bool + Send + Sync + 'source,
         F: Fn(
             &mut Former<'a, 'source, Source, Input, Output, Failure>,
-            Classifier<'a, 'source, Source, Input, Output, Failure>,
+            Formation<'a, 'source, Source, Input, Output, Failure>,
         ) -> Failure
         + Send
         + Sync
@@ -386,7 +386,7 @@ where
     where
         T: Fn(
             &mut Former<'a, 'source, Source, Input, Output, Failure>,
-            &mut Classifier<'a, 'source, Source, Input, Output, Failure>,
+            &mut Formation<'a, 'source, Source, Input, Output, Failure>,
         ) -> Result<(), Failure>
         + Send
         + Sync
@@ -412,7 +412,7 @@ where
     where
         T: Fn(
             &mut Former<'a, 'source, Source, Input, Output, Failure>,
-            &mut Classifier<'a, 'source, Source, Input, Output, Failure>,
+            &mut Formation<'a, 'source, Source, Input, Output, Failure>,
         ) -> Result<(), Failure>
         + Send
         + Sync
@@ -431,7 +431,7 @@ where
     where
         T: Fn(
             &mut Former<'a, 'source, Source, Input, Output, Failure>,
-            Classifier<'a, 'source, Source, Input, Output, Failure>,
+            Formation<'a, 'source, Source, Input, Output, Failure>,
         ) -> Failure
         + Send
         + Sync
@@ -450,7 +450,7 @@ where
     where
         T: Fn(
             &mut Former<'a, 'source, Source, Input, Output, Failure>,
-            Classifier<'a, 'source, Source, Input, Output, Failure>,
+            Formation<'a, 'source, Source, Input, Output, Failure>,
         ) -> Failure
         + Send
         + Sync
@@ -471,7 +471,7 @@ where
         S: Fn(&Input) -> bool + Send + Sync + 'source,
         E: Fn(
             &mut Former<'a, 'source, Source, Input, Output, Failure>,
-            Classifier<'a, 'source, Source, Input, Output, Failure>,
+            Formation<'a, 'source, Source, Input, Output, Failure>,
         ) -> Failure
         + Send
         + Sync
@@ -511,7 +511,7 @@ impl<'a, 'source, Source, Input, Output, Failure>
 Action<
     'a,
     Former<'a, 'source, Source, Input, Output, Failure>,
-    Classifier<'a, 'source, Source, Input, Output, Failure>,
+    Formation<'a, 'source, Source, Input, Output, Failure>,
 > for Literal<'a, 'source, Input>
 where
     Source: Peekable<'a, Input>,
@@ -524,14 +524,14 @@ where
     fn action(
         &self,
         former: &mut Former<'a, 'source, Source, Input, Output, Failure>,
-        classifier: &mut Classifier<'a, 'source, Source, Input, Output, Failure>,
+        formation: &mut Formation<'a, 'source, Source, Input, Output, Failure>,
     ) {
-        if let Some(peek) = former.source.get(classifier.marker) {
+        if let Some(peek) = former.source.get(formation.marker) {
             if self.value.eq(peek) {
-                classifier.set_align();
+                formation.set_align();
                 former
                     .source
-.next(&mut classifier.marker, &mut classifier.state);
+.next(&mut formation.marker, &mut formation.state);
 
                 let identity_c = former.consumed.len();
                 let identity_f = former.forms.len();
@@ -539,14 +539,14 @@ where
                 former.consumed.push(peek.clone());
                 former.forms.push(Form::input(peek.clone()));
 
-                classifier.consumed.push(identity_c);
-                classifier.form = identity_f;
-                classifier.stack.push(identity_f);
+                formation.consumed.push(identity_c);
+                formation.form = identity_f;
+                formation.stack.push(identity_f);
             } else {
-                classifier.set_empty();
+                formation.set_empty();
             }
         } else {
-            classifier.set_empty();
+            formation.set_empty();
         }
     }
 }
@@ -555,7 +555,7 @@ impl<'a, 'source, Source, Input, Output, Failure>
 Action<
     'a,
     Former<'a, 'source, Source, Input, Output, Failure>,
-    Classifier<'a, 'source, Source, Input, Output, Failure>,
+    Formation<'a, 'source, Source, Input, Output, Failure>,
 > for Predicate<'a, 'source, Input>
 where
     Source: Peekable<'a, Input>,
@@ -568,14 +568,14 @@ where
     fn action(
         &self,
         former: &mut Former<'a, 'source, Source, Input, Output, Failure>,
-        classifier: &mut Classifier<'a, 'source, Source, Input, Output, Failure>,
+        formation: &mut Formation<'a, 'source, Source, Input, Output, Failure>,
     ) {
-        if let Some(peek) = former.source.get(classifier.marker) {
+        if let Some(peek) = former.source.get(formation.marker) {
             if (self.function)(peek) {
-                classifier.set_align();
+                formation.set_align();
                 former
                     .source
-.next(&mut classifier.marker, &mut classifier.state);
+.next(&mut formation.marker, &mut formation.state);
 
                 let identity_c = former.consumed.len();
                 let identity_f = former.forms.len();
@@ -583,14 +583,14 @@ where
                 former.consumed.push(peek.clone());
                 former.forms.push(Form::input(peek.clone()));
 
-                classifier.consumed.push(identity_c);
-                classifier.form = identity_f;
-                classifier.stack.push(identity_f);
+                formation.consumed.push(identity_c);
+                formation.form = identity_f;
+                formation.stack.push(identity_f);
             } else {
-                classifier.set_empty();
+                formation.set_empty();
             }
         } else {
-            classifier.set_empty();
+            formation.set_empty();
         }
     }
 }
@@ -599,8 +599,8 @@ impl<'a, 'source, Source, Input, Output, Failure, const SIZE: Scale>
 Action<
     'a,
     Former<'a, 'source, Source, Input, Output, Failure>,
-    Classifier<'a, 'source, Source, Input, Output, Failure>,
-> for Alternative<Classifier<'a, 'source, Source, Input, Output, Failure>, SIZE>
+    Formation<'a, 'source, Source, Input, Output, Failure>,
+> for Alternative<Formation<'a, 'source, Source, Input, Output, Failure>, SIZE>
 where
     Source: Peekable<'a, Input>,
     Source::State: Default,
@@ -612,25 +612,25 @@ where
     fn action(
         &self,
         former: &mut Former<'a, 'source, Source, Input, Output, Failure>,
-        classifier: &mut Classifier<'a, 'source, Source, Input, Output, Failure>,
+        formation: &mut Formation<'a, 'source, Source, Input, Output, Failure>,
     ) {
-        let mut best: Option<Classifier<'a, 'source, Source, Input, Output, Failure>> = None;
+        let mut best: Option<Formation<'a, 'source, Source, Input, Output, Failure>> = None;
         let mut snapshot = (former.consumed.len(), former.forms.len());
 
-        let mut consumed = take(&mut classifier.consumed);
-        let mut stack = take(&mut classifier.stack);
+        let mut consumed = take(&mut formation.consumed);
+        let mut stack = take(&mut formation.stack);
         let base = (consumed.len(), stack.len());
 
         for (idx, pattern) in self.states.iter().enumerate() {
-            let mut child = Classifier::create(
+            let mut child = Formation::create(
                 pattern.action.clone(),
-                classifier.marker,
-                classifier.state,
+                formation.marker,
+                formation.state,
                 consumed,
                 Outcome::Blank,
                 0,
                 stack,
-                classifier.depth + 1,
+                formation.depth + 1,
             );
 
             former.build(&mut child);
@@ -684,24 +684,24 @@ where
 
         match best {
             Some(mut champion) => {
-                classifier.outcome = champion.outcome;
-                classifier.marker = champion.marker;
-                classifier.state = champion.state;
-                classifier.consumed = take(&mut champion.consumed);
-                classifier.form = champion.form;
-                classifier.stack = take(&mut champion.stack);
+                formation.outcome = champion.outcome;
+                formation.marker = champion.marker;
+                formation.state = champion.state;
+                formation.consumed = take(&mut champion.consumed);
+                formation.form = champion.form;
+                formation.stack = take(&mut champion.stack);
             }
             None => {
-                classifier.set_empty();
-                classifier.consumed = consumed;
-                classifier.stack = stack;
+                formation.set_empty();
+                formation.consumed = consumed;
+                formation.stack = stack;
             }
         }
     }
 }
 
 impl<'a, 'source, Source, Input, Output, Failure> Clone
-for Deferred<Classifier<'a, 'source, Source, Input, Output, Failure>>
+for Deferred<Formation<'a, 'source, Source, Input, Output, Failure>>
 where
     Source: Peekable<'a, Input>,
     Source::State: Default,
@@ -720,8 +720,8 @@ impl<'a, 'source, Source, Input, Output, Failure>
 Action<
     'a,
     Former<'a, 'source, Source, Input, Output, Failure>,
-    Classifier<'a, 'source, Source, Input, Output, Failure>,
-> for Deferred<Classifier<'a, 'source, Source, Input, Output, Failure>>
+    Formation<'a, 'source, Source, Input, Output, Failure>,
+> for Deferred<Formation<'a, 'source, Source, Input, Output, Failure>>
 where
     Source: Peekable<'a, Input>,
     Source::State: Default,
@@ -733,10 +733,10 @@ where
     fn action(
         &self,
         former: &mut Former<'a, 'source, Source, Input, Output, Failure>,
-        classifier: &mut Classifier<'a, 'source, Source, Input, Output, Failure>,
+        formation: &mut Formation<'a, 'source, Source, Input, Output, Failure>,
     ) {
         let identifier = self.factory as usize;
-        let memory = (identifier, classifier.marker);
+        let memory = (identifier, formation.marker);
 
         if let Some(memo) = former.memo.get(&memory) {
             if let Some(record) = &memo.record {
@@ -748,14 +748,14 @@ where
                 former.forms.extend(record.forms.iter().cloned());
                 former.consumed.extend(record.inputs.iter().cloned());
 
-                classifier.consumed.extend(
+                formation.consumed.extend(
                     record
                         .consumed
                         .iter()
                         .map(|&i| (i as isize + offset.1) as Identity),
                 );
 
-                classifier.stack.extend(record.stack.iter().map(|&i| {
+                formation.stack.extend(record.stack.iter().map(|&i| {
                     if i == 0 {
                         0
                     } else {
@@ -763,18 +763,18 @@ where
                     }
                 }));
 
-                classifier.form = if record.form == 0 {
+                formation.form = if record.form == 0 {
                     0
                 } else {
                     (record.form as isize + offset.0) as Identity
                 };
             } else {
-                classifier.form = 0;
+                formation.form = 0;
             }
 
-            classifier.marker = classifier.marker + memo.advance;
-            classifier.state = memo.state;
-            classifier.outcome = memo.outcome;
+            formation.marker = formation.marker + memo.advance;
+            formation.state = memo.state;
+            formation.outcome = memo.outcome;
 
             return;
         }
@@ -788,26 +788,26 @@ where
             }
         };
 
-        let consumed = take(&mut classifier.consumed);
-        let stack = take(&mut classifier.stack);
+        let consumed = take(&mut formation.consumed);
+        let stack = take(&mut formation.stack);
 
         let origin = (
             consumed.len(),
             stack.len(),
             former.forms.len() as Offset,
             former.consumed.len() as Offset,
-            classifier.marker,
+            formation.marker,
         );
 
-        let mut child = Classifier::create(
+        let mut child = Formation::create(
             stashed,
-            classifier.marker,
-            classifier.state,
+            formation.marker,
+            formation.state,
             consumed,
             Outcome::Blank,
             0,
             stack,
-            classifier.depth + 1,
+            formation.depth + 1,
         );
 
         former.build(&mut child);
@@ -846,9 +846,9 @@ where
             },
         );
 
-        (classifier.marker, classifier.state, classifier.outcome, classifier.form) = (child.marker, child.state, child.outcome, child.form);
+        (formation.marker, formation.state, formation.outcome, formation.form) = (child.marker, child.state, child.outcome, child.form);
 
-        (classifier.consumed, classifier.stack) = (child.consumed, child.stack);
+        (formation.consumed, formation.stack) = (child.consumed, child.stack);
     }
 }
 
@@ -856,8 +856,8 @@ impl<'a, 'source, Source, Input, Output, Failure>
 Action<
     'a,
     Former<'a, 'source, Source, Input, Output, Failure>,
-    Classifier<'a, 'source, Source, Input, Output, Failure>,
-> for Optional<Classifier<'a, 'source, Source, Input, Output, Failure>>
+    Formation<'a, 'source, Source, Input, Output, Failure>,
+> for Optional<Formation<'a, 'source, Source, Input, Output, Failure>>
 where
     Source: Peekable<'a, Input>,
     Source::State: Default,
@@ -869,37 +869,37 @@ where
     fn action(
         &self,
         former: &mut Former<'a, 'source, Source, Input, Output, Failure>,
-        classifier: &mut Classifier<'a, 'source, Source, Input, Output, Failure>,
+        formation: &mut Formation<'a, 'source, Source, Input, Output, Failure>,
     ) {
         let base = (
             former.consumed.len(),
             former.forms.len(),
-            classifier.consumed.len(),
-            classifier.stack.len(),
+            formation.consumed.len(),
+            formation.stack.len(),
         );
 
-        let mut child = classifier.create_child(self.state.action.clone());
+        let mut child = formation.create_child(self.state.action.clone());
         former.build(&mut child);
 
         let panicked = child.is_panicked();
         let aligned = child.is_aligned();
 
-        classifier.consumed = child.consumed;
-        classifier.stack = child.stack;
+        formation.consumed = child.consumed;
+        formation.stack = child.stack;
 
         if panicked {
-            (classifier.marker, classifier.state, classifier.form) =
+            (formation.marker, formation.state, formation.form) =
                 (child.marker, child.state, child.form);
-            classifier.set_panic();
+            formation.set_panic();
         } else if aligned {
-            (classifier.marker, classifier.state, classifier.form) = (child.marker, child.state, child.form);
-            classifier.set_align();
+            (formation.marker, formation.state, formation.form) = (child.marker, child.state, child.form);
+            formation.set_align();
         } else {
             former.consumed.truncate(base.0);
             former.forms.truncate(base.1);
-            classifier.consumed.truncate(base.2);
-            classifier.stack.truncate(base.3);
-            classifier.set_ignore();
+            formation.consumed.truncate(base.2);
+            formation.stack.truncate(base.3);
+            formation.set_ignore();
         }
     }
 }
@@ -908,8 +908,8 @@ impl<'a, 'source, Source, Input, Output, Failure, const SIZE: Scale>
 Action<
     'a,
     Former<'a, 'source, Source, Input, Output, Failure>,
-    Classifier<'a, 'source, Source, Input, Output, Failure>,
-> for Sequence<Classifier<'a, 'source, Source, Input, Output, Failure>, SIZE>
+    Formation<'a, 'source, Source, Input, Output, Failure>,
+> for Sequence<Formation<'a, 'source, Source, Input, Output, Failure>, SIZE>
 where
     Source: Peekable<'a, Input>,
     Source::State: Default,
@@ -921,14 +921,14 @@ where
     fn action(
         &self,
         former: &mut Former<'a, 'source, Source, Input, Output, Failure>,
-        classifier: &mut Classifier<'a, 'source, Source, Input, Output, Failure>,
+        formation: &mut Formation<'a, 'source, Source, Input, Output, Failure>,
     ) {
-        let mut consumed = take(&mut classifier.consumed);
-        let mut stack = take(&mut classifier.stack);
+        let mut consumed = take(&mut formation.consumed);
+        let mut stack = take(&mut formation.stack);
 
         let origin = (
-            classifier.marker,
-            classifier.state,
+            formation.marker,
+            formation.state,
             former.consumed.len(),
             former.forms.len(),
             consumed.len(),
@@ -939,15 +939,15 @@ where
         let mut broke = false;
 
         for pattern in &self.states {
-            let mut child = Classifier::create(
+            let mut child = Formation::create(
                 pattern.action.clone(),
-                classifier.marker,
-                classifier.state,
+                formation.marker,
+                formation.state,
                 consumed,
                 Outcome::Blank,
                 0,
                 stack,
-                classifier.depth + 1,
+                formation.depth + 1,
             );
 
             former.build(&mut child);
@@ -958,8 +958,8 @@ where
             (consumed, stack) = (take(&mut child.consumed), take(&mut child.stack));
 
             if halted {
-                classifier.outcome = child.outcome;
-                classifier.form = child.form;
+                formation.outcome = child.outcome;
+                formation.form = child.form;
                 broke = true;
                 break;
             }
@@ -968,34 +968,34 @@ where
                 forms.push(child.form);
             }
 
-            classifier.marker = child.marker;
-            classifier.state = child.state;
+            formation.marker = child.marker;
+            formation.state = child.state;
         }
 
-        classifier.consumed = consumed;
-        classifier.stack = stack;
+        formation.consumed = consumed;
+        formation.stack = stack;
 
         if broke {
-            let preserved = if classifier.is_failed() || classifier.is_panicked() {
-                former.forms.get(classifier.form).cloned()
+            let preserved = if formation.is_failed() || formation.is_panicked() {
+                former.forms.get(formation.form).cloned()
             } else {
                 None
             };
 
-            classifier.marker = origin.0;
-            classifier.state = origin.1;
+            formation.marker = origin.0;
+            formation.state = origin.1;
             former.consumed.truncate(origin.2);
             former.forms.truncate(origin.3);
-            classifier.consumed.truncate(origin.4);
-            classifier.stack.truncate(origin.5);
+            formation.consumed.truncate(origin.4);
+            formation.stack.truncate(origin.5);
 
             if let Some(failure) = preserved {
                 let identity = former.forms.len();
                 former.forms.push(failure);
-                classifier.form = identity;
+                formation.form = identity;
             }
         } else {
-            classifier.set_align();
+            formation.set_align();
 
             let group = Form::multiple(
                 forms
@@ -1006,7 +1006,7 @@ where
 
             let identity = former.forms.len();
             former.forms.push(group);
-            classifier.form = identity;
+            formation.form = identity;
         }
     }
 }
@@ -1015,8 +1015,8 @@ impl<'a, 'source, Source, Input, Output, Failure>
 Action<
     'a,
     Former<'a, 'source, Source, Input, Output, Failure>,
-    Classifier<'a, 'source, Source, Input, Output, Failure>,
-> for Repetition<Classifier<'a, 'source, Source, Input, Output, Failure>>
+    Formation<'a, 'source, Source, Input, Output, Failure>,
+> for Repetition<Formation<'a, 'source, Source, Input, Output, Failure>>
 where
     Source: Peekable<'a, Input>,
     Source::State: Default,
@@ -1028,14 +1028,14 @@ where
     fn action(
         &self,
         former: &mut Former<'a, 'source, Source, Input, Output, Failure>,
-        classifier: &mut Classifier<'a, 'source, Source, Input, Output, Failure>,
+        formation: &mut Formation<'a, 'source, Source, Input, Output, Failure>,
     ) {
-        let mut consumed = take(&mut classifier.consumed);
-        let mut stack = take(&mut classifier.stack);
+        let mut consumed = take(&mut formation.consumed);
+        let mut stack = take(&mut formation.stack);
 
         let origin = (
-            classifier.marker,
-            classifier.state,
+            formation.marker,
+            formation.state,
             former.consumed.len(),
             former.forms.len(),
             consumed.len(),
@@ -1044,7 +1044,7 @@ where
 
         let mut forms = Vec::new();
 
-        while former.source.peek_ahead(classifier.marker).is_some() {
+        while former.source.peek_ahead(formation.marker).is_some() {
             let step = (
                 former.consumed.len(),
                 former.forms.len(),
@@ -1052,22 +1052,22 @@ where
                 stack.len(),
             );
 
-            let mut child = Classifier::create(
+            let mut child = Formation::create(
                 self.state.action.clone(),
-                classifier.marker,
-                classifier.state,
+                formation.marker,
+                formation.state,
                 consumed,
                 Outcome::Blank,
                 0,
                 stack,
-                classifier.depth + 1,
+                formation.depth + 1,
             );
 
             former.build(&mut child);
             let halted = (self.halt)(&child);
             let kept = (self.keep)(&child);
 
-            if child.marker == classifier.marker && !halted {
+            if child.marker == formation.marker && !halted {
                 (consumed, stack) = (take(&mut child.consumed), take(&mut child.stack));
 
                 former.consumed.truncate(step.0);
@@ -1080,7 +1080,7 @@ where
             (consumed, stack) = (take(&mut child.consumed), take(&mut child.stack));
 
             if halted {
-                (classifier.outcome, classifier.marker, classifier.state) = (child.outcome, child.marker, child.state);
+                (formation.outcome, formation.marker, formation.state) = (child.outcome, child.marker, child.state);
 
                 if kept {
                     forms.push(child.form);
@@ -1094,7 +1094,7 @@ where
             }
 
             if kept {
-                (classifier.outcome, classifier.marker, classifier.state) = (child.outcome, child.marker, child.state);
+                (formation.outcome, formation.marker, formation.state) = (child.outcome, child.marker, child.state);
 
                 forms.push(child.form);
             } else {
@@ -1103,8 +1103,8 @@ where
                 consumed.truncate(step.2);
                 stack.truncate(step.3);
 
-                classifier.marker = child.marker;
-                classifier.state = child.state;
+                formation.marker = child.marker;
+                formation.state = child.state;
             }
 
             if let Some(maximum) = self.maximum {
@@ -1114,12 +1114,12 @@ where
             }
         }
 
-        classifier.consumed = consumed;
-        classifier.stack = stack;
+        formation.consumed = consumed;
+        formation.stack = stack;
 
         if forms.len() >= self.minimum as Identity {
-            if !classifier.is_failed() && !classifier.is_panicked() {
-                classifier.set_align();
+            if !formation.is_failed() && !formation.is_panicked() {
+                formation.set_align();
             }
 
             let group = Form::multiple(
@@ -1131,18 +1131,18 @@ where
 
             let identity = former.forms.len();
             former.forms.push(group);
-            classifier.form = identity;
+            formation.form = identity;
         } else {
-            classifier.marker = origin.0;
-            classifier.state = origin.1;
+            formation.marker = origin.0;
+            formation.state = origin.1;
 
             former.consumed.truncate(origin.2);
             former.forms.truncate(origin.3);
-            classifier.consumed.truncate(origin.4);
-            classifier.stack.truncate(origin.5);
+            formation.consumed.truncate(origin.4);
+            formation.stack.truncate(origin.5);
 
-            if !classifier.is_failed() && !classifier.is_panicked() {
-                classifier.set_empty();
+            if !formation.is_failed() && !formation.is_panicked() {
+                formation.set_empty();
             }
         }
     }

@@ -1,5 +1,5 @@
 use crate::{
-    combinator::{Classifier, Form, Former},
+    combinator::{Formation, Form, Former},
     data::{Identity, Offset, Scale},
     internal::{Artifact, RecordKind, Session, SessionError},
     parser::{Element, ErrorKind, ParseError},
@@ -97,10 +97,10 @@ impl<'a: 'source, 'source> Parser<'a> {
         }
     }
 
-    pub fn filter(length: Scale) -> Classifier<'a, 'source, Self, Token<'a>, Element<'a>, ParseError<'a>> {
-        Classifier::repetition(
-            Classifier::alternative([
-                Classifier::predicate(|token: &Token| {
+    pub fn filter(length: Scale) -> Formation<'a, 'source, Self, Token<'a>, Element<'a>, ParseError<'a>> {
+        Formation::repetition(
+            Formation::alternative([
+                Formation::predicate(|token: &Token| {
                     matches!(
                         token.kind,
                         TokenKind::Punctuation(PunctuationKind::Newline)
@@ -110,7 +110,7 @@ impl<'a: 'source, 'source> Parser<'a> {
                     )
                 })
                     .with_ignore(),
-                Classifier::predicate(|token: &Token| {
+                Formation::predicate(|token: &Token| {
                     !matches!(
                         token.kind,
                         TokenKind::Punctuation(PunctuationKind::Newline)

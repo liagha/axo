@@ -1,5 +1,5 @@
 use crate::{
-    combinator::{Classifier, Form},
+    combinator::{Formation, Form},
     data::*,
     parser::{Element, ElementKind, ErrorKind, ParseError, Parser, Symbol, SymbolKind},
     scanner::{OperatorKind, Token, TokenKind},
@@ -8,27 +8,27 @@ use crate::{
 
 impl<'a> Parser<'a> {
     pub fn symbolization<'source>(
-    ) -> Classifier<'a, 'source, Self, Token<'a>, Element<'a>, ParseError<'a>> {
+    ) -> Formation<'a, 'source, Self, Token<'a>, Element<'a>, ParseError<'a>> {
         Self::alternative([
-            Classifier::deferred(Self::binding),
-            Classifier::deferred(Self::structure),
-            Classifier::deferred(Self::union),
-            Classifier::deferred(Self::function),
+            Formation::deferred(Self::binding),
+            Formation::deferred(Self::structure),
+            Formation::deferred(Self::union),
+            Formation::deferred(Self::function),
         ])
     }
 
     pub fn binding<'source>(
-    ) -> Classifier<'a, 'source, Self, Token<'a>, Element<'a>, ParseError<'a>> {
-        Classifier::sequence([
-            Classifier::predicate(|token: &Token| {
+    ) -> Formation<'a, 'source, Self, Token<'a>, Element<'a>, ParseError<'a>> {
+        Formation::sequence([
+            Formation::predicate(|token: &Token| {
                 if let Some(id) = token.kind.try_unwrap_identifier() {
                     matches!(id.as_str().unwrap(), "static" | "let" | "meta")
                 } else {
                     false
                 }
             }),
-            Classifier::deferred(Self::expression).with_panic(|former, classifier| {
-                let consumed = classifier
+            Formation::deferred(Self::expression).with_panic(|former, formation| {
+                let consumed = formation
                     .consumed
                     .iter()
                     .map(|index| former.consumed.get(*index).unwrap().clone())
@@ -38,8 +38,8 @@ impl<'a> Parser<'a> {
                 ParseError::new(ErrorKind::ExpectedBody, span)
             }),
         ])
-            .with_transform(|former, classifier| {
-                let form = former.forms.get_mut(classifier.form).unwrap();
+            .with_transform(|former, formation| {
+                let form = former.forms.get_mut(formation.form).unwrap();
                 let sequence = form.as_forms();
                 let keyword = sequence[0].unwrap_input();
 
@@ -114,18 +114,18 @@ impl<'a> Parser<'a> {
     }
 
     pub fn structure<'source>(
-    ) -> Classifier<'a, 'source, Self, Token<'a>, Element<'a>, ParseError<'a>> {
-        Classifier::sequence([
-            Classifier::sequence([
-                Classifier::predicate(|token: &Token| {
+    ) -> Formation<'a, 'source, Self, Token<'a>, Element<'a>, ParseError<'a>> {
+        Formation::sequence([
+            Formation::sequence([
+                Formation::predicate(|token: &Token| {
                     if let Some(id) = token.kind.try_unwrap_identifier() {
                         id.as_str() == Some("struct")
                     } else {
                         false
                     }
                 }),
-                Classifier::deferred(Self::literal).with_panic(|former, classifier| {
-                    let consumed = classifier
+                Formation::deferred(Self::literal).with_panic(|former, formation| {
+                    let consumed = formation
                         .consumed
                         .iter()
                         .map(|index| former.consumed.get(*index).unwrap().clone())
@@ -135,8 +135,8 @@ impl<'a> Parser<'a> {
                     ParseError::new(ErrorKind::ExpectedHead, span)
                 }),
             ]),
-            Classifier::deferred(Self::expression).with_panic(|former, classifier| {
-                let consumed = classifier
+            Formation::deferred(Self::expression).with_panic(|former, formation| {
+                let consumed = formation
                     .consumed
                     .iter()
                     .map(|index| former.consumed.get(*index).unwrap().clone())
@@ -146,8 +146,8 @@ impl<'a> Parser<'a> {
                 ParseError::new(ErrorKind::ExpectedBody, span)
             }),
         ])
-            .with_transform(|former, classifier| {
-                let form = former.forms.get_mut(classifier.form).unwrap();
+            .with_transform(|former, formation| {
+                let form = former.forms.get_mut(formation.form).unwrap();
                 let sequence = form.as_forms();
                 let head = sequence[0].as_forms();
 
@@ -178,19 +178,19 @@ impl<'a> Parser<'a> {
             })
     }
 
-    pub fn union<'source>() -> Classifier<'a, 'source, Self, Token<'a>, Element<'a>, ParseError<'a>>
+    pub fn union<'source>() -> Formation<'a, 'source, Self, Token<'a>, Element<'a>, ParseError<'a>>
     {
-        Classifier::sequence([
-            Classifier::sequence([
-                Classifier::predicate(|token: &Token| {
+        Formation::sequence([
+            Formation::sequence([
+                Formation::predicate(|token: &Token| {
                     if let Some(id) = token.kind.try_unwrap_identifier() {
                         id.as_str() == Some("union")
                     } else {
                         false
                     }
                 }),
-                Classifier::deferred(Self::literal).with_panic(|former, classifier| {
-                    let consumed = classifier
+                Formation::deferred(Self::literal).with_panic(|former, formation| {
+                    let consumed = formation
                         .consumed
                         .iter()
                         .map(|index| former.consumed.get(*index).unwrap().clone())
@@ -200,8 +200,8 @@ impl<'a> Parser<'a> {
                     ParseError::new(ErrorKind::ExpectedHead, span)
                 }),
             ]),
-            Classifier::deferred(Self::expression).with_panic(|former, classifier| {
-                let consumed = classifier
+            Formation::deferred(Self::expression).with_panic(|former, formation| {
+                let consumed = formation
                     .consumed
                     .iter()
                     .map(|index| former.consumed.get(*index).unwrap().clone())
@@ -211,8 +211,8 @@ impl<'a> Parser<'a> {
                 ParseError::new(ErrorKind::ExpectedBody, span)
             }),
         ])
-            .with_transform(|former, classifier| {
-                let form = former.forms.get_mut(classifier.form).unwrap();
+            .with_transform(|former, formation| {
+                let form = former.forms.get_mut(formation.form).unwrap();
                 let sequence = form.as_forms();
                 let head = sequence[0].as_forms();
 
@@ -244,18 +244,18 @@ impl<'a> Parser<'a> {
     }
 
     pub fn function<'source>(
-    ) -> Classifier<'a, 'source, Self, Token<'a>, Element<'a>, ParseError<'a>> {
+    ) -> Formation<'a, 'source, Self, Token<'a>, Element<'a>, ParseError<'a>> {
         Self::alternative([
-            Classifier::sequence([
-                Classifier::predicate(|token: &Token| {
+            Formation::sequence([
+                Formation::predicate(|token: &Token| {
                     if let Some(id) = token.kind.try_unwrap_identifier() {
                         *id == Str::from("func")
                     } else {
                         false
                     }
                 }),
-                Classifier::deferred(Self::literal).with_panic(|former, classifier| {
-                    let consumed = classifier
+                Formation::deferred(Self::literal).with_panic(|former, formation| {
+                    let consumed = formation
                         .consumed
                         .iter()
                         .map(|index| former.consumed.get(*index).unwrap().clone())
@@ -265,15 +265,15 @@ impl<'a> Parser<'a> {
                     ParseError::new(ErrorKind::ExpectedName, span)
                 }),
                 Self::group(Self::alternative([
-                    Classifier::deferred(Self::symbolization),
-                    Classifier::predicate(|token: &Token| {
+                    Formation::deferred(Self::symbolization),
+                    Formation::predicate(|token: &Token| {
                         if let Some(OperatorKind::Composite(operator)) = token.kind.try_unwrap_operator() {
                             operator.as_slice() == [OperatorKind::Dot, OperatorKind::Dot, OperatorKind::Dot]
                         } else {
                             false
                         }
-                    }).with_transform(|former, classifier| {
-                        let form = former.forms.get_mut(classifier.form).unwrap();
+                    }).with_transform(|former, formation| {
+                        let form = former.forms.get_mut(formation.form).unwrap();
                         let span = form.unwrap_input().span();
 
                         *form = Form::output(Element::new(
@@ -288,9 +288,9 @@ impl<'a> Parser<'a> {
 
                         Ok(())
                     }),
-                    Classifier::predicate(|token: &Token| token.kind.is_identifier())
-                        .with_transform(|former, classifier| {
-                            let form = former.forms.get_mut(classifier.form).unwrap();
+                    Formation::predicate(|token: &Token| token.kind.is_identifier())
+                        .with_transform(|former, formation| {
+                            let form = former.forms.get_mut(formation.form).unwrap();
                             let input = form.unwrap_input();
                             *form = Form::output(Element::new(
                                 ElementKind::literal(input.clone()),
@@ -299,8 +299,8 @@ impl<'a> Parser<'a> {
                             Ok(())
                         }),
                 ]))
-                    .with_panic(|former, classifier| {
-                        let stack = classifier
+                    .with_panic(|former, formation| {
+                        let stack = formation
                             .stack
                             .iter()
                             .map(|index| former.forms.get(*index).unwrap().clone())
@@ -309,8 +309,8 @@ impl<'a> Parser<'a> {
 
                         ParseError::new(ErrorKind::ExpectedHead, span)
                     }),
-                Classifier::sequence([
-                    Classifier::predicate(|token: &Token| {
+                Formation::sequence([
+                    Formation::predicate(|token: &Token| {
                         if let Some(OperatorKind::Colon) = token.kind.try_unwrap_operator() {
                             true
                         } else {
@@ -319,11 +319,11 @@ impl<'a> Parser<'a> {
                     })
                         .with_ignore(),
                     Self::alternative([
-                        Classifier::deferred(Self::prefixed),
-                        Classifier::deferred(Self::primary),
+                        Formation::deferred(Self::prefixed),
+                        Formation::deferred(Self::primary),
                     ])
-                        .with_panic(|former, classifier| {
-                            let stack = classifier
+                        .with_panic(|former, formation| {
+                            let stack = formation
                                 .stack
                                 .iter()
                                 .map(|index| former.forms.get(*index).unwrap().clone())
@@ -333,17 +333,17 @@ impl<'a> Parser<'a> {
                             ParseError::new(ErrorKind::ExpectedAnnotation, span)
                         }),
                 ]).into_optional()
-                    .with_transform(|former, classifier| {
-                        let form = former.forms.get_mut(classifier.form).unwrap();
+                    .with_transform(|former, formation| {
+                        let form = former.forms.get_mut(formation.form).unwrap();
                         let output = form.as_forms();
                         *form = output[0].clone();
 
                         Ok(())
                     }),
-                Classifier::deferred(Self::expression).into_optional(),
+                Formation::deferred(Self::expression).into_optional(),
             ])
-                .with_transform(|former, classifier| {
-                    let form = former.forms.get_mut(classifier.form).unwrap();
+                .with_transform(|former, formation| {
+                    let form = former.forms.get_mut(formation.form).unwrap();
                     let sequence = form.as_forms();
                     let keyword = sequence[0].unwrap_input().clone();
                     let name = sequence[1].unwrap_output().clone();
@@ -419,25 +419,25 @@ impl<'a> Parser<'a> {
                     ));
                     Ok(())
                 }),
-            Classifier::sequence([
-                Classifier::predicate(|token: &Token| {
+            Formation::sequence([
+                Formation::predicate(|token: &Token| {
                     if let Some(id) = token.kind.try_unwrap_identifier() {
                         *id == Str::from("func")
                     } else {
                         false
                     }
                 }),
-                Classifier::deferred(Self::literal),
+                Formation::deferred(Self::literal),
                 Self::group(Self::alternative([
-                    Classifier::deferred(Self::symbolization),
-                    Classifier::predicate(|token: &Token| {
+                    Formation::deferred(Self::symbolization),
+                    Formation::predicate(|token: &Token| {
                         if let Some(OperatorKind::Composite(operator)) = token.kind.try_unwrap_operator() {
                             operator.as_slice() == [OperatorKind::Dot, OperatorKind::Dot, OperatorKind::Dot]
                         } else {
                             false
                         }
-                    }).with_transform(|former, classifier| {
-                        let form = former.forms.get_mut(classifier.form).unwrap();
+                    }).with_transform(|former, formation| {
+                        let form = former.forms.get_mut(formation.form).unwrap();
                         let span = form.unwrap_input().span();
 
                         *form = Form::output(Element::new(
@@ -452,9 +452,9 @@ impl<'a> Parser<'a> {
 
                         Ok(())
                     }),
-                    Classifier::predicate(|token: &Token| token.kind.is_identifier())
-                        .with_transform(|former, classifier| {
-                            let form = former.forms.get_mut(classifier.form).unwrap();
+                    Formation::predicate(|token: &Token| token.kind.is_identifier())
+                        .with_transform(|former, formation| {
+                            let form = former.forms.get_mut(formation.form).unwrap();
                             let input = form.unwrap_input();
 
                             *form = Form::output(Element::new(
@@ -465,10 +465,10 @@ impl<'a> Parser<'a> {
                             Ok(())
                         }),
                 ])),
-                Classifier::deferred(Self::expression).into_optional(),
+                Formation::deferred(Self::expression).into_optional(),
             ])
-                .with_transform(|former, classifier| {
-                    let form = former.forms.get_mut(classifier.form).unwrap();
+                .with_transform(|former, formation| {
+                    let form = former.forms.get_mut(formation.form).unwrap();
                     let sequence = form.as_forms();
                     let keyword = sequence[0].unwrap_input().clone();
                     let name = sequence[1].unwrap_output().clone();

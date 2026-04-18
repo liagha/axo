@@ -1,5 +1,5 @@
 use crate::{
-    combinator::{formation::classifier::Classifier, formation::form::Form, Formable},
+    combinator::{formation::formation::Formation, formation::form::Form, Formable},
     tracker::{Peekable, Span, Spanned},
 };
 
@@ -22,7 +22,7 @@ where
 }
 
 impl<'a, 'source, Source, Input, Output, Failure> Clone
-    for Classifier<'a, 'source, Source, Input, Output, Failure>
+    for Formation<'a, 'source, Source, Input, Output, Failure>
 where
     Source: Peekable<'a, Input>,
     Input: Formable<'a>,

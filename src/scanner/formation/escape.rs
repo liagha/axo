@@ -1,5 +1,5 @@
 use crate::{
-    combinator::{Classifier, Form},
+    combinator::{Formation, Form},
     data::{
         character::{from_u32, parse_radix},
         Str,
@@ -10,17 +10,17 @@ use crate::{
 
 impl<'a> Scanner<'a> {
     pub fn simple_escape<'source>(
-    ) -> Classifier<'a, 'source, Self, Character, Token<'a>, ScanError<'a>> {
-        Classifier::sequence([
-            Classifier::literal('\\'),
-            Classifier::predicate(|c: &Character| match c.value {
+    ) -> Formation<'a, 'source, Self, Character, Token<'a>, ScanError<'a>> {
+        Formation::sequence([
+            Formation::literal('\\'),
+            Formation::predicate(|c: &Character| match c.value {
                 '\\' | '"' | '\'' | 'a' | 'b' | 'e' | 'f' | 'n' | 'r' | 't' | 'v' | '0' => true,
                 c if c.is_alphanumeric() => true,
                 _ => false,
             }),
         ])
-        .with_transform(|former, classifier| {
-            let form = former.forms.get_mut(classifier.form).unwrap();
+        .with_transform(|former, formation| {
+            let form = former.forms.get_mut(formation.form).unwrap();
             let inputs = form.collect_inputs();
             let span = inputs.span().clone();
             let escape = inputs[1];
@@ -53,17 +53,17 @@ impl<'a> Scanner<'a> {
     }
 
     pub fn octal_escape<'source>(
-    ) -> Classifier<'a, 'source, Self, Character, Token<'a>, ScanError<'a>> {
-        Classifier::sequence([
-            Classifier::literal('\\'),
-            Classifier::persistence(
-                Classifier::predicate(|c: &Character| c.value.is_digit(8)),
+    ) -> Formation<'a, 'source, Self, Character, Token<'a>, ScanError<'a>> {
+        Formation::sequence([
+            Formation::literal('\\'),
+            Formation::persistence(
+                Formation::predicate(|c: &Character| c.value.is_digit(8)),
                 1,
                 Some(3),
             ),
         ])
-        .with_transform(|former, classifier| {
-            let form = former.forms.get_mut(classifier.form).unwrap();
+        .with_transform(|former, formation| {
+            let form = former.forms.get_mut(formation.form).unwrap();
             let inputs = form.collect_inputs();
             let digits: Str = inputs.iter().skip(1).map(|c| c.value).collect();
             let span = inputs.span().clone();
@@ -98,18 +98,18 @@ impl<'a> Scanner<'a> {
     }
 
     pub fn hex_escape<'source>(
-    ) -> Classifier<'a, 'source, Self, Character, Token<'a>, ScanError<'a>> {
-        Classifier::sequence([
-            Classifier::literal('\\'),
-            Classifier::alternative([Classifier::literal('x'), Classifier::literal('X')]),
-            Classifier::persistence(
-                Classifier::predicate(|c: &Character| c.value.is_ascii_hexdigit()),
+    ) -> Formation<'a, 'source, Self, Character, Token<'a>, ScanError<'a>> {
+        Formation::sequence([
+            Formation::literal('\\'),
+            Formation::alternative([Formation::literal('x'), Formation::literal('X')]),
+            Formation::persistence(
+                Formation::predicate(|c: &Character| c.value.is_ascii_hexdigit()),
                 1,
                 Some(2),
             ),
         ])
-        .with_transform(|former, classifier| {
-            let form = former.forms.get_mut(classifier.form).unwrap();
+        .with_transform(|former, formation| {
+            let form = former.forms.get_mut(formation.form).unwrap();
             let inputs = form.collect_inputs();
             let digits: Str = inputs.iter().skip(2).map(|c| c.value).collect();
             let span = inputs.span().clone();
@@ -144,20 +144,20 @@ impl<'a> Scanner<'a> {
     }
 
     pub fn unicode_escape<'source>(
-    ) -> Classifier<'a, 'source, Self, Character, Token<'a>, ScanError<'a>> {
-        Classifier::sequence([
-            Classifier::literal('\\'),
-            Classifier::alternative([Classifier::literal('u'), Classifier::literal('U')]),
-            Classifier::literal('{'),
-            Classifier::persistence(
-                Classifier::predicate(|c: &Character| c.value.is_ascii_hexdigit()),
+    ) -> Formation<'a, 'source, Self, Character, Token<'a>, ScanError<'a>> {
+        Formation::sequence([
+            Formation::literal('\\'),
+            Formation::alternative([Formation::literal('u'), Formation::literal('U')]),
+            Formation::literal('{'),
+            Formation::persistence(
+                Formation::predicate(|c: &Character| c.value.is_ascii_hexdigit()),
                 1,
                 Some(6),
             ),
-            Classifier::literal('}'),
+            Formation::literal('}'),
         ])
-        .with_transform(|former, classifier| {
-            let form = former.forms.get_mut(classifier.form).unwrap();
+        .with_transform(|former, formation| {
+            let form = former.forms.get_mut(formation.form).unwrap();
             let inputs = form.collect_inputs();
             let digits: Str = inputs
                 .iter()
@@ -201,18 +201,18 @@ impl<'a> Scanner<'a> {
     }
 
     pub fn unicode_escape_simple<'source>(
-    ) -> Classifier<'a, 'source, Self, Character, Token<'a>, ScanError<'a>> {
-        Classifier::sequence([
-            Classifier::literal('\\'),
-            Classifier::alternative([Classifier::literal('u'), Classifier::literal('U')]),
-            Classifier::persistence(
-                Classifier::predicate(|c: &Character| c.value.is_ascii_hexdigit()),
+    ) -> Formation<'a, 'source, Self, Character, Token<'a>, ScanError<'a>> {
+        Formation::sequence([
+            Formation::literal('\\'),
+            Formation::alternative([Formation::literal('u'), Formation::literal('U')]),
+            Formation::persistence(
+                Formation::predicate(|c: &Character| c.value.is_ascii_hexdigit()),
                 4,
                 Some(4),
             ),
         ])
-        .with_transform(move |former, classifier| {
-            let form = former.forms.get_mut(classifier.form).unwrap();
+        .with_transform(move |former, formation| {
+            let form = former.forms.get_mut(formation.form).unwrap();
             let inputs = form.collect_inputs();
             let digits: Str = inputs.iter().skip(2).map(|c| c.value).collect();
             let span = inputs.span().clone();
@@ -242,8 +242,8 @@ impl<'a> Scanner<'a> {
     }
 
     pub fn escape_sequence<'source>(
-    ) -> Classifier<'a, 'source, Self, Character, Token<'a>, ScanError<'a>> {
-        Classifier::alternative([
+    ) -> Formation<'a, 'source, Self, Character, Token<'a>, ScanError<'a>> {
+        Formation::alternative([
             Self::unicode_escape(),
             Self::unicode_escape_simple(),
             Self::hex_escape(),

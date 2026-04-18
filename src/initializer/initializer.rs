@@ -1,5 +1,5 @@
 use crate::{
-    combinator::{Classifier, Form, Former},
+    combinator::{Formation, Form, Former},
     data::{Offset, Scale, Str},
     initializer::InitializeError,
     parser::{Element, ElementKind, ParseError, Symbol, SymbolKind},
@@ -79,31 +79,31 @@ impl<'a> Initializer<'a> {
         }
     }
 
-    pub fn filter<'source>(length: Scale) -> Classifier<'a, 'source, Self, Token<'a>, Element<'a>, ParseError<'a>> {
-        Classifier::repetition(
-            Classifier::alternative([
-                Classifier::predicate(is_ignored).with_ignore(),
-                Classifier::predicate(|token: &Token| !is_ignored(token)),
+    pub fn filter<'source>(length: Scale) -> Formation<'a, 'source, Self, Token<'a>, Element<'a>, ParseError<'a>> {
+        Formation::repetition(
+            Formation::alternative([
+                Formation::predicate(is_ignored).with_ignore(),
+                Formation::predicate(|token: &Token| !is_ignored(token)),
             ]),
             0,
             Some(length),
         )
     }
 
-    pub fn directive<'source>() -> Classifier<'a, 'source, Self, Token<'a>, Symbol<'a>, InitializeError<'a>> {
-        Classifier::alternative([
+    pub fn directive<'source>() -> Formation<'a, 'source, Self, Token<'a>, Symbol<'a>, InitializeError<'a>> {
+        Formation::alternative([
             Self::verbosity(),
             Self::input(),
             Self::output(),
             Self::discard(),
             Self::bare(),
             Self::implicit_input(),
-            Classifier::anything().with_ignore(),
+            Formation::anything().with_ignore(),
         ])
     }
 
-    pub fn classifier<'source>() -> Classifier<'a, 'source, Self, Token<'a>, Symbol<'a>, InitializeError<'a>> {
-        Classifier::repetition(Self::directive(), 0, None)
+    pub fn formation<'source>() -> Formation<'a, 'source, Self, Token<'a>, Symbol<'a>, InitializeError<'a>> {
+        Formation::repetition(Self::directive(), 0, None)
     }
 
     pub fn initialize(&mut self) -> Vec<(Location<'a>, Span)> {
@@ -113,22 +113,22 @@ impl<'a> Initializer<'a> {
         self.input = scanner.output;
 
         let length = self.length();
-        let classifier = Self::filter(length);
+        let formation = Self::filter(length);
 
         let inputs = {
             let mut former = Former::new(self);
-            former.form(classifier).collect_inputs()
+            former.form(formation).collect_inputs()
         };
 
         self.input = inputs;
         self.reset();
 
         let mut directives = Vec::new();
-        let classifier = Self::classifier();
+        let formation = Self::formation();
 
         let forms = {
             let mut former = Former::new(self);
-            former.form(classifier).flatten()
+            former.form(formation).flatten()
         };
 
         for form in forms {

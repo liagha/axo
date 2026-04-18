@@ -2,7 +2,7 @@ mod delimited;
 mod symbol;
 
 use crate::{
-    combinator::{Classifier, Form, Former},
+    combinator::{Formation, Form, Former},
     data::*,
     parser::{Element, ElementKind, ErrorKind, ParseError, Parser},
     scanner::{PunctuationKind, Token, TokenKind},
@@ -12,9 +12,9 @@ use crate::{
 impl<'a> Parser<'a> {
     #[inline]
     fn alternative<'source, const SIZE: Scale>(
-        patterns: [Classifier<'a, 'source, Self, Token<'a>, Element<'a>, ParseError<'a>>; SIZE],
-    ) -> Classifier<'a, 'source, Self, Token<'a>, Element<'a>, ParseError<'a>> {
-        Classifier::alternative_with(
+        patterns: [Formation<'a, 'source, Self, Token<'a>, Element<'a>, ParseError<'a>>; SIZE],
+    ) -> Formation<'a, 'source, Self, Token<'a>, Element<'a>, ParseError<'a>> {
+        Formation::alternative_with(
             patterns,
             |state| state.is_aligned(),
             |new, old| {
@@ -58,19 +58,19 @@ impl<'a> Parser<'a> {
     #[inline]
     fn recover_emit<'source>(
         former: &mut Former<'a, 'source, Self, Token<'a>, Element<'a>, ParseError<'a>>,
-        classifier: Classifier<'a, 'source, Self, Token<'a>, Element<'a>, ParseError<'a>>,
+        formation: Formation<'a, 'source, Self, Token<'a>, Element<'a>, ParseError<'a>>,
     ) -> ParseError<'a> {
-        if let Some(form) = former.forms.get(classifier.form) {
+        if let Some(form) = former.forms.get(formation.form) {
             if let Some(error) = form.get_failure() {
                 return error.clone();
             }
         }
 
-        if let Some(token) = former.source.get(classifier.marker) {
+        if let Some(token) = former.source.get(formation.marker) {
             return ParseError::new(ErrorKind::UnexpectedToken(token.kind.clone()), token.span);
         }
 
-        ParseError::new(ErrorKind::ExpectedBody, Span::point(classifier.state))
+        ParseError::new(ErrorKind::ExpectedBody, Span::point(formation.state))
     }
 
     pub fn get_body(element: Element<'a>) -> Vec<Element<'a>> {
@@ -81,8 +81,8 @@ impl<'a> Parser<'a> {
     }
 
     pub fn literal<'source>(
-    ) -> Classifier<'a, 'source, Self, Token<'a>, Element<'a>, ParseError<'a>> {
-        Classifier::predicate(|token: &Token| match &token.kind {
+    ) -> Formation<'a, 'source, Self, Token<'a>, Element<'a>, ParseError<'a>> {
+        Formation::predicate(|token: &Token| match &token.kind {
             TokenKind::String(_)
             | TokenKind::Character(_)
             | TokenKind::Boolean(_)
@@ -94,8 +94,8 @@ impl<'a> Parser<'a> {
             ),
             _ => false,
         })
-        .with_transform(|former, classifier| {
-            let form = former.forms.get_mut(classifier.form).unwrap();
+        .with_transform(|former, formation| {
+            let form = former.forms.get_mut(formation.form).unwrap();
             let inputs = form.collect_inputs();
             let input = inputs.into_iter().next().unwrap();
             let span = input.span;
@@ -107,27 +107,27 @@ impl<'a> Parser<'a> {
     }
 
     pub fn primary<'source>(
-    ) -> Classifier<'a, 'source, Self, Token<'a>, Element<'a>, ParseError<'a>> {
+    ) -> Formation<'a, 'source, Self, Token<'a>, Element<'a>, ParseError<'a>> {
         Self::alternative([
-            Classifier::deferred(Self::delimited),
-            Classifier::deferred(Self::literal),
+            Formation::deferred(Self::delimited),
+            Formation::deferred(Self::literal),
         ])
     }
 
     pub fn prefixed<'source>(
-    ) -> Classifier<'a, 'source, Self, Token<'a>, Element<'a>, ParseError<'a>> {
-        Classifier::sequence([
-            Classifier::predicate(|token: &Token| {
+    ) -> Formation<'a, 'source, Self, Token<'a>, Element<'a>, ParseError<'a>> {
+        Formation::sequence([
+            Formation::predicate(|token: &Token| {
                 if let TokenKind::Operator(operator) = &token.kind {
                     operator.is_prefix()
                 } else {
                     false
                 }
             }),
-            Classifier::deferred(Self::primary),
+            Formation::deferred(Self::primary),
         ])
-        .with_transform(|former, classifier| {
-            let form = former.forms.get_mut(classifier.form).unwrap();
+        .with_transform(|former, formation| {
+            let form = former.forms.get_mut(formation.form).unwrap();
             let prefixes = form.collect_inputs();
             let mut outputs = form.collect_outputs();
             let mut unary = outputs.swap_remove(0);
@@ -146,15 +146,15 @@ impl<'a> Parser<'a> {
     }
 
     pub fn suffixed<'source>(
-    ) -> Classifier<'a, 'source, Self, Token<'a>, Element<'a>, ParseError<'a>> {
-        Classifier::sequence([
-            Classifier::deferred(Self::primary),
-            Classifier::repetition(
+    ) -> Formation<'a, 'source, Self, Token<'a>, Element<'a>, ParseError<'a>> {
+        Formation::sequence([
+            Formation::deferred(Self::primary),
+            Formation::repetition(
                 Self::alternative([
-                    Self::group(Classifier::deferred(Self::element)),
-                    Self::collection(Classifier::deferred(Self::element)),
-                    Self::bundle(Classifier::deferred(Self::element)),
-                    Classifier::predicate(|token: &Token| {
+                    Self::group(Formation::deferred(Self::element)),
+                    Self::collection(Formation::deferred(Self::element)),
+                    Self::bundle(Formation::deferred(Self::element)),
+                    Formation::predicate(|token: &Token| {
                         if let TokenKind::Operator(operator) = &token.kind {
                             operator.is_suffix()
                         } else {
@@ -166,8 +166,8 @@ impl<'a> Parser<'a> {
                 None,
             ),
         ])
-        .with_transform(move |former, classifier| {
-            let form = former.forms.get_mut(classifier.form).unwrap();
+        .with_transform(move |former, formation| {
+            let form = former.forms.get_mut(formation.form).unwrap();
             let sequence = form.as_forms();
             let operand = sequence[0].unwrap_output();
             let suffixes = sequence[1].as_forms();
@@ -230,37 +230,37 @@ impl<'a> Parser<'a> {
         }
     }
 
-    pub fn unary<'source>() -> Classifier<'a, 'source, Self, Token<'a>, Element<'a>, ParseError<'a>>
+    pub fn unary<'source>() -> Formation<'a, 'source, Self, Token<'a>, Element<'a>, ParseError<'a>>
     {
         Self::alternative([
-            Classifier::deferred(Self::prefixed),
-            Classifier::deferred(Self::suffixed),
-            Classifier::deferred(Self::primary),
+            Formation::deferred(Self::prefixed),
+            Formation::deferred(Self::suffixed),
+            Formation::deferred(Self::primary),
         ])
     }
 
-    pub fn binary<'source>() -> Classifier<'a, 'source, Self, Token<'a>, Element<'a>, ParseError<'a>>
+    pub fn binary<'source>() -> Formation<'a, 'source, Self, Token<'a>, Element<'a>, ParseError<'a>>
     {
-        Self::alternative([Classifier::with_transform(
-            Classifier::sequence([
-                Classifier::deferred(Self::unary),
-                Classifier::repetition(
-                    Classifier::sequence([
-                        Classifier::predicate(|token: &Token| {
+        Self::alternative([Formation::with_transform(
+            Formation::sequence([
+                Formation::deferred(Self::unary),
+                Formation::repetition(
+                    Formation::sequence([
+                        Formation::predicate(|token: &Token| {
                             if let TokenKind::Operator(operator) = &token.kind {
                                 operator.precedence().is_some()
                             } else {
                                 false
                             }
                         }),
-                        Classifier::deferred(Self::unary),
+                        Formation::deferred(Self::unary),
                     ]),
                     1,
                     None,
                 ),
             ]),
-            |former, classifier| {
-                let form = former.forms.get_mut(classifier.form).unwrap();
+            |former, formation| {
+                let form = former.forms.get_mut(formation.form).unwrap();
                 let sequence = form.as_forms();
                 let left = sequence[0].unwrap_output().clone();
                 let operations = sequence[1].as_forms();
@@ -327,26 +327,26 @@ impl<'a> Parser<'a> {
     }
 
     pub fn expression<'source>(
-    ) -> Classifier<'a, 'source, Self, Token<'a>, Element<'a>, ParseError<'a>> {
+    ) -> Formation<'a, 'source, Self, Token<'a>, Element<'a>, ParseError<'a>> {
         Self::alternative([
-            Classifier::deferred(Self::binary),
-            Classifier::deferred(Self::unary),
-            Classifier::deferred(Self::primary),
+            Formation::deferred(Self::binary),
+            Formation::deferred(Self::unary),
+            Formation::deferred(Self::primary),
         ])
     }
 
     pub fn element<'source>(
-    ) -> Classifier<'a, 'source, Self, Token<'a>, Element<'a>, ParseError<'a>> {
+    ) -> Formation<'a, 'source, Self, Token<'a>, Element<'a>, ParseError<'a>> {
         Self::alternative([
-            Classifier::deferred(Self::symbolization),
-            Classifier::deferred(Self::expression),
+            Formation::deferred(Self::symbolization),
+            Formation::deferred(Self::expression),
         ])
     }
 
     pub fn fallback<'source>(
-    ) -> Classifier<'a, 'source, Self, Token<'a>, Element<'a>, ParseError<'a>> {
-        Classifier::with_fail(Classifier::anything(), |former, classifier| {
-            let form = former.forms.get_mut(classifier.form).unwrap();
+    ) -> Formation<'a, 'source, Self, Token<'a>, Element<'a>, ParseError<'a>> {
+        Formation::with_fail(Formation::anything(), |former, formation| {
+            let form = former.forms.get_mut(formation.form).unwrap();
             let token = form.unwrap_input();
 
             ParseError::new(
@@ -356,10 +356,10 @@ impl<'a> Parser<'a> {
         })
     }
 
-    pub fn parser<'source>() -> Classifier<'a, 'source, Self, Token<'a>, Element<'a>, ParseError<'a>>
+    pub fn parser<'source>() -> Formation<'a, 'source, Self, Token<'a>, Element<'a>, ParseError<'a>>
     {
-        Classifier::repetition(
-            Self::alternative([Classifier::deferred(Self::element).with_recover(
+        Formation::repetition(
+            Self::alternative([Formation::deferred(Self::element).with_recover(
                 Self::recover_sync,
                 Self::recover_emit,
             )]),

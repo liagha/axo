@@ -1,5 +1,5 @@
 use crate::{
-    combinator::{Classifier, Form},
+    combinator::{Formation, Form},
     data::*,
     parser::{Element, ElementKind, ErrorKind, ParseError, Parser},
     scanner::{PunctuationKind, Token, TokenKind},
@@ -8,35 +8,35 @@ use crate::{
 
 impl<'a> Parser<'a> {
     pub fn bundle<'source>(
-        item: Classifier<'a, 'source, Self, Token<'a>, Element<'a>, ParseError<'a>>,
-    ) -> Classifier<'a, 'source, Self, Token<'a>, Element<'a>, ParseError<'a>> {
-        let separator = Classifier::predicate(|token: &Token| {
+        item: Formation<'a, 'source, Self, Token<'a>, Element<'a>, ParseError<'a>>,
+    ) -> Formation<'a, 'source, Self, Token<'a>, Element<'a>, ParseError<'a>> {
+        let separator = Formation::predicate(|token: &Token| {
             token.kind == TokenKind::Punctuation(PunctuationKind::Comma)
         })
         .into_optional();
 
-        Classifier::sequence([
-            Classifier::predicate(|t: &Token| {
+        Formation::sequence([
+            Formation::predicate(|t: &Token| {
                 t.kind == TokenKind::Punctuation(PunctuationKind::LeftBrace)
             }),
             item.clone().into_optional(),
-            Classifier::persistence(
-                Classifier::sequence([separator, item.into_optional()]),
+            Formation::persistence(
+                Formation::sequence([separator, item.into_optional()]),
                 0,
                 None,
             ),
-            Classifier::predicate(|t: &Token| {
+            Formation::predicate(|t: &Token| {
                 t.kind == TokenKind::Punctuation(PunctuationKind::RightBrace)
             })
-            .with_panic(|former, classifier| {
-                let consumed: Vec<Token> = classifier
+            .with_panic(|former, formation| {
+                let consumed: Vec<Token> = formation
                     .consumed
                     .iter()
                     .filter_map(|index| former.consumed.get(*index).cloned())
                     .collect();
 
                 let span = if consumed.is_empty() {
-                    Span::point(classifier.state)
+                    Span::point(formation.state)
                 } else {
                     consumed.span()
                 };
@@ -49,8 +49,8 @@ impl<'a> Parser<'a> {
                 )
             }),
         ])
-        .with_transform(|former, classifier| {
-            let form = former.forms.get_mut(classifier.form).unwrap();
+        .with_transform(|former, formation| {
+            let form = former.forms.get_mut(formation.form).unwrap();
             let delimiters = form.collect_inputs();
             let elements = form.collect_outputs();
 
@@ -59,7 +59,7 @@ impl<'a> Parser<'a> {
                     ErrorKind::UnclosedDelimiter(TokenKind::Punctuation(
                         PunctuationKind::LeftBrace,
                     )),
-                    Span::point(classifier.state),
+                    Span::point(formation.state),
                 ));
             };
             let Some(end) = delimiters.last() else {
@@ -92,35 +92,35 @@ impl<'a> Parser<'a> {
     }
 
     pub fn block<'source>(
-        item: Classifier<'a, 'source, Self, Token<'a>, Element<'a>, ParseError<'a>>,
-    ) -> Classifier<'a, 'source, Self, Token<'a>, Element<'a>, ParseError<'a>> {
-        let separator = Classifier::predicate(|token: &Token| {
+        item: Formation<'a, 'source, Self, Token<'a>, Element<'a>, ParseError<'a>>,
+    ) -> Formation<'a, 'source, Self, Token<'a>, Element<'a>, ParseError<'a>> {
+        let separator = Formation::predicate(|token: &Token| {
             token.kind == TokenKind::Punctuation(PunctuationKind::Semicolon)
         })
         .into_optional();
 
-        Classifier::sequence([
-            Classifier::predicate(|t: &Token| {
+        Formation::sequence([
+            Formation::predicate(|t: &Token| {
                 t.kind == TokenKind::Punctuation(PunctuationKind::LeftBrace)
             }),
             item.clone().into_optional(),
-            Classifier::persistence(
-                Classifier::sequence([separator, item.into_optional()]),
+            Formation::persistence(
+                Formation::sequence([separator, item.into_optional()]),
                 0,
                 None,
             ),
-            Classifier::predicate(|t: &Token| {
+            Formation::predicate(|t: &Token| {
                 t.kind == TokenKind::Punctuation(PunctuationKind::RightBrace)
             })
-            .with_panic(|former, classifier| {
-                let consumed: Vec<Token> = classifier
+            .with_panic(|former, formation| {
+                let consumed: Vec<Token> = formation
                     .consumed
                     .iter()
                     .filter_map(|index| former.consumed.get(*index).cloned())
                     .collect();
 
                 let span = if consumed.is_empty() {
-                    Span::point(classifier.state)
+                    Span::point(formation.state)
                 } else {
                     consumed.span()
                 };
@@ -133,8 +133,8 @@ impl<'a> Parser<'a> {
                 )
             }),
         ])
-        .with_transform(|former, classifier| {
-            let form = former.forms.get_mut(classifier.form).unwrap();
+        .with_transform(|former, formation| {
+            let form = former.forms.get_mut(formation.form).unwrap();
             let delimiters = form.collect_inputs();
             let elements = form.collect_outputs();
 
@@ -143,7 +143,7 @@ impl<'a> Parser<'a> {
                     ErrorKind::UnclosedDelimiter(TokenKind::Punctuation(
                         PunctuationKind::LeftBrace,
                     )),
-                    Span::point(classifier.state),
+                    Span::point(formation.state),
                 ));
             };
             let Some(end) = delimiters.last() else {
@@ -176,35 +176,35 @@ impl<'a> Parser<'a> {
     }
 
     pub fn group<'source>(
-        item: Classifier<'a, 'source, Self, Token<'a>, Element<'a>, ParseError<'a>>,
-    ) -> Classifier<'a, 'source, Self, Token<'a>, Element<'a>, ParseError<'a>> {
-        let separator = Classifier::predicate(|token: &Token| {
+        item: Formation<'a, 'source, Self, Token<'a>, Element<'a>, ParseError<'a>>,
+    ) -> Formation<'a, 'source, Self, Token<'a>, Element<'a>, ParseError<'a>> {
+        let separator = Formation::predicate(|token: &Token| {
             token.kind == TokenKind::Punctuation(PunctuationKind::Comma)
         })
         .into_optional();
 
-        Classifier::sequence([
-            Classifier::predicate(|t: &Token| {
+        Formation::sequence([
+            Formation::predicate(|t: &Token| {
                 t.kind == TokenKind::Punctuation(PunctuationKind::LeftParenthesis)
             }),
             item.clone().into_optional(),
-            Classifier::persistence(
-                Classifier::sequence([separator, item.into_optional()]),
+            Formation::persistence(
+                Formation::sequence([separator, item.into_optional()]),
                 0,
                 None,
             ),
-            Classifier::predicate(|t: &Token| {
+            Formation::predicate(|t: &Token| {
                 t.kind == TokenKind::Punctuation(PunctuationKind::RightParenthesis)
             })
-            .with_panic(|former, classifier| {
-                let consumed: Vec<Token> = classifier
+            .with_panic(|former, formation| {
+                let consumed: Vec<Token> = formation
                     .consumed
                     .iter()
                     .filter_map(|index| former.consumed.get(*index).cloned())
                     .collect();
 
                 let span = if consumed.is_empty() {
-                    Span::point(classifier.state)
+                    Span::point(formation.state)
                 } else {
                     consumed.span()
                 };
@@ -217,8 +217,8 @@ impl<'a> Parser<'a> {
                 )
             }),
         ])
-        .with_transform(|former, classifier| {
-            let form = former.forms.get_mut(classifier.form).unwrap();
+        .with_transform(|former, formation| {
+            let form = former.forms.get_mut(formation.form).unwrap();
             let delimiters = form.collect_inputs();
             let elements = form.collect_outputs();
 
@@ -227,7 +227,7 @@ impl<'a> Parser<'a> {
                     ErrorKind::UnclosedDelimiter(TokenKind::Punctuation(
                         PunctuationKind::LeftParenthesis,
                     )),
-                    Span::point(classifier.state),
+                    Span::point(formation.state),
                 ));
             };
             let Some(end) = delimiters.last() else {
@@ -260,35 +260,35 @@ impl<'a> Parser<'a> {
     }
 
     pub fn sequence<'source>(
-        item: Classifier<'a, 'source, Self, Token<'a>, Element<'a>, ParseError<'a>>,
-    ) -> Classifier<'a, 'source, Self, Token<'a>, Element<'a>, ParseError<'a>> {
-        let separator = Classifier::predicate(|token: &Token| {
+        item: Formation<'a, 'source, Self, Token<'a>, Element<'a>, ParseError<'a>>,
+    ) -> Formation<'a, 'source, Self, Token<'a>, Element<'a>, ParseError<'a>> {
+        let separator = Formation::predicate(|token: &Token| {
             token.kind == TokenKind::Punctuation(PunctuationKind::Semicolon)
         })
         .into_optional();
 
-        Classifier::sequence([
-            Classifier::predicate(|t: &Token| {
+        Formation::sequence([
+            Formation::predicate(|t: &Token| {
                 t.kind == TokenKind::Punctuation(PunctuationKind::LeftParenthesis)
             }),
             item.clone().into_optional(),
-            Classifier::persistence(
-                Classifier::sequence([separator, item.into_optional()]),
+            Formation::persistence(
+                Formation::sequence([separator, item.into_optional()]),
                 0,
                 None,
             ),
-            Classifier::predicate(|t: &Token| {
+            Formation::predicate(|t: &Token| {
                 t.kind == TokenKind::Punctuation(PunctuationKind::RightParenthesis)
             })
-            .with_panic(|former, classifier| {
-                let consumed: Vec<Token> = classifier
+            .with_panic(|former, formation| {
+                let consumed: Vec<Token> = formation
                     .consumed
                     .iter()
                     .filter_map(|index| former.consumed.get(*index).cloned())
                     .collect();
 
                 let span = if consumed.is_empty() {
-                    Span::point(classifier.state)
+                    Span::point(formation.state)
                 } else {
                     consumed.span()
                 };
@@ -301,8 +301,8 @@ impl<'a> Parser<'a> {
                 )
             }),
         ])
-        .with_transform(|former, classifier| {
-            let form = former.forms.get_mut(classifier.form).unwrap();
+        .with_transform(|former, formation| {
+            let form = former.forms.get_mut(formation.form).unwrap();
             let delimiters = form.collect_inputs();
             let elements = form.collect_outputs();
 
@@ -311,7 +311,7 @@ impl<'a> Parser<'a> {
                     ErrorKind::UnclosedDelimiter(TokenKind::Punctuation(
                         PunctuationKind::LeftParenthesis,
                     )),
-                    Span::point(classifier.state),
+                    Span::point(formation.state),
                 ));
             };
             let Some(end) = delimiters.last() else {
@@ -344,35 +344,35 @@ impl<'a> Parser<'a> {
     }
 
     pub fn collection<'source>(
-        item: Classifier<'a, 'source, Self, Token<'a>, Element<'a>, ParseError<'a>>,
-    ) -> Classifier<'a, 'source, Self, Token<'a>, Element<'a>, ParseError<'a>> {
-        let separator = Classifier::predicate(|token: &Token| {
+        item: Formation<'a, 'source, Self, Token<'a>, Element<'a>, ParseError<'a>>,
+    ) -> Formation<'a, 'source, Self, Token<'a>, Element<'a>, ParseError<'a>> {
+        let separator = Formation::predicate(|token: &Token| {
             token.kind == TokenKind::Punctuation(PunctuationKind::Comma)
         })
         .into_optional();
 
-        Classifier::sequence([
-            Classifier::predicate(|t: &Token| {
+        Formation::sequence([
+            Formation::predicate(|t: &Token| {
                 t.kind == TokenKind::Punctuation(PunctuationKind::LeftBracket)
             }),
             item.clone().into_optional(),
-            Classifier::persistence(
-                Classifier::sequence([separator, item.into_optional()]),
+            Formation::persistence(
+                Formation::sequence([separator, item.into_optional()]),
                 0,
                 None,
             ),
-            Classifier::predicate(|t: &Token| {
+            Formation::predicate(|t: &Token| {
                 t.kind == TokenKind::Punctuation(PunctuationKind::RightBracket)
             })
-            .with_panic(|former, classifier| {
-                let consumed: Vec<Token> = classifier
+            .with_panic(|former, formation| {
+                let consumed: Vec<Token> = formation
                     .consumed
                     .iter()
                     .filter_map(|index| former.consumed.get(*index).cloned())
                     .collect();
 
                 let span = if consumed.is_empty() {
-                    Span::point(classifier.state)
+                    Span::point(formation.state)
                 } else {
                     consumed.span()
                 };
@@ -385,8 +385,8 @@ impl<'a> Parser<'a> {
                 )
             }),
         ])
-        .with_transform(|former, classifier| {
-            let form = former.forms.get_mut(classifier.form).unwrap();
+        .with_transform(|former, formation| {
+            let form = former.forms.get_mut(formation.form).unwrap();
             let delimiters = form.collect_inputs();
             let elements = form.collect_outputs();
 
@@ -395,7 +395,7 @@ impl<'a> Parser<'a> {
                     ErrorKind::UnclosedDelimiter(TokenKind::Punctuation(
                         PunctuationKind::LeftBracket,
                     )),
-                    Span::point(classifier.state),
+                    Span::point(formation.state),
                 ));
             };
             let Some(end) = delimiters.last() else {
@@ -428,35 +428,35 @@ impl<'a> Parser<'a> {
     }
 
     pub fn series<'source>(
-        item: Classifier<'a, 'source, Self, Token<'a>, Element<'a>, ParseError<'a>>,
-    ) -> Classifier<'a, 'source, Self, Token<'a>, Element<'a>, ParseError<'a>> {
-        let separator = Classifier::predicate(|token: &Token| {
+        item: Formation<'a, 'source, Self, Token<'a>, Element<'a>, ParseError<'a>>,
+    ) -> Formation<'a, 'source, Self, Token<'a>, Element<'a>, ParseError<'a>> {
+        let separator = Formation::predicate(|token: &Token| {
             token.kind == TokenKind::Punctuation(PunctuationKind::Semicolon)
         })
         .into_optional();
 
-        Classifier::sequence([
-            Classifier::predicate(|t: &Token| {
+        Formation::sequence([
+            Formation::predicate(|t: &Token| {
                 t.kind == TokenKind::Punctuation(PunctuationKind::LeftBracket)
             }),
             item.clone().into_optional(),
-            Classifier::persistence(
-                Classifier::sequence([separator, item.into_optional()]),
+            Formation::persistence(
+                Formation::sequence([separator, item.into_optional()]),
                 0,
                 None,
             ),
-            Classifier::predicate(|t: &Token| {
+            Formation::predicate(|t: &Token| {
                 t.kind == TokenKind::Punctuation(PunctuationKind::RightBracket)
             })
-            .with_panic(|former, classifier| {
-                let consumed: Vec<Token> = classifier
+            .with_panic(|former, formation| {
+                let consumed: Vec<Token> = formation
                     .consumed
                     .iter()
                     .filter_map(|index| former.consumed.get(*index).cloned())
                     .collect();
 
                 let span = if consumed.is_empty() {
-                    Span::point(classifier.state)
+                    Span::point(formation.state)
                 } else {
                     consumed.span()
                 };
@@ -469,8 +469,8 @@ impl<'a> Parser<'a> {
                 )
             }),
         ])
-        .with_transform(|former, classifier| {
-            let form = former.forms.get_mut(classifier.form).unwrap();
+        .with_transform(|former, formation| {
+            let form = former.forms.get_mut(formation.form).unwrap();
             let delimiters = form.collect_inputs();
             let elements = form.collect_outputs();
 
@@ -479,7 +479,7 @@ impl<'a> Parser<'a> {
                     ErrorKind::UnclosedDelimiter(TokenKind::Punctuation(
                         PunctuationKind::LeftBracket,
                     )),
-                    Span::point(classifier.state),
+                    Span::point(formation.state),
                 ));
             };
             let Some(end) = delimiters.last() else {
@@ -512,8 +512,8 @@ impl<'a> Parser<'a> {
     }
 
     pub fn delimited<'source>(
-    ) -> Classifier<'a, 'source, Self, Token<'a>, Element<'a>, ParseError<'a>> {
-        let item = Classifier::deferred(Self::element);
+    ) -> Formation<'a, 'source, Self, Token<'a>, Element<'a>, ParseError<'a>> {
+        let item = Formation::deferred(Self::element);
 
         Self::alternative([
             Self::bundle(item.clone()),

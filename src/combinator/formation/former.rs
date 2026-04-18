@@ -90,7 +90,7 @@ pub mod outcome {
 
 use crate::combinator::outcome::Outcome;
 use crate::{
-    combinator::{Action, Classifier, Form, Formable},
+    combinator::{Action, Formation, Form, Formable},
     data::{
         memory::{replace, Arc},
         Identity, Offset,
@@ -105,7 +105,7 @@ pub type Stash<'a, 'source, Source, Input, Output, Failure> = Vec<(
         dyn Action<
             'a,
             Former<'a, 'source, Source, Input, Output, Failure>,
-            Classifier<'a, 'source, Source, Input, Output, Failure>,
+            Formation<'a, 'source, Source, Input, Output, Failure>,
         > + Send
             + Sync
             + 'source,
@@ -171,17 +171,17 @@ where
     }
 
     #[inline(always)]
-    pub fn build(&mut self, classifier: &mut Classifier<'a, 'source, Source, Input, Output, Failure>) {
-        let action = classifier.action.clone();
-        action.action(self, classifier);
+    pub fn build(&mut self, formation: &mut Formation<'a, 'source, Source, Input, Output, Failure>) {
+        let action = formation.action.clone();
+        action.action(self, formation);
     }
 
     #[inline(always)]
     pub fn form(
         &mut self,
-        classifier: Classifier<'a, 'source, Source, Input, Output, Failure>,
+        formation: Formation<'a, 'source, Source, Input, Output, Failure>,
     ) -> Form<'a, Input, Output, Failure> {
-        let mut active = Classifier::new(classifier.action.clone(), 0, self.source.origin());
+        let mut active = Formation::new(formation.action.clone(), 0, self.source.origin());
         self.build(&mut active);
 
         if matches!(active.outcome, Outcome::Aligned | Outcome::Failed) {

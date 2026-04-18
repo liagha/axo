@@ -84,7 +84,7 @@ impl<'scanner> Scanner<'scanner> {
     pub fn scan(&mut self) {
         let forms = {
             let mut former = Former::new(self);
-            former.form(Self::classifier()).flatten()
+            former.form(Self::formation()).flatten()
         };
 
         for form in forms {

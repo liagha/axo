@@ -1,5 +1,5 @@
 use crate::{
-    combinator::{Classifier, Form},
+    combinator::{Formation, Form},
     data::{Float, Integer, Str},
     scanner::{Character, ErrorKind, ScanError, Scanner, Token, TokenKind},
     text::parser,
@@ -8,8 +8,8 @@ use crate::{
 
 impl<'a> Scanner<'a> {
     pub fn number<'source>(
-    ) -> Classifier<'a, 'source, Self, Character, Token<'a>, ScanError<'a>> {
-        Classifier::alternative([
+    ) -> Formation<'a, 'source, Self, Character, Token<'a>, ScanError<'a>> {
+        Formation::alternative([
             Self::hexadecimal(),
             Self::binary(),
             Self::octal(),
@@ -18,22 +18,22 @@ impl<'a> Scanner<'a> {
     }
 
     fn hexadecimal<'source>(
-    ) -> Classifier<'a, 'source, Self, Character, Token<'a>, ScanError<'a>> {
-        Classifier::with_transform(
-            Classifier::sequence([
-                Classifier::literal('0'),
-                Classifier::alternative([Classifier::literal('x'), Classifier::literal('X')]),
-                Classifier::persistence(
-                    Classifier::alternative([
-                        Classifier::predicate(|c: &Character| c.is_alphanumeric()),
-                        Classifier::literal('_').with_ignore(),
+    ) -> Formation<'a, 'source, Self, Character, Token<'a>, ScanError<'a>> {
+        Formation::with_transform(
+            Formation::sequence([
+                Formation::literal('0'),
+                Formation::alternative([Formation::literal('x'), Formation::literal('X')]),
+                Formation::persistence(
+                    Formation::alternative([
+                        Formation::predicate(|c: &Character| c.is_alphanumeric()),
+                        Formation::literal('_').with_ignore(),
                     ]),
                     1,
                     None,
                 ),
             ]),
-            move |former, classifier| {
-                let form = former.forms.get_mut(classifier.form).unwrap();
+            move |former, formation| {
+                let form = former.forms.get_mut(formation.form).unwrap();
                 let inputs = form.collect_inputs();
                 let span = inputs.span().clone();
                 let parser = parser::<Integer>();
@@ -52,22 +52,22 @@ impl<'a> Scanner<'a> {
         )
     }
 
-    fn binary<'source>() -> Classifier<'a, 'source, Self, Character, Token<'a>, ScanError<'a>> {
-        Classifier::with_transform(
-            Classifier::sequence([
-                Classifier::literal('0'),
-                Classifier::alternative([Classifier::literal('b'), Classifier::literal('B')]),
-                Classifier::persistence(
-                    Classifier::alternative([
-                        Classifier::predicate(|c: &Character| matches!(c.value, '0' | '1')),
-                        Classifier::literal('_').with_ignore(),
+    fn binary<'source>() -> Formation<'a, 'source, Self, Character, Token<'a>, ScanError<'a>> {
+        Formation::with_transform(
+            Formation::sequence([
+                Formation::literal('0'),
+                Formation::alternative([Formation::literal('b'), Formation::literal('B')]),
+                Formation::persistence(
+                    Formation::alternative([
+                        Formation::predicate(|c: &Character| matches!(c.value, '0' | '1')),
+                        Formation::literal('_').with_ignore(),
                     ]),
                     1,
                     None,
                 ),
             ]),
-            |former, classifier| {
-                let form = former.forms.get_mut(classifier.form).unwrap();
+            |former, formation| {
+                let form = former.forms.get_mut(formation.form).unwrap();
                 let inputs = form.collect_inputs();
                 let span = inputs.span().clone();
                 let parser = parser::<Integer>();
@@ -86,22 +86,22 @@ impl<'a> Scanner<'a> {
         )
     }
 
-    fn octal<'source>() -> Classifier<'a, 'source, Self, Character, Token<'a>, ScanError<'a>> {
-        Classifier::with_transform(
-            Classifier::sequence([
-                Classifier::literal('0'),
-                Classifier::alternative([Classifier::literal('o'), Classifier::literal('O')]),
-                Classifier::persistence(
-                    Classifier::alternative([
-                        Classifier::predicate(|c: &Character| ('0'..='7').contains(&c.value)),
-                        Classifier::literal('_').with_ignore(),
+    fn octal<'source>() -> Formation<'a, 'source, Self, Character, Token<'a>, ScanError<'a>> {
+        Formation::with_transform(
+            Formation::sequence([
+                Formation::literal('0'),
+                Formation::alternative([Formation::literal('o'), Formation::literal('O')]),
+                Formation::persistence(
+                    Formation::alternative([
+                        Formation::predicate(|c: &Character| ('0'..='7').contains(&c.value)),
+                        Formation::literal('_').with_ignore(),
                     ]),
                     1,
                     None,
                 ),
             ]),
-            |former, classifier| {
-                let form = former.forms.get_mut(classifier.form).unwrap();
+            |former, formation| {
+                let form = former.forms.get_mut(formation.form).unwrap();
                 let inputs = form.collect_inputs();
                 let span = inputs.span().clone();
                 let parser = parser::<Integer>();
@@ -120,33 +120,33 @@ impl<'a> Scanner<'a> {
         )
     }
 
-    fn decimal<'source>() -> Classifier<'a, 'source, Self, Character, Token<'a>, ScanError<'a>>
+    fn decimal<'source>() -> Formation<'a, 'source, Self, Character, Token<'a>, ScanError<'a>>
     {
-        Classifier::with_transform(
-            Classifier::sequence([
-                Classifier::persistence(
-                    Classifier::alternative([
-                        Classifier::predicate(|c: &Character| c.is_numeric()),
-                        Classifier::literal('.'),
-                        Classifier::literal('_').with_ignore(),
+        Formation::with_transform(
+            Formation::sequence([
+                Formation::persistence(
+                    Formation::alternative([
+                        Formation::predicate(|c: &Character| c.is_numeric()),
+                        Formation::literal('.'),
+                        Formation::literal('_').with_ignore(),
                     ]),
                     1, 
                     None,
                 ),
-                Classifier::optional(Classifier::sequence([
-                    Classifier::predicate(|c: &Character| matches!(c.value, 'e' | 'E')),
-                    Classifier::optional(Classifier::predicate(|c: &Character| {
+                Formation::optional(Formation::sequence([
+                    Formation::predicate(|c: &Character| matches!(c.value, 'e' | 'E')),
+                    Formation::optional(Formation::predicate(|c: &Character| {
                         matches!(c.value, '+' | '-')
                     })),
-                    Classifier::persistence(
-                        Classifier::predicate(|c: &Character| c.is_numeric()),
+                    Formation::persistence(
+                        Formation::predicate(|c: &Character| c.is_numeric()),
                         1,
                         None,
                     ),
                 ])),
             ]),
-            |former, classifier| {
-                let form = former.forms.get_mut(classifier.form).unwrap();
+            |former, formation| {
+                let form = former.forms.get_mut(formation.form).unwrap();
                 let inputs = form.collect_inputs();
                 let span = inputs.span().clone();
                 let number: Str = inputs.into_iter().collect();

@@ -1,5 +1,5 @@
 mod character;
-mod classifier;
+mod formation;
 mod error;
 mod operator;
 mod punctuation;
