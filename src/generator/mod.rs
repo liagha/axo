@@ -187,6 +187,8 @@ Action<
         build.compiler("clang");
         build.opt_level(0);
         build.host(Session::get_host());
+        build.warnings(false);
+        build.cargo_metadata(false);
 
         if let Some(target) = session.get_target() {
             build.target(target.as_str().unwrap());
@@ -199,8 +201,8 @@ Action<
 
             let target = match record.kind {
                 RecordKind::Source => {
-                    if let Some(Artifact::Output(loc)) = record.fetch(4) {
-                        Some(loc.to_string())
+                    if let Some(Artifact::Output(location)) = record.fetch(4) {
+                        Some(location.to_string())
                     } else {
                         None
                     }
@@ -249,7 +251,7 @@ Action<
                 if compiler.is_like_msvc() {
                     command.arg("/nologo").arg("/c").arg(path.clone()).arg(format!("/Fo{}", object));
                 } else {
-                    command.arg("-c").arg(path.clone()).arg("-o").arg(object.to_string());
+                    command.arg("-w").arg("-Wno-override-module").arg("-c").arg(path.clone()).arg("-o").arg(object.to_string());
                 }
 
                 let status = command.status().expect("failed");
@@ -264,6 +266,8 @@ Action<
 
         if compiler.is_like_msvc() {
             link.arg("/nologo");
+        } else {
+            link.arg("-w");
         }
 
         for &key in &keys {
@@ -280,8 +284,8 @@ Action<
 
         let record = session.records.get(&key).unwrap();
 
-        let location = if let Some(Artifact::Output(loc)) = record.fetch(4) {
-            *loc
+        let location = if let Some(Artifact::Output(location)) = record.fetch(4) {
+            *location
         } else {
             record.location
         };
@@ -291,7 +295,7 @@ Action<
         if compiler.is_like_msvc() {
             link.arg(format!("/Fe{}", executable));
         } else {
-            link.arg("-o").arg(executable.to_string());
+            link.arg("-w").arg("-o").arg(executable.to_string());
         }
 
         let status = link.status().expect("failed");

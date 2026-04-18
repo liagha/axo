@@ -7,7 +7,7 @@ use {
         analyzer::Analyzer,
         combinator::{Action, Operation, Operator},
         data::{
-            memory::{transmute, forget, Arc},
+            memory::{transmute, Arc},
             Str,
         },
         internal::{
@@ -217,6 +217,8 @@ impl<'session> Session<'session> {
                     build.compiler("clang");
                     build.opt_level(0);
                     build.host(Session::get_host());
+                    build.warnings(false);
+                    build.cargo_metadata(false);
 
                     if let Some(target) = self.get_target() {
                         build.target(target.as_str().unwrap());
@@ -228,7 +230,7 @@ impl<'session> Session<'session> {
                     if compiler.is_like_msvc() {
                         command.arg("/nologo").arg("/LD").arg(format!("/Fe{}", library.display()));
                     } else {
-                        command.arg("-shared").arg("-fPIC").arg("-o").arg(&library);
+                        command.arg("-w").arg("-shared").arg("-fPIC").arg("-o").arg(&library);
                     }
 
                     for source in sources {
@@ -241,10 +243,12 @@ impl<'session> Session<'session> {
                 }
 
                 if library.exists() {
+                    use crate::data::memory::forget;
+                    
                     let loading = unsafe { libloading::Library::new(&library) };
                     match loading {
-                        Ok(lib) => forget(lib),
-                        Err(err) => panic!("failed to open library: {} - {}", library.display(), err),
+                        Ok(instance) => forget(instance),
+                        Err(error) => panic!("failed to open library: {} - {}", library.display(), error),
                     }
                 }
             }
