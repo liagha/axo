@@ -260,21 +260,16 @@ impl<'session> Session<'session> {
                 let recompile = dirty || !library.exists();
 
                 if recompile {
-                    let mut build = cc::Build::new();
-                    build.compiler("clang");
-                    build.opt_level(0);
-                    build.host(Session::get_host());
-                    build.warnings(false);
-                    build.cargo_metadata(false);
+                    let mut command = std::process::Command::new("clang");
+                    let mut is_msvc = cfg!(target_env = "msvc");
 
                     if let Some(target) = self.get_target() {
-                        build.target(target.as_str().unwrap());
+                        let target_str = target.as_str().unwrap();
+                        command.arg("-target").arg(target_str);
+                        is_msvc = target_str.contains("msvc");
                     }
 
-                    let compiler = build.get_compiler();
-                    let mut command = compiler.to_command();
-
-                    if compiler.is_like_msvc() {
+                    if is_msvc {
                         command.arg("/nologo").arg("/LD").arg(format!("/Fe{}", library.display()));
                     } else {
                         command.arg("-w").arg("-shared").arg("-fPIC").arg("-o").arg(&library);
@@ -284,7 +279,7 @@ impl<'session> Session<'session> {
                         command.arg(source);
                     }
 
-                    if !command.status().expect("cc not found").success() {
+                    if !command.status().expect("clang not found").success() {
                         panic!("failed to compile dynamic library");
                     }
                 }

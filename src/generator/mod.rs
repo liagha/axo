@@ -162,18 +162,10 @@ Action<
         let mut keys: Vec<_> = session.records.keys().copied().collect();
         keys.sort();
 
-        let mut build = cc::Build::new();
-        build.compiler("clang");
-        build.opt_level(0);
-        build.host(Session::get_host());
-        build.warnings(false);
-        build.cargo_metadata(false);
-
-        if let Some(target) = session.get_target() {
-            build.target(target.as_str().unwrap());
-        }
-
-        let compiler = build.get_compiler();
+        let target_str = session.get_target().map(|t| t.as_str().unwrap().to_string());
+        let is_msvc = target_str.as_ref()
+            .map(|t| t.contains("msvc"))
+            .unwrap_or_else(|| cfg!(target_env = "msvc"));
 
         for &key in &keys {
             let record = session.records.get_mut(&key).unwrap();
@@ -225,15 +217,18 @@ Action<
                     continue;
                 }
 
-                let mut command = compiler.to_command();
+                let mut command = std::process::Command::new("clang");
+                if let Some(t) = &target_str {
+                    command.arg("-target").arg(t);
+                }
 
-                if compiler.is_like_msvc() {
+                if is_msvc {
                     command.arg("/nologo").arg("/c").arg(path.clone()).arg(format!("/Fo{}", object));
                 } else {
                     command.arg("-w").arg("-Wno-override-module").arg("-c").arg(path.clone()).arg("-o").arg(object.to_string());
                 }
 
-                let status = command.status().expect("failed");
+                let status = command.status().expect("failed compiling: clang not found or execution failed");
 
                 if !status.success() {
                     panic!("failed compiling: {}", path);
@@ -241,9 +236,12 @@ Action<
             }
         }
 
-        let mut link = compiler.to_command();
+        let mut link = std::process::Command::new("clang");
+        if let Some(t) = &target_str {
+            link.arg("-target").arg(t);
+        }
 
-        if compiler.is_like_msvc() {
+        if is_msvc {
             link.arg("/nologo");
         } else {
             link.arg("-w");
@@ -271,13 +269,13 @@ Action<
 
         let executable = Session::executable(&base, location, None);
 
-        if compiler.is_like_msvc() {
+        if is_msvc {
             link.arg(format!("/Fe{}", executable));
         } else {
             link.arg("-w").arg("-o").arg(executable.to_string());
         }
 
-        let status = link.status().expect("failed");
+        let status = link.status().expect("failed linking: clang not found or execution failed");
 
         if !status.success() {
             panic!("emitter failed: {}", status);

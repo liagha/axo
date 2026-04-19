@@ -1,10 +1,8 @@
 use axo::{
-    dialog,
     internal::{Session, SessionError},
-    parser::{ElementKind, Symbol, SymbolKind},
+    parser::{ElementKind, SymbolKind},
     scanner::TokenKind,
-    tracker::{Location, Span, TrackError, ErrorKind},
-    data::Str,
+    tracker::{TrackError, ErrorKind},
 };
 
 fn main() {
@@ -31,39 +29,29 @@ fn main() {
 
     if targets.is_empty() {
         #[cfg(feature = "interpreter")]
-        dialog::start(bare, initializer.output, flag);
+        axo::dialog::start(bare, initializer.output, flag);
     } else {
-        build(targets, bare, initializer.output, failures, flag);
-    }
-}
+        let mut session = Session::create(bare, initializer.output, failures, flag);
 
-fn build(
-    targets: Vec<(Location<'static>, Span)>,
-    bare: bool,
-    directives: Vec<Symbol>,
-    failures: Vec<SessionError<'static>>,
-    flag: Str<'static>,
-) {
-    let mut session = Session::create(bare, directives, failures, flag);
+        targets.iter().for_each(|(target, span)| {
+            if !Session::traverse(target, &mut session.records) {
+                let string = target.to_string();
 
-    targets.iter().for_each(|(target, span)| {
-        if !Session::traverse(target, &mut session.records) {
-            let string = target.to_string();
+                if let Some(kind) = axo::internal::RecordKind::from_path(&string) {
+                    let mut hasher = axo::internal::hash::DefaultHasher::new();
+                    axo::internal::hash::Hash::hash(&string, &mut hasher);
 
-            if let Some(kind) = axo::internal::RecordKind::from_path(&string) {
-                let mut hasher = axo::internal::hash::DefaultHasher::new();
-                axo::internal::hash::Hash::hash(&string, &mut hasher);
-
-                let identity = (axo::internal::hash::Hasher::finish(&hasher) as axo::data::Identity) | 0x40000000;
-                session.records.insert(identity, axo::internal::Record::new(kind, target.clone()));
-            } else {
-                session.errors.push(SessionError::Track(TrackError::new(
-                    ErrorKind::UnSupportedInput(target.clone()),
-                    span.clone(),
-                )));
+                    let identity = (axo::internal::hash::Hasher::finish(&hasher) as axo::data::Identity) | 0x40000000;
+                    session.records.insert(identity, axo::internal::Record::new(kind, target.clone()));
+                } else {
+                    session.errors.push(SessionError::Track(TrackError::new(
+                        ErrorKind::UnSupportedInput(target.clone()),
+                        span.clone(),
+                    )));
+                }
             }
-        }
-    });
+        });
 
-    let _session = session.compile();
+        let _session = session.compile();
+    }
 }
