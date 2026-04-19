@@ -175,7 +175,7 @@ impl<'a> Resolver<'a> {
 
         Self::prepare(session, &source);
         Self::run_declare(session, &source);
-        Self::report(session);
+        //Self::report(session);
         Self::run_resolve(session, &source);
 
         session
@@ -247,6 +247,7 @@ impl<'a> Resolver<'a> {
         }
     }
 
+    #[allow(dead_code)]
     fn report(session: &mut Session<'a>) {
         if let Some(stencil) = session.get_stencil() {
             session.report_section(

@@ -102,13 +102,13 @@ where
 }
 
 impl<'session> Session<'session> {
-    fn decode<T: Deserialize>(bytes: &'session [u8]) -> Option<T> {
+    fn decode<T: Deserialize<'session>>(bytes: &'session [u8]) -> Option<T> {
         catch_unwind(AssertUnwindSafe(|| T::deserialize(bytes).ok()))
             .ok()
             .flatten()
     }
 
-    pub fn cache<T: Deserialize + Serialize + Clone>(
+    pub fn cache<T: Deserialize<'session> + Serialize + Clone>(
         &mut self,
         name: &str,
         hash: u64,

@@ -128,7 +128,7 @@ impl<'scanner> Scanner<'scanner> {
         }
 
         let content = if let Some(content) = content {
-            crate::data::Str::from(content)
+            Str::from(content)
         } else {
             match location.get_value() {
                 Ok(content) => content,

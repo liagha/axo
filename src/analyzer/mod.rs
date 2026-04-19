@@ -8,7 +8,7 @@ pub use {analysis::*, analyzer::*, error::*};
 use crate::{
     combinator::{Action, Operation, Operator},
     data::memory::Arc,
-    internal::{platform::Lock, time::Duration, Session},
+    internal::{platform::Lock, Session},
     reporter::Error,
 };
 
@@ -27,20 +27,11 @@ Action<
         operation: &mut Operation<'source, Arc<Lock<Session<'source>>>>,
     ) {
         let mut session = operator.store.write().unwrap();
-        let initial = session.errors.len();
-
-        session.report_start("analyzing");
 
         let mut keys: Vec<_> = session.records.keys().copied().collect();
         keys.sort();
 
         Analyzer::execute(&mut session, &keys);
-
-        let now = session.timer.elapsed();
-        let sum: Duration = session.laps.iter().copied().sum();
-        let duration = now.saturating_sub(sum);
-        
-        session.report_finish("analyzing", duration, session.errors.len() - initial);
 
         if session.errors.is_empty() {
             operation.set_resolve(Vec::new());

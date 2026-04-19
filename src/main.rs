@@ -1,45 +1,15 @@
-#[cfg(feature = "interpreter")]
-mod dialog;
-
 use axo::{
-    data::{Identity, Module, Str},
-    identifier,
-    initializer::Initializer,
-    internal::{
-        hash::{DefaultHasher, Hash, Hasher, Map},
-        platform::{args, read_dir},
-        time::Instant,
-        Record, RecordKind, Session, SessionError,
-    },
-    literal, module,
+    dialog,
+    internal::{Session, SessionError},
     parser::{ElementKind, Symbol, SymbolKind},
-    resolver::Resolver,
     scanner::TokenKind,
-    tracker::{ErrorKind as TrackErrorKind, Location, Span, TrackError},
+    tracker::{Location, Span, TrackError, ErrorKind},
+    data::Str,
 };
-#[cfg(feature = "interpreter")]
-use axo::interpreter::Interpreter;
-
-pub const BASE: &[(&str, &str)] = &[
-    ("./base/cast.axo", include_str!("../base/cast.axo")),
-    ("./base/cast.c", include_str!("../base/cast.c")),
-    ("./base/file.axo", include_str!("../base/file.axo")),
-    ("./base/file.c", include_str!("../base/file.c")),
-    ("./base/memory.axo", include_str!("../base/memory.axo")),
-    ("./base/memory.c", include_str!("../base/memory.c")),
-    ("./base/print.axo", include_str!("../base/print.axo")),
-    ("./base/print.c", include_str!("../base/print.c")),
-    ("./base/process.axo", include_str!("../base/process.axo")),
-    ("./base/process.c", include_str!("../base/process.c")),
-    ("./base/string.axo", include_str!("../base/string.axo")),
-    ("./base/string.c", include_str!("../base/string.c")),
-    ("./base/input.axo", include_str!("../base/input.axo")),
-    ("./base/input.c", include_str!("../base/input.c")),
-];
 
 fn main() {
-    let flag = arguments();
-    let mut initializer = Initializer::new(flag);
+    let flag = Session::arguments();
+    let mut initializer = axo::initializer::Initializer::new(flag.clone());
     let targets = initializer.initialize();
 
     let bare = initializer.output.iter().any(|symbol| {
@@ -67,28 +37,6 @@ fn main() {
     }
 }
 
-#[cfg(feature = "interpreter")]
-pub fn run<'a>(session: &mut Session<'a>, core: &mut Interpreter<'a>, keys: &[Identity]) {
-    use axo::{
-        analyzer::Analyzer, parser::Parser, resolver::Resolver, scanner::Scanner,
-    };
-
-    session.errors.clear();
-
-    if !session.prepare() {
-        session.report_all();
-        return;
-    }
-
-    Scanner::execute(session, keys);
-    Parser::execute(session, keys);
-    Resolver::execute(session, keys);
-    Analyzer::execute(session, keys);
-    Interpreter::execute(session, core, keys);
-
-    session.report_all();
-}
-
 fn build(
     targets: Vec<(Location<'static>, Span)>,
     bare: bool,
@@ -96,21 +44,21 @@ fn build(
     failures: Vec<SessionError<'static>>,
     flag: Str<'static>,
 ) {
-    let mut session = create(bare, directives, failures, flag);
+    let mut session = Session::create(bare, directives, failures, flag);
 
     targets.iter().for_each(|(target, span)| {
-        if !traverse(target, &mut session.records) {
+        if !Session::traverse(target, &mut session.records) {
             let string = target.to_string();
 
-            if let Some(kind) = RecordKind::from_path(&string) {
-                let mut hasher = DefaultHasher::new();
-                Hash::hash(&string, &mut hasher);
+            if let Some(kind) = axo::internal::RecordKind::from_path(&string) {
+                let mut hasher = axo::internal::hash::DefaultHasher::new();
+                axo::internal::hash::Hash::hash(&string, &mut hasher);
 
-                let identity = (hasher.finish() as Identity) | 0x40000000;
-                session.records.insert(identity, Record::new(kind, target.clone()));
+                let identity = (axo::internal::hash::Hasher::finish(&hasher) as axo::data::Identity) | 0x40000000;
+                session.records.insert(identity, axo::internal::Record::new(kind, target.clone()));
             } else {
                 session.errors.push(SessionError::Track(TrackError::new(
-                    TrackErrorKind::UnSupportedInput(target.clone()),
+                    ErrorKind::UnSupportedInput(target.clone()),
                     span.clone(),
                 )));
             }
@@ -118,109 +66,4 @@ fn build(
     });
 
     let _session = session.compile();
-}
-
-pub fn create<'a>(
-    bare: bool,
-    directives: Vec<Symbol<'a>>,
-    failures: Vec<SessionError<'a>>,
-    flag: Str<'a>,
-) -> Session<'a> {
-    let timer = Instant::now();
-    let mut laps = Vec::new();
-
-    let mut resolver = Resolver::new();
-    let mut records = Map::new();
-    let cache = Map::new();
-
-    let mut record = Record::new(RecordKind::Flag, Location::from("flag"));
-    record.set_content(flag);
-    records.insert(0, record);
-
-    if !bare {
-        for &(path, content) in BASE {
-            if let Some(kind) = RecordKind::from_path(path) {
-                let string = path.to_string();
-                let location = Location::from(string.clone());
-                let mut hasher = DefaultHasher::new();
-                Hash::hash(&string, &mut hasher);
-                let identity = (hasher.finish() as Identity) & 0x3FFFFFFF;
-                let mut base = Record::new(kind, location);
-                base.set_content(Str::from(content));
-                records.insert(identity, base);
-            }
-        }
-    }
-
-    for symbol in directives.clone() {
-        resolver.registry.insert(symbol.identity, symbol);
-    }
-
-    let directive = module!(Module::new(literal!(identifier!("directive"))))
-        .with_members(directives);
-
-    resolver.insert(directive);
-
-    laps.push(timer.elapsed());
-
-    Session {
-        timer,
-        laps,
-        records,
-        initializer: Initializer::new(arguments()),
-        resolver,
-        errors: failures,
-        target: None,
-        cache,
-        buffers: Vec::new(),
-    }
-}
-
-pub fn arguments<'a>() -> Str<'a> {
-    args()
-        .skip(1)
-        .map(|arg| {
-            if arg.contains(' ') || arg.contains('\t') {
-                format!("\"{}\"", arg.replace('\\', "\\\\").replace('"', "\\\""))
-            } else {
-                arg
-            }
-        })
-        .collect::<Vec<String>>()
-        .join(" ")
-        .into()
-}
-
-pub fn traverse<'a>(target: &Location<'a>, records: &mut Map<Identity, Record<'a>>) -> bool {
-    let Ok(path) = target.to_path() else {
-        return false;
-    };
-
-    if !path.is_dir() {
-        return false;
-    }
-
-    let mut stack = vec![path];
-
-    while let Some(current) = stack.pop() {
-        if let Ok(entries) = read_dir(current) {
-            for entry in entries.flatten() {
-                let child = entry.path();
-                if child.is_dir() {
-                    stack.push(child);
-                } else {
-                    let string = child.to_string_lossy().into_owned();
-                    if let Some(kind) = RecordKind::from_path(&string) {
-                        let location = Location::from(string.clone());
-                        let mut hasher = DefaultHasher::new();
-                        Hash::hash(&string, &mut hasher);
-                        let identity = (hasher.finish() as Identity) | 0x40000000;
-                        records.insert(identity, Record::new(kind, location));
-                    }
-                }
-            }
-        }
-    }
-
-    true
 }

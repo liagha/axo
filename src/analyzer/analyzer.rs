@@ -59,7 +59,6 @@ impl<'analyzer> Analyzer<'analyzer> {
                 analyses.shrink_to_fit();
                 let record = session.records.get_mut(&key).unwrap();
                 record.store(3, Artifact::Analyses(analyses));
-                record.artifacts.remove(&2);
                 return;
             }
         }
@@ -87,7 +86,6 @@ impl<'analyzer> Analyzer<'analyzer> {
         if let Some(analyses) = session.cache("analyses", hash, Some(analyzer.output)) {
             let record = session.records.get_mut(&key).unwrap();
             record.store(3, Artifact::Analyses(analyses));
-            record.artifacts.remove(&2);
         }
     }
 }

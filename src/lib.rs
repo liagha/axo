@@ -14,6 +14,8 @@ pub mod scanner;
 pub mod analyzer;
 #[cfg(feature = "interpreter")]
 pub mod interpreter;
+#[cfg(feature = "interpreter")]
+pub mod dialog;
 
 pub mod internal;
 pub mod reporter;

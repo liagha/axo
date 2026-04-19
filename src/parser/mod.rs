@@ -17,7 +17,6 @@ use crate::{
     data::memory::Arc,
     internal::{platform::Lock, Session},
     reporter::Error,
-    tracker::Location,
 };
 
 pub type ParseError<'error> = Error<'error, ErrorKind<'error>>;
@@ -50,7 +49,7 @@ Action<
 
 impl<'source> Default for Parser<'source> {
     fn default() -> Self {
-        Parser::new(Location::from(file!()))
+        Parser::new()
     }
 }
 
@@ -60,7 +59,7 @@ mod tests {
     use crate::{
         data::Str,
         scanner::{PunctuationKind, Scanner, TokenKind},
-        tracker::{Location, Peekable, Position},
+        tracker::{Peekable, Position},
     };
 
     fn parse(source: &'static str) -> Parser<'static> {
@@ -68,7 +67,7 @@ mod tests {
         scanner.scan();
         assert!(scanner.errors.is_empty());
 
-        let mut parser = Parser::new(Location::from("test"));
+        let mut parser = Parser::new();
         parser.set_input(scanner.output);
         parser.parse();
         parser

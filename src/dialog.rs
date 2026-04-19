@@ -1,21 +1,15 @@
-use axo::{
-    data::{
-        Str, from_utf8,
-    },
+use crate::{
+    data::{Str, from_utf8},
     internal::{
         platform::{
-            set_current_dir,
-            read_dir, stdin, stdout,
-            Read, Write,
-            Command,
+            set_current_dir, read_dir, stdin, stdout, Read, Write, Command,
         },
-        RecordKind,
-        Record
+        RecordKind, Record, Session,
     },
     interpreter,
     interpreter::Interpreter,
     parser::Symbol,
-    tracker::Location
+    tracker::Location,
 };
 
 pub struct Dialog {
@@ -153,8 +147,8 @@ impl Dialog {
     }
 }
 
-pub fn start(bare: bool, directives: Vec<Symbol>, flag_content: Str) {
-    let mut session = crate::create(bare, directives, Vec::new(), flag_content);
+pub fn start(bare: bool, directives: Vec<Symbol>, flag: Str) {
+    let mut session = Session::create(bare, directives, Vec::new(), flag);
     let mut core = Interpreter::new(1024);
 
     let mut keys: Vec<_> = session
@@ -164,7 +158,7 @@ pub fn start(bare: bool, directives: Vec<Symbol>, flag_content: Str) {
         .collect();
     keys.sort();
 
-    crate::run(&mut session, &mut core, &keys);
+    Session::execute(&mut session, &mut core, &keys);
 
     let mut terminal = Dialog::new();
 
@@ -213,7 +207,7 @@ pub fn start(bare: bool, directives: Vec<Symbol>, flag_content: Str) {
         let identity = session.records.len() | 0x40000000;
         session.records.insert(identity, record);
 
-        crate::run(&mut session, &mut core, &[identity]);
+        Session::execute(&mut session, &mut core, &[identity]);
 
         if session.errors.is_empty() {
             if let Some(result) = core.extract() {

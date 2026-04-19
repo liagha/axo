@@ -1,10 +1,10 @@
 use crate::{
-    combinator::{Formation, Form, Former},
+    combinator::{Form, Formation, Former},
     data::{Identity, Offset, Scale},
     internal::{Artifact, RecordKind, Session, SessionError},
     parser::{Element, ErrorKind, ParseError},
     scanner::{PunctuationKind, Token, TokenKind},
-    tracker::{Location, Peekable, Position},
+    tracker::{Peekable, Position},
 };
 use broccli::Color;
 
@@ -37,7 +37,10 @@ impl<'a> Peekable<'a, Token<'a>> for Parser<'a> {
 
     fn next(&self, index: &mut Offset, state: &mut Self::State) -> Option<Token<'a>> {
         let token = self.get(*index)?;
-        *state = Position { identity: token.span.identity, offset: token.span.end };
+        *state = Position {
+            identity: token.span.identity,
+            offset: token.span.end,
+        };
         *index += 1;
         Some(token.clone())
     }
@@ -87,7 +90,7 @@ impl<'a: 'source, 'source> Parser<'a> {
             > (current.span.end, current.span.start, Self::priority(current))
     }
 
-    pub fn new(_: Location<'a>) -> Self {
+    pub fn new() -> Self {
         Parser {
             index: 0,
             state: Position::new(0),
@@ -97,7 +100,9 @@ impl<'a: 'source, 'source> Parser<'a> {
         }
     }
 
-    pub fn filter(length: Scale) -> Formation<'a, 'source, Self, Token<'a>, Element<'a>, ParseError<'a>> {
+    pub fn filter(
+        length: Scale,
+    ) -> Formation<'a, 'source, Self, Token<'a>, Element<'a>, ParseError<'a>> {
         Formation::repetition(
             Formation::alternative([
                 Formation::predicate(|token: &Token| {
@@ -170,7 +175,7 @@ impl<'a: 'source, 'source> Parser<'a> {
     }
 
     fn process(session: &mut Session<'a>, key: Identity) {
-        let (kind, hash, dirty, location, tokens) = {
+        let (kind, hash, dirty, tokens) = {
             let record = session.records.get(&key).unwrap();
             let tokens = if let Some(Artifact::Tokens(tokens)) = record.fetch(1) {
                 Some(tokens.clone())
@@ -181,7 +186,6 @@ impl<'a: 'source, 'source> Parser<'a> {
                 record.kind.clone(),
                 record.hash,
                 record.dirty,
-                record.location,
                 tokens,
             )
         };
@@ -195,12 +199,11 @@ impl<'a: 'source, 'source> Parser<'a> {
                 elements.shrink_to_fit();
                 let record = session.records.get_mut(&key).unwrap();
                 record.store(2, Artifact::Elements(elements));
-                record.artifacts.remove(&1);
                 return;
             }
         }
 
-        let mut parser = Parser::new(location);
+        let mut parser = Parser::new();
         if let Some(tokens) = tokens {
             parser.set_input(tokens);
         }
@@ -220,14 +223,13 @@ impl<'a: 'source, 'source> Parser<'a> {
         session.errors.extend(
             parser
                 .errors
-                .iter()
-                .map(|error| SessionError::Parse(error.clone())),
+                .into_iter()
+                .map(SessionError::Parse),
         );
 
         if let Some(elements) = session.cache("elements", hash, Some(parser.output)) {
             let record = session.records.get_mut(&key).unwrap();
             record.store(2, Artifact::Elements(elements));
-            record.artifacts.remove(&1);
         }
     }
 }

@@ -3,23 +3,14 @@ mod inkwell;
 
 use {
     crate::{
-        internal::{
-            platform::{
-                create_dir_all,
-                Lock,
-                Command,
-            },
-            time::Duration,
-            SessionError, RecordKind, Session,
-            Artifact,
-        },
-        data::{
-            Str,
-            memory::Arc,
-        },
         combinator::{Action, Operation, Operator},
+        data::{memory::Arc, Str},
+        internal::{
+            platform::{create_dir_all, Command, Lock},
+            Artifact, RecordKind, Session, SessionError,
+        },
         reporter::Error,
-        tracker::{Span, error::ErrorKind as TrackErrorKind, TrackError},
+        tracker::{error::ErrorKind as TrackErrorKind, Span, TrackError},
     },
 };
 
@@ -50,10 +41,6 @@ Action<
 
         let triple = TargetMachine::get_default_triple();
         let base = session.base();
-
-        let initial = session.errors.len();
-
-        session.report_start("generating");
 
         let mut keys: Vec<_> = session
             .records
@@ -130,12 +117,6 @@ Action<
             }
         }
 
-        let now = session.timer.elapsed();
-        let sum: Duration = session.laps.iter().copied().sum();
-        let duration = now.saturating_sub(sum);
-
-        session.report_finish("generating", duration, session.errors.len() - initial);
-
         session.errors.extend(
             generator
                 .errors
@@ -174,8 +155,6 @@ Action<
             }
             return;
         }
-
-        session.report_start("emitting");
 
         let base = session.base();
         let mut direct = Vec::new();
@@ -306,12 +285,6 @@ Action<
 
         session.target = Some(executable);
 
-        let now = session.timer.elapsed();
-        let sum: Duration = session.laps.iter().copied().sum();
-        let duration = now.saturating_sub(sum);
-
-        session.report_external("emitting", duration);
-
         if session.errors.is_empty() {
             operation.set_resolve(Vec::new());
         } else {
@@ -344,8 +317,6 @@ Action<
             return;
         }
 
-        session.report_start("running");
-
         let executable = session.target.unwrap();
 
         session.report_execute(&executable.to_string());
@@ -357,12 +328,6 @@ Action<
         if !status.success() {
             panic!("{}", status);
         }
-
-        let now = session.timer.elapsed();
-        let sum: Duration = session.laps.iter().copied().sum();
-        let duration = now.saturating_sub(sum);
-
-        session.report_external("running", duration);
 
         if session.errors.is_empty() {
             operation.set_resolve(Vec::new());

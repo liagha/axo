@@ -17,7 +17,6 @@ use {
         internal::{
             foreign::{CChar, CStr, CVoid},
             platform::{temp_dir, Lock, DLL_EXTENSION},
-            time::Duration,
             Artifact, RecordKind, Session, SessionError,
         },
         reporter::Error,
@@ -67,9 +66,6 @@ impl<'source> Action<
         let session = &mut *guard;
         let mut core = self.core.write().unwrap();
 
-        let initial = session.errors.len();
-        session.report_start("interpreting");
-
         let mut sources: Vec<_> = session
             .records
             .iter()
@@ -79,12 +75,6 @@ impl<'source> Action<
         sources.sort();
 
         Interpreter::execute(session, &mut core, &sources);
-
-        let now = session.timer.elapsed();
-        let sum: Duration = session.laps.iter().copied().sum();
-        let duration = now.saturating_sub(sum);
-
-        session.report_finish("interpreting", duration, session.errors.len() - initial);
 
         if session.errors.is_empty() {
             operation.set_resolve(Vec::new());
