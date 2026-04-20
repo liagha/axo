@@ -1,5 +1,4 @@
 use orbyte::Orbyte;
-use crate::resolver::{ErrorKind, ResolveError};
 use crate::{
     data::Identity,
     internal::hash::Set,
@@ -49,61 +48,44 @@ impl Scope {
         self.symbols.contains(&target)
     }
 
+    fn names<'a>(members: &[Element<'a>]) -> Vec<crate::data::Str<'a>> {
+        members
+            .iter()
+            .filter_map(|member| match &member.kind {
+                ElementKind::Binary(binary) => binary.left.target(),
+                _ => member.target(),
+            })
+            .collect()
+    }
+
+    fn fields<'a>(members: &[Symbol<'a>]) -> Vec<crate::data::Str<'a>> {
+        members
+            .iter()
+            .filter(|member| member.is_instance())
+            .filter_map(|member| member.target())
+            .collect()
+    }
+
     pub fn fits<'a>(query: &Element<'a>, symbol: &Symbol<'a>) -> bool {
         match (&query.kind, &symbol.kind) {
-            (
-                ElementKind::Literal(token),
-                _,
-            ) => {
-                if let Token {
-                    kind: TokenKind::Identifier(_),
-                    ..
-                } = **token {
-                    true
-                } else {
-                    false
-                }
-            },
+            (ElementKind::Literal(token), _) => {
+                matches!(
+                    **token,
+                    Token {
+                        kind: TokenKind::Identifier(_),
+                        ..
+                    }
+                )
+            }
             (ElementKind::Invoke(invoke), SymbolKind::Function(function)) => {
                 invoke.members.len() == function.members.len()
             }
             (ElementKind::Construct(construct), SymbolKind::Structure(structure)) => {
-                let fields = structure
-                    .members
-                    .iter()
-                    .filter(|member| member.is_instance())
-                    .filter_map(|member| member.target())
-                    .collect::<Vec<_>>();
-
-                let args = construct
-                    .members
-                    .iter()
-                    .filter_map(|member| match &member.kind {
-                        ElementKind::Binary(binary) => binary.left.target(),
-                        _ => member.target(),
-                    })
-                    .collect::<Vec<_>>();
-
-                fields == args
+                Self::fields(&structure.members) == Self::names(&construct.members)
             }
             (ElementKind::Construct(construct), SymbolKind::Union(union)) => {
-                let fields = union
-                    .members
-                    .iter()
-                    .filter(|member| member.is_instance())
-                    .filter_map(|member| member.target())
-                    .collect::<Vec<_>>();
-
-                let args = construct
-                    .members
-                    .iter()
-                    .filter_map(|member| match &member.kind {
-                        ElementKind::Binary(binary) => binary.left.target(),
-                        _ => member.target(),
-                    })
-                    .collect::<Vec<_>>();
-
-                args.len() == 1 && fields.contains(&args[0])
+                let args = Self::names(&construct.members);
+                args.len() == 1 && Self::fields(&union.members).contains(&args[0])
             }
             _ => false,
         }
@@ -112,39 +94,24 @@ impl Scope {
     pub fn exact<'a>(&self, target: &Element<'a>, resolver: &Resolver<'a>) -> Option<Symbol<'a>> {
         let query = target.target()?;
 
-        for identity in &self.symbols {
-            if let Some(symbol) = resolver.registry.get(identity) {
-                if let Some(candidate) = symbol.target() {
-                    if query == candidate && Self::fits(target, symbol) {
-                        return Some(symbol.clone());
-                    }
-                }
-            }
-        }
-
-        None
+        self.symbols.iter().find_map(|identity| {
+            resolver
+                .registry
+                .get(identity)
+                .filter(|symbol| {
+                    symbol.target() == Some(query.clone()) && Self::fits(target, symbol)
+                })
+                .cloned()
+        })
     }
 
     pub fn lookup<'a>(
         &self,
         target: &Element<'a>,
         resolver: &Resolver<'a>,
-    ) -> Result<Symbol<'a>, Vec<ResolveError<'a>>> {
-        if let Some(symbol) = Resolver::builtin(target) {
-            return Ok(symbol);
-        }
-
-        if let Some(symbol) = self.exact(target, resolver) {
-            Ok(symbol)
-        } else {
-            Err(vec![ResolveError {
-                kind: ErrorKind::UndefinedSymbol {
-                    query: target.target().unwrap().clone(),
-                },
-                span: target.span.clone(),
-                hints: Vec::new(),
-                phantom: Default::default(),
-            }])
-        }
+    ) -> Result<Symbol<'a>, Vec<crate::resolver::ResolveError<'a>>> {
+        Resolver::builtin(target)
+            .or_else(|| self.exact(target, resolver))
+            .ok_or_else(|| resolver.undefined(target))
     }
 }

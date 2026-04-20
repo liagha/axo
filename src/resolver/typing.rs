@@ -605,10 +605,11 @@ impl<'resolver> Resolver<'resolver> {
                         ErrorKind::Mismatch(left.clone(), right.clone()),
                         span,
                     ));
-                    return left;
+                    left
+                } else {
+                    self.variables[identity] = Some(right.clone());
+                    right
                 }
-                self.variables[identity] = Some(right.clone());
-                right
             }
             (_, TypeKind::Variable(identity)) => {
                 if self.occurs(identity, &left) {
@@ -616,10 +617,11 @@ impl<'resolver> Resolver<'resolver> {
                         ErrorKind::Mismatch(left.clone(), right.clone()),
                         span,
                     ));
-                    return left;
+                    left
+                } else {
+                    self.variables[identity] = Some(left.clone());
+                    left
                 }
-                self.variables[identity] = Some(left.clone());
-                left
             }
 
             (TypeKind::Integer { size: 8, .. }, TypeKind::Character) => right.clone(),
@@ -637,54 +639,58 @@ impl<'resolver> Resolver<'resolver> {
                 TypeKind::Array { member: left_item, size: left_size },
                 TypeKind::Array { member: right_item, size: right_size },
             ) if left_size == right_size => {
-                let unified = self.unify(span, &left_item, &right_item);
                 Type::from(TypeKind::Array {
-                    member: Box::new(unified),
+                    member: Box::new(self.unify(span, &left_item, &right_item)),
                     size: left_size,
                 })
             }
 
             (TypeKind::Pointer { target: left_target }, TypeKind::Pointer { target: right_target }) => {
-                let unified = self.unify(span, &left_target, &right_target);
-                Type::from(TypeKind::Pointer { target: Box::new(unified) })
+                Type::from(TypeKind::Pointer {
+                    target: Box::new(self.unify(span, &left_target, &right_target)),
+                })
             }
 
             (TypeKind::Tuple { members: left_items }, TypeKind::Tuple { members: right_items })
             if left_items.len() == right_items.len() => {
-                let mut unified = Vec::with_capacity(left_items.len());
-                for (first, second) in left_items.iter().zip(right_items.iter()) {
-                    unified.push(self.unify(span, first, second));
+                let mut members = Vec::with_capacity(left_items.len());
+                for (left, right) in left_items.iter().zip(right_items.iter()) {
+                    members.push(self.unify(span, left, right));
                 }
-                Type::from(TypeKind::Tuple { members: Box::new(unified) })
+                Type::from(TypeKind::Tuple {
+                    members: Box::new(members),
+                })
             }
 
             (TypeKind::Structure(left_aggr), TypeKind::Structure(right_aggr))
                 if left.identity == right.identity =>
             {
-                let members = if right_aggr.members.is_empty() {
-                    left_aggr.members
-                } else {
-                    right_aggr.members
-                };
-
                 Type::new(
                     left.identity,
-                    TypeKind::Structure(Box::new(Aggregate::new(left_aggr.target, members))),
+                    TypeKind::Structure(Box::new(Aggregate::new(
+                        left_aggr.target,
+                        if right_aggr.members.is_empty() {
+                            left_aggr.members
+                        } else {
+                            right_aggr.members
+                        },
+                    ))),
                 )
             }
 
             (TypeKind::Union(left_aggr), TypeKind::Union(right_aggr))
                 if left.identity == right.identity =>
             {
-                let members = if right_aggr.members.is_empty() {
-                    left_aggr.members
-                } else {
-                    right_aggr.members
-                };
-
                 Type::new(
                     left.identity,
-                    TypeKind::Union(Box::new(Aggregate::new(left_aggr.target, members))),
+                    TypeKind::Union(Box::new(Aggregate::new(
+                        left_aggr.target,
+                        if right_aggr.members.is_empty() {
+                            left_aggr.members
+                        } else {
+                            right_aggr.members
+                        },
+                    ))),
                 )
             }
 
@@ -697,14 +703,12 @@ impl<'resolver> Resolver<'resolver> {
                 let left_value = self.binding_value_type(&left_binding);
                 let right_value = self.binding_value_type(&right_binding);
                 let value = self.unify(span, &left_value, &right_value);
-
                 let annotation = match (left_binding.annotation, right_binding.annotation) {
-                    (Some(first), Some(second)) => Some(Box::new(self.unify(span, &first, &second))),
-                    (Some(first), None) => Some(first),
-                    (None, Some(second)) => Some(second),
+                    (Some(left), Some(right)) => Some(Box::new(self.unify(span, &left, &right))),
+                    (Some(left), None) => Some(left),
+                    (None, Some(right)) => Some(right),
                     (None, None) => None,
                 };
-
                 Type::from(TypeKind::Binding(Box::new(Binding::new(
                     left_binding.target,
                     Some(Box::new(value)),
@@ -743,6 +747,7 @@ impl<'resolver> Resolver<'resolver> {
             (TypeKind::Has(target), TypeKind::Union(aggr)) => {
                 let name = self.member_name(&target);
                 let mut found = false;
+
                 for member in &aggr.members {
                     if self.member_name(member) == name {
                         self.unify(span, &target, member);
@@ -750,6 +755,7 @@ impl<'resolver> Resolver<'resolver> {
                         break;
                     }
                 }
+
                 if !found {
                     self.errors.push(ResolveError::new(
                         ErrorKind::MissingMember {
@@ -759,6 +765,7 @@ impl<'resolver> Resolver<'resolver> {
                         span,
                     ));
                 }
+
                 right.clone()
             }
 
@@ -766,6 +773,7 @@ impl<'resolver> Resolver<'resolver> {
             (TypeKind::Union(aggr), TypeKind::Has(target)) => {
                 let name = self.member_name(&target);
                 let mut found = false;
+
                 for member in &aggr.members {
                     if self.member_name(member) == name {
                         self.unify(span, member, &target);
@@ -773,6 +781,7 @@ impl<'resolver> Resolver<'resolver> {
                         break;
                     }
                 }
+
                 if !found {
                     self.errors.push(ResolveError::new(
                         ErrorKind::UndefinedMember {
@@ -782,6 +791,7 @@ impl<'resolver> Resolver<'resolver> {
                         span,
                     ));
                 }
+
                 left.clone()
             }
 
@@ -795,9 +805,10 @@ impl<'resolver> Resolver<'resolver> {
             }
 
             (TypeKind::And(left_a, left_b), TypeKind::And(right_a, right_b)) => {
-                let a = self.unify(span, &left_a, &right_a);
-                let b = self.unify(span, &left_b, &right_b);
-                Type::from(TypeKind::And(Box::new(a), Box::new(b)))
+                Type::from(TypeKind::And(
+                    Box::new(self.unify(span, &left_a, &right_a)),
+                    Box::new(self.unify(span, &left_b, &right_b)),
+                ))
             }
 
             (TypeKind::And(a, b), _) => {
@@ -811,42 +822,42 @@ impl<'resolver> Resolver<'resolver> {
             }
 
             (TypeKind::Or(left_a, left_b), TypeKind::Or(right_a, right_b)) => {
-                let a = self.unify(span, &left_a, &right_a);
-                let b = self.unify(span, &left_b, &right_b);
-                Type::from(TypeKind::Or(Box::new(a), Box::new(b)))
+                Type::from(TypeKind::Or(
+                    Box::new(self.unify(span, &left_a, &right_a)),
+                    Box::new(self.unify(span, &left_b, &right_b)),
+                ))
             }
 
             (TypeKind::Function(left_func), TypeKind::Function(right_func))
             if left_func.members.len() == right_func.members.len() => {
-                let mut unified = Vec::with_capacity(left_func.members.len());
-                for (first, second) in left_func.members.iter().zip(right_func.members.iter()) {
-                    unified.push(self.unify(span, first, second));
+                let mut members = Vec::with_capacity(left_func.members.len());
+                for (left, right) in left_func.members.iter().zip(right_func.members.iter()) {
+                    members.push(self.unify(span, left, right));
                 }
 
                 let output = match (left_func.output, right_func.output) {
-                    (Some(first), Some(second)) => Some(Box::new(self.unify(span, &first, &second))),
-                    (Some(first), None) => Some(first.clone()),
-                    (None, Some(second)) => Some(second.clone()),
+                    (Some(left), Some(right)) => Some(Box::new(self.unify(span, &left, &right))),
+                    (Some(left), None) => Some(left),
+                    (None, Some(right)) => Some(right),
                     (None, None) => None,
                 };
 
-                let name = if left_func.target.is_empty() {
-                    right_func.target.clone()
-                } else {
-                    left_func.target.clone()
-                };
-
-                let body = self.unify(span, &left_func.body, &right_func.body);
-
-                Type::new(left.identity, TypeKind::Function(Box::new(Function::new(
-                    name,
-                    unified,
-                    body,
-                    output,
-                    left_func.interface,
-                    left_func.entry,
-                    left_func.variadic
-                ))))
+                Type::new(
+                    left.identity,
+                    TypeKind::Function(Box::new(Function::new(
+                        if left_func.target.is_empty() {
+                            right_func.target.clone()
+                        } else {
+                            left_func.target.clone()
+                        },
+                        members,
+                        self.unify(span, &left_func.body, &right_func.body),
+                        output,
+                        left_func.interface,
+                        left_func.entry,
+                        left_func.variadic,
+                    ))),
+                )
             }
 
             _ => {
@@ -1064,11 +1075,15 @@ impl<'resolver> Resolver<'resolver> {
                     } else if delimited.separator.is_none() && delimited.members.len() == 1 {
                         self.annotation(&delimited.members[0])
                     } else {
-                        let mut members = Vec::with_capacity(delimited.members.len());
-                        for member in &delimited.members {
-                            members.push(self.annotation(member)?);
-                        }
-                        Ok(Type::from(TypeKind::Tuple { members: Box::new(members) }))
+                        Ok(Type::from(TypeKind::Tuple {
+                            members: Box::new(
+                                delimited
+                                    .members
+                                    .iter()
+                                    .map(|member| self.annotation(member))
+                                    .collect::<Result<Vec<_>, _>>()?,
+                            ),
+                        }))
                     }
                 }
 

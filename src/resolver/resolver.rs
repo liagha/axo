@@ -1,8 +1,8 @@
 use broccli::Color;
 use crate::{
     data::{memory::replace, Identity, Module, Str},
-    internal::{hash::Map, Artifact, RecordKind, Session, SessionError},
     format::Show,
+    internal::{hash::Map, Artifact, RecordKind, Session, SessionError},
     parser::{Element, ElementKind, Symbol, SymbolKind},
     resolver::{next_identity, scope::Scope, ErrorKind, ResolveError, Type},
     scanner::{Token, TokenKind},
@@ -36,6 +36,7 @@ impl Clone for Resolver<'_> {
 pub trait Resolvable<'a> {
     fn declare(&mut self, resolver: &mut Resolver<'a>);
     fn resolve(&mut self, resolver: &mut Resolver<'a>);
+
     fn is_instance(&self) -> bool {
         false
     }
@@ -66,82 +67,82 @@ impl<'a> Resolver<'a> {
     }
 
     pub fn enter(&mut self) {
-        let next = next_identity();
-
-        self.scopes.insert(next, Scope::new(Some(self.active)));
-        self.active = next;
+        let identity = next_identity();
+        self.scopes.insert(identity, Scope::new(Some(self.active)));
+        self.active = identity;
     }
 
     pub fn enter_scope(&mut self, mut scope: Scope) {
-        let next = next_identity();
-
+        let identity = next_identity();
         scope.parent = Some(self.active);
-        self.scopes.insert(next, scope);
-        self.active = next;
+        self.scopes.insert(identity, scope);
+        self.active = identity;
     }
 
     pub fn exit(&mut self) {
-        if let Some(scope) = self.scopes.get(&self.active) {
-            if let Some(parent) = scope.parent {
-                self.active = parent;
-            }
+        if let Some(parent) = self.active().parent {
+            self.active = parent;
         }
+    }
+
+    pub fn nest<T>(&mut self, action: impl FnOnce(&mut Self) -> T) -> (T, Scope) {
+        self.enter();
+        let value = action(self);
+        let active = self.active;
+        self.exit();
+        (value, self.scopes.remove(&active).unwrap())
+    }
+
+    pub fn within<T>(&mut self, scope: Scope, action: impl FnOnce(&mut Self) -> T) -> (T, Scope) {
+        self.enter_scope(scope);
+        let value = action(self);
+        let active = self.active;
+        self.exit();
+        (value, self.scopes.remove(&active).unwrap())
     }
 
     pub fn insert(&mut self, symbol: Symbol<'a>) {
         let identity = symbol.identity;
         self.registry.insert(identity, symbol);
-
-        if let Some(scope) = self.scopes.get_mut(&self.active) {
-            scope.insert(identity);
-        }
+        self.active_mut().insert(identity);
     }
 
     pub fn get_symbol(&self, identity: Identity) -> Option<&Symbol<'a>> {
         self.registry.get(&identity)
     }
 
-    pub fn collect(&self) -> Vec<Symbol<'a>> {
-        let mut symbols = Vec::new();
-        let mut current = Some(self.active());
-
-        while let Some(scope) = current {
-            for identity in &scope.symbols {
-                if let Some(symbol) = self.registry.get(identity) {
-                    symbols.push(symbol.clone());
-                }
-            }
-            current = scope.parent.and_then(|id| self.scopes.get(&id));
+    fn walk<T>(&self, scope: Identity, seed: T, step: impl Fn(T, &Scope) -> T + Copy) -> T {
+        let scope = self.scopes.get(&scope).unwrap();
+        let seed = step(seed, scope);
+        match scope.parent {
+            Some(parent) => self.walk(parent, seed, step),
+            None => seed,
         }
+    }
 
+    pub fn collect(&self) -> Vec<Symbol<'a>> {
+        let mut symbols = self.walk(self.active, Vec::new(), |mut items, scope| {
+            items.extend(
+                scope.symbols
+                    .iter()
+                    .filter_map(|identity| self.registry.get(identity).cloned()),
+            );
+            items
+        });
         symbols.sort();
         symbols
     }
 
     pub fn find(&self, target: Identity) -> Option<Identity> {
-        let mut current = Some(self.active());
-
-        while let Some(scope) = current {
-            if scope.has(target) {
-                return Some(target);
-            }
-            current = scope.parent.and_then(|id| self.scopes.get(&id));
-        }
-
-        None
+        self.walk(self.active, None, |found, scope| {
+            found.or_else(|| scope.has(target).then_some(target))
+        })
     }
 
     pub fn exact(&self, target: &Element<'a>) -> Option<Symbol<'a>> {
-        let mut current = Some(self.active());
-
-        while let Some(scope) = current {
-            if let Some(symbol) = scope.exact(target, self) {
-                return Some(symbol);
-            }
-            current = scope.parent.and_then(|id| self.scopes.get(&id));
-        }
-
-        None
+        self.walk(self.active, None, |found, scope| {
+            found.or_else(|| scope.exact(target, self))
+        })
     }
 
     pub fn candidates(&self, target: &Element<'a>) -> Vec<Symbol<'a>> {
@@ -149,123 +150,136 @@ impl<'a> Resolver<'a> {
             return Vec::new();
         };
 
-        let mut symbols = Vec::new();
-        let mut current = Some(self.active());
-
-        while let Some(scope) = current {
-            for identity in &scope.symbols {
-                if let Some(symbol) = self.registry.get(identity) {
-                    if symbol.target() == Some(query.clone()) {
-                        symbols.push(symbol.clone());
-                    }
-                }
-            }
-            current = scope.parent.and_then(|id| self.scopes.get(&id));
-        }
+        let mut symbols = self.walk(self.active, Vec::new(), |mut items, scope| {
+            items.extend(
+                scope.symbols.iter().filter_map(|identity| {
+                    self.registry
+                        .get(identity)
+                        .filter(|symbol| symbol.target() == Some(query.clone()))
+                        .cloned()
+                }),
+            );
+            items
+        });
 
         symbols.sort();
         symbols
     }
 
-    pub fn lookup(&self, target: &Element<'a>) -> Result<Symbol<'a>, Vec<ResolveError<'a>>> {
-        if let Some(symbol) = Self::builtin(target) {
-            return Ok(symbol);
-        }
+    pub fn undefined(&self, target: &Element<'a>) -> Vec<ResolveError<'a>> {
+        vec![ResolveError {
+            kind: ErrorKind::UndefinedSymbol {
+                query: target.target().unwrap().clone(),
+            },
+            span: target.span.clone(),
+            hints: Vec::new(),
+            phantom: Default::default(),
+        }]
+    }
 
-        if let Some(symbol) = self.exact(target) {
-            Ok(symbol)
-        } else {
-            Err(vec![ResolveError {
-                kind: ErrorKind::UndefinedSymbol {
-                    query: target.target().unwrap().clone(),
-                },
-                span: target.span.clone(),
-                hints: Vec::new(),
-                phantom: Default::default(),
-            }])
-        }
+    pub fn lookup(&self, target: &Element<'a>) -> Result<Symbol<'a>, Vec<ResolveError<'a>>> {
+        Self::builtin(target)
+            .or_else(|| self.exact(target))
+            .ok_or_else(|| self.undefined(target))
     }
 
     pub fn execute(session: &mut Session<'a>, keys: &[Identity]) {
-        let mut source: Vec<_> = keys
+        let mut source = keys
             .iter()
             .copied()
-            .filter(|key| {
-                session.records.get(key).map_or(false, |r| r.kind == RecordKind::Source)
-            })
-            .collect();
+            .filter(|key| session.records.get(key).is_some_and(|record| record.kind == RecordKind::Source))
+            .collect::<Vec<_>>();
         source.sort();
 
         Self::prepare(session, &source);
-        Self::run_declare(session, &source);
-        //Self::report(session);
-        Self::run_resolve(session, &source);
+        Self::visit(session, &source, |element, resolver| element.declare(resolver));
+        Self::visit(session, &source, |element, resolver| element.resolve(resolver));
 
         session
             .errors
             .extend(session.resolver.errors.drain(..).map(SessionError::Resolve));
     }
 
+    fn module_name(record: &crate::internal::Record<'a>) -> Str<'a> {
+        Str::from(record.location.stem().unwrap().to_string())
+    }
+
+    fn module_target(session: &Session<'a>, key: Identity) -> Option<Identity> {
+        match session.records.get(&key)?.fetch(0)? {
+            Artifact::Module(identity) => Some(*identity),
+            _ => None,
+        }
+    }
+
+    fn module_symbol(identity: Identity, name: Str<'a>, span: Span) -> Symbol<'a> {
+        let head = Element::new(
+            ElementKind::literal(Token::new(TokenKind::identifier(name), span)),
+            span,
+        )
+        .into();
+
+        let mut symbol = Symbol::new(SymbolKind::module(Module::new(head)), span);
+        symbol.identity = identity;
+        symbol
+    }
+
     fn prepare(session: &mut Session<'a>, source: &[Identity]) {
-        let modules: Vec<_> = source
+        let modules = source
             .iter()
             .filter_map(|&identity| {
                 let record = session.records.get_mut(&identity).unwrap();
-                let name = Str::from(record.location.stem().unwrap().to_string());
+                let name = Self::module_name(record);
 
-                let existing = session.resolver.registry.iter().find_map(|(&id, symbol)| {
-                    if matches!(symbol.kind, SymbolKind::Module(_)) && symbol.target() == Some(name.clone()) {
-                        Some(id)
-                    } else {
-                        None
-                    }
-                });
-
-                if let Some(target) = existing {
+                if let Some(target) = session
+                    .resolver
+                    .registry
+                    .iter()
+                    .find_map(|(&target, symbol)| {
+                        (matches!(symbol.kind, SymbolKind::Module(_))
+                            && symbol.target() == Some(name.clone()))
+                        .then_some(target)
+                    })
+                {
                     record.store(0, Artifact::Module(target));
                     return None;
                 }
 
-                let end = record.content.as_ref().map(|value| value.len() as u32).unwrap_or(0);
-                let span = Span::range(identity, 0, end);
-                let head = Element::new(
-                    ElementKind::literal(Token::new(TokenKind::identifier(name), span)),
-                    span,
-                ).into();
-
-                let mut symbol = Symbol::new(
-                    SymbolKind::module(Module::new(head)),
-                    span,
-                );
-
-                symbol.identity = identity;
-                record.store(0, Artifact::Module(symbol.identity));
+                let span = record.span(identity);
+                let symbol = Self::module_symbol(identity, name, span);
+                record.store(0, Artifact::Module(identity));
                 Some(symbol)
             })
-            .collect();
+            .collect::<Vec<_>>();
 
         for module in modules {
             session.resolver.insert(module);
         }
     }
 
-    fn run_declare(session: &mut Session<'a>, source: &[Identity]) {
+    fn visit(
+        session: &mut Session<'a>,
+        source: &[Identity],
+        action: impl Fn(&mut Element<'a>, &mut Resolver<'a>) + Copy,
+    ) {
         for &key in source {
-            let target = if let Some(Artifact::Module(m)) = session.records.get(&key).unwrap().fetch(0) { *m } else { continue };
+            let Some(target) = Self::module_target(session, key) else {
+                continue;
+            };
+
             let mut module = session.resolver.registry.remove(&target).unwrap();
-            let scope = replace(&mut module.scope, Box::from(Scope::new(None)));
+            let scope = replace(&mut module.scope, Box::new(Scope::new(None)));
 
-            session.resolver.enter_scope(*scope);
-
-            if let Some(Artifact::Elements(elements)) = session.records.get_mut(&key).unwrap().fetch_mut(2) {
-                for element in elements.iter_mut() {
-                    element.declare(&mut session.resolver);
+            let (_, scope) = session.resolver.within(*scope, |resolver| {
+                if let Some(Artifact::Elements(elements)) =
+                    session.records.get_mut(&key).unwrap().fetch_mut(2)
+                {
+                    for element in elements {
+                        action(element, resolver);
+                    }
                 }
-            }
+            });
 
-            let active = session.resolver.active;
-            session.resolver.exit();
-            module.set_scope(session.resolver.scopes.remove(&active).unwrap());
+            module.set_scope(scope);
             session.resolver.insert(module);
         }
     }
@@ -299,27 +313,6 @@ impl<'a> Resolver<'a> {
                     .collect::<Vec<String>>()
                     .join("\n"),
             )
-        }
-    }
-
-    fn run_resolve(session: &mut Session<'a>, source: &[Identity]) {
-        for &key in source {
-            let target = if let Some(Artifact::Module(m)) = session.records.get(&key).unwrap().fetch(0) { *m } else { continue };
-            let mut module = session.resolver.registry.remove(&target).unwrap();
-            let scope = replace(&mut module.scope, Box::from(Scope::new(None)));
-
-            session.resolver.enter_scope(*scope);
-
-            if let Some(Artifact::Elements(elements)) = session.records.get_mut(&key).unwrap().fetch_mut(2) {
-                for element in elements.iter_mut() {
-                    element.resolve(&mut session.resolver);
-                }
-            }
-
-            let active = session.resolver.active;
-            session.resolver.exit();
-            module.scope = Box::from(session.resolver.scopes.remove(&active).unwrap());
-            session.resolver.insert(module);
         }
     }
 }
