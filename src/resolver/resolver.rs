@@ -144,6 +144,29 @@ impl<'a> Resolver<'a> {
         None
     }
 
+    pub fn candidates(&self, target: &Element<'a>) -> Vec<Symbol<'a>> {
+        let Some(query) = target.target() else {
+            return Vec::new();
+        };
+
+        let mut symbols = Vec::new();
+        let mut current = Some(self.active());
+
+        while let Some(scope) = current {
+            for identity in &scope.symbols {
+                if let Some(symbol) = self.registry.get(identity) {
+                    if symbol.target() == Some(query.clone()) {
+                        symbols.push(symbol.clone());
+                    }
+                }
+            }
+            current = scope.parent.and_then(|id| self.scopes.get(&id));
+        }
+
+        symbols.sort();
+        symbols
+    }
+
     pub fn lookup(&self, target: &Element<'a>) -> Result<Symbol<'a>, Vec<ResolveError<'a>>> {
         if let Some(symbol) = Self::builtin(target) {
             return Ok(symbol);

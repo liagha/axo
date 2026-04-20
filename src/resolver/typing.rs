@@ -1,6 +1,6 @@
 use orbyte::Orbyte;
 use crate::{
-    data::{Aggregate, Boolean, Function, Identity, Interface, Scale, Str},
+    data::{Aggregate, Binding, Boolean, Function, Identity, Interface, Scale, Str},
     parser::{Element, ElementKind},
     resolver::{ErrorKind, ResolveError, Resolver},
     scanner::{OperatorKind, PunctuationKind, TokenKind},
@@ -38,14 +38,14 @@ pub enum TypeKind<'typing> {
     Void,
     Variable(Identity),
     Unknown,
-    Any,
     Type,
-    Has(Str<'typing>, Box<Type<'typing>>),
+    Has(Box<Type<'typing>>),
     And(Box<Type<'typing>>, Box<Type<'typing>>),
     Or(Box<Type<'typing>>, Box<Type<'typing>>),
     Module(Str<'typing>),
     Structure(Box<Aggregate<Str<'typing>, Type<'typing>>>),
     Union(Box<Aggregate<Str<'typing>, Type<'typing>>>),
+    Binding(Box<Binding<Str<'typing>, Box<Type<'typing>>, Option<Box<Type<'typing>>>>>),
     Function(Box<Function<Str<'typing>, Type<'typing>, Type<'typing>, Option<Box<Type<'typing>>>>>),
 }
 
@@ -111,18 +111,13 @@ impl<'typing> TypeKind<'typing> {
     }
 
     #[inline(always)]
-    pub fn is_any(&self) -> bool {
-        matches!(self, Self::Any)
-    }
-
-    #[inline(always)]
     pub fn is_type(&self) -> bool {
         matches!(self, Self::Type)
     }
 
     #[inline(always)]
     pub fn is_has(&self) -> bool {
-        matches!(self, Self::Has(_, _))
+        matches!(self, Self::Has(_))
     }
 
     #[inline(always)]
@@ -148,6 +143,11 @@ impl<'typing> TypeKind<'typing> {
     #[inline(always)]
     pub fn is_function(&self) -> bool {
         matches!(self, Self::Function(_))
+    }
+
+    #[inline(always)]
+    pub fn is_binding(&self) -> bool {
+        matches!(self, Self::Binding(_))
     }
 
     #[inline]
@@ -215,9 +215,9 @@ impl<'typing> TypeKind<'typing> {
 
     #[inline]
     #[track_caller]
-    pub fn unwrap_has(self) -> (Str<'typing>, Box<Type<'typing>>) {
+    pub fn unwrap_has(self) -> Box<Type<'typing>> {
         match self {
-            Self::Has(name, target) => (name, target),
+            Self::Has(target) => target,
             _ => panic!("expected has"),
         }
     }
@@ -255,6 +255,16 @@ impl<'typing> TypeKind<'typing> {
         match self {
             Self::Union(union) => union,
             _ => panic!("expected union"),
+        }
+    }
+
+    #[inline]
+    #[track_caller]
+    pub fn unwrap_binding(self) -> Box<Binding<Str<'typing>, Box<Type<'typing>>, Option<Box<Type<'typing>>>>>
+    {
+        match self {
+            Self::Binding(binding) => binding,
+            _ => panic!("expected binding"),
         }
     }
 
@@ -324,9 +334,9 @@ impl<'typing> TypeKind<'typing> {
     }
 
     #[inline(always)]
-    pub fn try_unwrap_has(&self) -> Option<(&Str<'typing>, &Box<Type<'typing>>)> {
+    pub fn try_unwrap_has(&self) -> Option<&Box<Type<'typing>>> {
         match self {
-            Self::Has(name, target) => Some((name, target)),
+            Self::Has(target) => Some(target),
             _ => None,
         }
     }
@@ -359,6 +369,17 @@ impl<'typing> TypeKind<'typing> {
     pub fn try_unwrap_union(&self) -> Option<&Box<Aggregate<Str<'typing>, Type<'typing>>>> {
         match self {
             Self::Union(union) => Some(union),
+            _ => None,
+        }
+    }
+
+    #[inline(always)]
+    pub fn try_unwrap_binding(
+        &self,
+    ) -> Option<&Box<Binding<Str<'typing>, Box<Type<'typing>>, Option<Box<Type<'typing>>>>>> 
+    {
+        match self {
+            Self::Binding(binding) => Some(binding),
             _ => None,
         }
     }
@@ -428,9 +449,9 @@ impl<'typing> TypeKind<'typing> {
     }
 
     #[inline(always)]
-    pub fn try_unwrap_has_mut(&mut self) -> Option<(&mut Str<'typing>, &mut Box<Type<'typing>>)> {
+    pub fn try_unwrap_has_mut(&mut self) -> Option<&mut Box<Type<'typing>>> {
         match self {
-            Self::Has(name, target) => Some((name, target)),
+            Self::Has(target) => Some(target),
             _ => None,
         }
     }
@@ -468,6 +489,17 @@ impl<'typing> TypeKind<'typing> {
     }
 
     #[inline(always)]
+    pub fn try_unwrap_binding_mut(
+        &mut self,
+    ) -> Option<&mut Box<Binding<Str<'typing>, Box<Type<'typing>>, Option<Box<Type<'typing>>>>>> 
+    {
+        match self {
+            Self::Binding(binding) => Some(binding),
+            _ => None,
+        }
+    }
+
+    #[inline(always)]
     pub fn try_unwrap_function_mut(&mut self) -> Option<&mut Box<Function<Str<'typing>, Type<'typing>, Type<'typing>, Option<Box<Type<'typing>>>>>> {
         match self {
             Self::Function(function) => Some(function),
@@ -483,6 +515,27 @@ impl<'typing> PartialEq for Type<'typing> {
 }
 
 impl<'resolver> Resolver<'resolver> {
+    fn member_name(&mut self, typing: &Type<'resolver>) -> Option<Str<'resolver>> {
+        match &self.reify(typing).kind {
+            TypeKind::Binding(binding) => Some(binding.target),
+            TypeKind::Function(function) if !function.target.is_empty() => Some(function.target),
+            _ => None,
+        }
+    }
+
+    fn binding_value_type(
+        &mut self,
+        binding: &Binding<Str<'resolver>, Box<Type<'resolver>>, Option<Box<Type<'resolver>>>>,
+    ) -> Type<'resolver> {
+        if let Some(value) = &binding.value {
+            self.reify(value)
+        } else if let Some(annotation) = &binding.annotation {
+            self.reify(annotation)
+        } else {
+            Type::from(TypeKind::Unknown)
+        }
+    }
+
     pub fn fresh(&mut self) -> Type<'resolver> {
         let identity = self.variables.len();
         self.variables.push(None);
@@ -503,7 +556,17 @@ impl<'resolver> Resolver<'resolver> {
             TypeKind::Pointer { target } => self.occurs(identity, target),
             TypeKind::Array { member, .. } => self.occurs(identity, member),
             TypeKind::Tuple { members } => members.iter().any(|item| self.occurs(identity, item)),
-            TypeKind::Has(_, target) => self.occurs(identity, target),
+            TypeKind::Has(target) => self.occurs(identity, target),
+            TypeKind::Binding(binding) => {
+                binding
+                    .value
+                    .as_ref()
+                    .map_or(false, |value| self.occurs(identity, value))
+                    || binding
+                        .annotation
+                        .as_ref()
+                        .map_or(false, |annotation| self.occurs(identity, annotation))
+            }
             TypeKind::And(left, right) | TypeKind::Or(left, right) => {
                 self.occurs(identity, left) || self.occurs(identity, right)
             }
@@ -536,9 +599,6 @@ impl<'resolver> Resolver<'resolver> {
         match (left.kind.clone(), right.kind.clone()) {
             (TypeKind::Unknown, _) => right.clone(),
             (_, TypeKind::Unknown) => left.clone(),
-            (TypeKind::Any, _) => right.clone(),
-            (_, TypeKind::Any) => left.clone(),
-
             (TypeKind::Variable(identity), _) => {
                 if self.occurs(identity, &right) {
                     self.errors.push(ResolveError::new(
@@ -598,57 +658,137 @@ impl<'resolver> Resolver<'resolver> {
                 Type::from(TypeKind::Tuple { members: Box::new(unified) })
             }
 
-            (TypeKind::Structure(_), TypeKind::Structure(_))
-            | (TypeKind::Union(_), TypeKind::Union(_))
-            | (TypeKind::Module(_), TypeKind::Module(_))
+            (TypeKind::Structure(left_aggr), TypeKind::Structure(right_aggr))
+                if left.identity == right.identity =>
+            {
+                let members = if right_aggr.members.is_empty() {
+                    left_aggr.members
+                } else {
+                    right_aggr.members
+                };
+
+                Type::new(
+                    left.identity,
+                    TypeKind::Structure(Box::new(Aggregate::new(left_aggr.target, members))),
+                )
+            }
+
+            (TypeKind::Union(left_aggr), TypeKind::Union(right_aggr))
+                if left.identity == right.identity =>
+            {
+                let members = if right_aggr.members.is_empty() {
+                    left_aggr.members
+                } else {
+                    right_aggr.members
+                };
+
+                Type::new(
+                    left.identity,
+                    TypeKind::Union(Box::new(Aggregate::new(left_aggr.target, members))),
+                )
+            }
+
+            (TypeKind::Module(_), TypeKind::Module(_))
             if left.identity == right.identity => left,
 
-            (TypeKind::Has(name, target), TypeKind::Structure(aggr)) |
-            (TypeKind::Has(name, target), TypeKind::Union(aggr)) => {
+            (TypeKind::Binding(left_binding), TypeKind::Binding(right_binding))
+                if left_binding.target == right_binding.target =>
+            {
+                let left_value = self.binding_value_type(&left_binding);
+                let right_value = self.binding_value_type(&right_binding);
+                let value = self.unify(span, &left_value, &right_value);
+
+                let annotation = match (left_binding.annotation, right_binding.annotation) {
+                    (Some(first), Some(second)) => Some(Box::new(self.unify(span, &first, &second))),
+                    (Some(first), None) => Some(first),
+                    (None, Some(second)) => Some(second),
+                    (None, None) => None,
+                };
+
+                Type::from(TypeKind::Binding(Box::new(Binding::new(
+                    left_binding.target,
+                    Some(Box::new(value)),
+                    annotation,
+                    left_binding.kind,
+                ))))
+            }
+
+            (TypeKind::Has(target), TypeKind::Binding(binding)) => {
+                let member = Type::from(TypeKind::Binding(binding.clone()));
+                if self.member_name(&target) == self.member_name(&member) {
+                    self.unify(span, &target, &member)
+                } else {
+                    self.errors.push(ResolveError::new(
+                        ErrorKind::Mismatch(left.clone(), right.clone()),
+                        span,
+                    ));
+                    left
+                }
+            }
+
+            (TypeKind::Binding(binding), TypeKind::Has(target)) => {
+                let member = Type::from(TypeKind::Binding(binding.clone()));
+                if self.member_name(&member) == self.member_name(&target) {
+                    self.unify(span, &member, &target)
+                } else {
+                    self.errors.push(ResolveError::new(
+                        ErrorKind::Mismatch(left.clone(), right.clone()),
+                        span,
+                    ));
+                    left
+                }
+            }
+
+            (TypeKind::Has(target), TypeKind::Structure(aggr)) |
+            (TypeKind::Has(target), TypeKind::Union(aggr)) => {
+                let name = self.member_name(&target);
                 let mut found = false;
                 for member in &aggr.members {
-                    if let TypeKind::Has(member_name, member_target) = &member.kind {
-                        if member_name == &name {
-                            self.unify(span, &target, member_target);
-                            found = true;
-                            break;
-                        }
+                    if self.member_name(member) == name {
+                        self.unify(span, &target, member);
+                        found = true;
+                        break;
                     }
                 }
                 if !found {
                     self.errors.push(ResolveError::new(
-                        ErrorKind::Mismatch(left.clone(), right.clone()),
+                        ErrorKind::MissingMember {
+                            target: aggr.target.clone(),
+                            member: name.unwrap_or_default(),
+                        },
                         span,
                     ));
                 }
                 right.clone()
             }
 
-            (TypeKind::Structure(aggr), TypeKind::Has(name, target)) |
-            (TypeKind::Union(aggr), TypeKind::Has(name, target)) => {
+            (TypeKind::Structure(aggr), TypeKind::Has(target)) |
+            (TypeKind::Union(aggr), TypeKind::Has(target)) => {
+                let name = self.member_name(&target);
                 let mut found = false;
                 for member in &aggr.members {
-                    if let TypeKind::Has(member_name, member_target) = &member.kind {
-                        if member_name == &name {
-                            self.unify(span, member_target, &target);
-                            found = true;
-                            break;
-                        }
+                    if self.member_name(member) == name {
+                        self.unify(span, member, &target);
+                        found = true;
+                        break;
                     }
                 }
                 if !found {
                     self.errors.push(ResolveError::new(
-                        ErrorKind::Mismatch(left.clone(), right.clone()),
+                        ErrorKind::UndefinedMember {
+                            target: aggr.target.clone(),
+                            member: name.unwrap_or_default(),
+                        },
                         span,
                     ));
                 }
                 left.clone()
             }
 
-            (TypeKind::Has(left_name, left_target), TypeKind::Has(right_name, right_target)) => {
-                if left_name == right_name {
+            (TypeKind::Has(left_target), TypeKind::Has(right_target)) => {
+                if self.member_name(&left_target) == self.member_name(&right_target) {
                     let unified = self.unify(span, &left_target, &right_target);
-                    Type::from(TypeKind::Has(left_name, Box::new(unified)))
+                    Type::from(TypeKind::Has(Box::new(unified)))
                 } else {
                     Type::from(TypeKind::And(Box::new(left.clone()), Box::new(right.clone())))
                 }
@@ -741,8 +881,37 @@ impl<'resolver> Resolver<'resolver> {
                 let items = members.iter().map(|item| self.reify(item)).collect();
                 Type::from(TypeKind::Tuple { members: Box::new(items) })
             }
-            TypeKind::Has(name, target) => {
-                Type::from(TypeKind::Has(name.clone(), Box::new(self.reify(target))))
+            TypeKind::Structure(aggregate) if aggregate.members.is_empty() && typing.identity != 0 => {
+                if let Some(symbol) = self.registry.get(&typing.identity).cloned() {
+                    if symbol.typing != *typing {
+                        return self.reify(&symbol.typing);
+                    }
+                }
+                typing.clone()
+            }
+            TypeKind::Union(aggregate) if aggregate.members.is_empty() && typing.identity != 0 => {
+                if let Some(symbol) = self.registry.get(&typing.identity).cloned() {
+                    if symbol.typing != *typing {
+                        return self.reify(&symbol.typing);
+                    }
+                }
+                typing.clone()
+            }
+            TypeKind::Has(target) => {
+                Type::from(TypeKind::Has(Box::new(self.reify(target))))
+            }
+            TypeKind::Binding(binding) => {
+                let value = binding.value.as_ref().map(|value| Box::new(self.reify(value)));
+                let annotation = binding
+                    .annotation
+                    .as_ref()
+                    .map(|annotation| Box::new(self.reify(annotation)));
+                Type::from(TypeKind::Binding(Box::new(Binding::new(
+                    binding.target.clone(),
+                    value,
+                    annotation,
+                    binding.kind,
+                ))))
             }
             TypeKind::And(left, right) => {
                 Type::from(TypeKind::And(Box::new(self.reify(left)), Box::new(self.reify(right))))
@@ -824,7 +993,6 @@ impl<'resolver> Resolver<'resolver> {
                         "Character" => TypeKind::Character,
                         "String" => TypeKind::String,
                         "Void" => TypeKind::Void,
-                        "Any" => TypeKind::Any,
                         "Type" => TypeKind::Type,
                         _ => {
                             return if let Ok(symbol) = self.lookup(element) {

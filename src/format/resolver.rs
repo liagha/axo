@@ -53,11 +53,14 @@ impl<'typing> Show<'typing> for TypeKind<'typing> {
             TypeKind::Union(union) => base
                 .variant("Union")
                 .field("union", union.format(config.clone())),
-            TypeKind::Any => base.variant("Any"),
+            TypeKind::Binding(binding) => base
+                .variant("Binding")
+                .field("target", binding.target.format(config.clone()))
+                .field("value", binding.value.format(config.clone()))
+                .field("annotation", binding.annotation.format(config.clone())),
             TypeKind::Type => base.variant("Type"),
-            TypeKind::Has(name, target) => base
+            TypeKind::Has(target) => base
                 .variant("Has")
-                .field("name", name.format(config.clone()))
                 .field("target", target.format(config.clone())),
             TypeKind::And(left, right) => base
                 .variant("And")

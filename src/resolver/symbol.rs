@@ -1,8 +1,20 @@
 use crate::{
-    data::{memory::replace, Aggregate, Function, Interface},
+    data::{memory::replace, Aggregate, Binding as TypeBinding, Function, Interface},
     parser::{Symbol, SymbolKind},
     resolver::{scope::Scope, Resolvable, Resolver, Type, TypeKind},
 };
+
+fn value_type<'symbol>(typing: &Type<'symbol>) -> Type<'symbol> {
+    match &typing.kind {
+        TypeKind::Binding(binding) => binding
+            .value
+            .as_deref()
+            .cloned()
+            .or_else(|| binding.annotation.as_deref().cloned())
+            .unwrap_or_else(|| Type::from(TypeKind::Unknown)),
+        _ => typing.clone(),
+    }
+}
 
 impl<'symbol> Resolvable<'symbol> for Symbol<'symbol> {
     fn declare(&mut self, resolver: &mut Resolver<'symbol>) {
@@ -37,12 +49,27 @@ impl<'symbol> Resolvable<'symbol> for Symbol<'symbol> {
             SymbolKind::Binding(binding) => {
                 binding.target.declare(resolver);
 
-                if let Some(annotation) = &mut binding.annotation {
+                let annotation = if let Some(annotation) = &mut binding.annotation {
                     annotation.resolve(resolver);
-                    resolver.annotation(annotation).unwrap_or_else(|_| resolver.fresh())
+                    Some(Box::new(
+                        resolver.annotation(annotation).unwrap_or_else(|_| resolver.fresh()),
+                    ))
                 } else {
-                    resolver.fresh()
-                }
+                    None
+                };
+
+                let value = annotation
+                    .as_deref()
+                    .cloned()
+                    .unwrap_or_else(|| resolver.fresh());
+                binding.target.typing = value.clone();
+
+                Type::new(self.identity, TypeKind::Binding(Box::new(TypeBinding::new(
+                    binding.target.target().unwrap_or_default(),
+                    Some(Box::new(value)),
+                    annotation,
+                    binding.kind,
+                ))))
             }
             SymbolKind::Function(function) => {
                 let head = function.target.target().unwrap();
@@ -52,7 +79,7 @@ impl<'symbol> Resolvable<'symbol> for Symbol<'symbol> {
                     member.declare(resolver);
                 }
 
-                let members = function.members.iter().map(|m| m.typing.clone()).collect();
+                let members = function.members.iter().map(|member| value_type(&member.typing)).collect();
 
                 let mut move_to_body = false;
                 let output = if let Some(annotation) = &mut function.output {
@@ -139,7 +166,7 @@ impl<'symbol> Resolvable<'symbol> for Symbol<'symbol> {
                     value.typing.clone()
                 });
 
-                let typing = match (annotation, inferred) {
+                let typing = match (annotation.clone(), inferred) {
                     (Some(source), Some(target)) => resolver.unify(self.span, &source, &target),
                     (Some(source), None) => source,
                     (None, Some(target)) => target,
@@ -147,7 +174,14 @@ impl<'symbol> Resolvable<'symbol> for Symbol<'symbol> {
                 };
 
                 resolver.unify(self.span, &binding.target.typing, &typing);
-                typing
+                binding.target.typing = typing.clone();
+
+                Type::new(self.identity, TypeKind::Binding(Box::new(TypeBinding::new(
+                    binding.target.target().unwrap_or_default(),
+                    Some(Box::new(typing)),
+                    annotation.map(Box::new),
+                    binding.kind,
+                ))))
             }
 
             SymbolKind::Structure(structure) => {
@@ -208,7 +242,7 @@ impl<'symbol> Resolvable<'symbol> for Symbol<'symbol> {
                     .iter_mut()
                     .map(|member| {
                         member.resolve(resolver);
-                        member.typing.clone()
+                        value_type(&member.typing)
                     })
                     .collect();
 

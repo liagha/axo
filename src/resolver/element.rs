@@ -1,6 +1,6 @@
 use crate::{
-    data::{Aggregate, Delimited, Function, Interface, Scale, Str},
-    parser::{Element, ElementKind},
+    data::{Binding, BindingKind, Delimited, Function, Interface, Scale, Str},
+    parser::{Element, ElementKind, SymbolKind},
     resolver::{Error, ErrorKind, Resolvable, Resolver, Type, TypeKind},
     scanner::{OperatorKind, PunctuationKind, Token, TokenKind},
     tracker::Spanned,
@@ -23,6 +23,25 @@ fn assignable(element: &Element) -> bool {
             )
         }
         _ => false,
+    }
+}
+
+fn combine_types<'element>(mut members: Vec<Type<'element>>) -> Option<Type<'element>> {
+    let mut current = members.pop()?;
+
+    while let Some(next) = members.pop() {
+        current = Type::from(TypeKind::And(Box::new(next), Box::new(current)));
+    }
+
+    Some(current)
+}
+
+fn member_name<'element>(typing: &Type<'element>) -> Option<Str<'element>> {
+    match &typing.kind {
+        TypeKind::Binding(binding) => Some(binding.target),
+        TypeKind::Function(function) if !function.target.is_empty() => Some(function.target),
+        TypeKind::Has(target) => member_name(target),
+        _ => None,
     }
 }
 
@@ -89,7 +108,19 @@ impl<'element> Resolvable<'element> for Element<'element> {
                 TokenKind::Character(_) => Type::from(TypeKind::Character),
                 TokenKind::Identifier(_) => {
                     if let Ok(symbol) = resolver.lookup(self) {
-                        symbol.typing
+                        let typing = resolver.reify(&symbol.typing);
+
+                        if let TypeKind::Binding(binding) = typing.kind {
+                            if let Some(value) = binding.value {
+                                *value
+                            } else if let Some(annotation) = binding.annotation {
+                                *annotation
+                            } else {
+                                Type::from(TypeKind::Unknown)
+                            }
+                        } else {
+                            typing
+                        }
                     } else {
                         self.typing.clone()
                     }
@@ -274,7 +305,7 @@ impl<'element> Resolvable<'element> for Element<'element> {
                                 }
                             }
 
-                            if scope.is_none() {
+                            if scope.is_none() && left.kind.is_module() {
                                 if let Some(symbol) = resolver.get_symbol(left.identity).cloned() {
                                     scope = Some(symbol.scope);
                                 }
@@ -288,9 +319,38 @@ impl<'element> Resolvable<'element> for Element<'element> {
                                 self.reference = binary.right.reference;
                                 binary.right.typing.clone()
                             } else {
-                                binary.right.resolve(resolver);
+                            match binary.right.target() {
+                                Some(name) => {
+                                    let member = resolver.fresh();
+                                    let binding = Type::from(TypeKind::Binding(Box::new(
+                                        Binding::new(
+                                            name.clone(),
+                                            Some(Box::new(member.clone())),
+                                            None,
+                                            BindingKind::Let,
+                                        ),
+                                    )));
+                                    let requirement = Type::from(TypeKind::Has(Box::new(binding)));
 
-                                if !left.kind.is_unknown() {
+                                    let unified =
+                                        resolver.unify(binary.right.span, &left, &requirement);
+                                    binary.left.typing = unified;
+
+                                    if let Some(symbol) =
+                                        resolver.get_symbol(left.identity).cloned()
+                                    {
+                                        resolver.enter_scope(*symbol.scope.clone());
+                                        if let Ok(found) = resolver.lookup(&binary.right) {
+                                            binary.right.reference = Some(found.identity);
+                                            self.reference = Some(found.identity);
+                                        }
+                                        resolver.exit();
+                                    }
+
+                                    member
+                                }
+                                None => {
+                                    binary.right.resolve(resolver);
                                     resolver.errors.push(Error::new(
                                         ErrorKind::InvalidBinary(
                                             binary.operator.clone(),
@@ -299,9 +359,9 @@ impl<'element> Resolvable<'element> for Element<'element> {
                                         ),
                                         binary.operator.span,
                                     ));
+                                    resolver.fresh()
                                 }
-
-                                resolver.fresh()
+                            }
                             }
                         }
                         [OperatorKind::Equal] => {
@@ -548,9 +608,6 @@ impl<'element> Resolvable<'element> for Element<'element> {
             }
 
             ElementKind::Invoke(invoke) => {
-                invoke.target.resolve(resolver);
-                self.reference = invoke.target.reference;
-
                 let target = invoke.target.target().and_then(|name| name.as_str());
 
                 match target {
@@ -640,7 +697,7 @@ impl<'element> Resolvable<'element> for Element<'element> {
 
                         members.extend(invoke.members.iter().map(|member| member.typing.clone()));
 
-                        let mut function = Type::from(TypeKind::Function(Box::new(Function::new(
+                        let expected = Type::from(TypeKind::Function(Box::new(Function::new(
                             Str::default(),
                             members,
                             body,
@@ -650,7 +707,32 @@ impl<'element> Resolvable<'element> for Element<'element> {
                             false,
                         ))));
 
-                        function = resolver.unify(self.span, &invoke.target.typing, &function);
+                        let mut selected = None;
+                        for symbol in resolver.candidates(&invoke.target) {
+                            if !matches!(symbol.kind, SymbolKind::Function(_)) {
+                                continue;
+                            }
+
+                            let mut trial = resolver.clone();
+                            let before = trial.errors.len();
+                            let _ = trial.unify(self.span, &symbol.typing, &expected);
+
+                            if trial.errors.len() == before {
+                                selected = Some(symbol);
+                                break;
+                            }
+                        }
+
+                        if let Some(symbol) = selected {
+                            invoke.target.reference = Some(symbol.identity);
+                            invoke.target.typing = symbol.typing.clone();
+                            self.reference = Some(symbol.identity);
+                        } else {
+                            invoke.target.resolve(resolver);
+                            self.reference = invoke.target.reference;
+                        }
+
+                        let function = resolver.unify(self.span, &invoke.target.typing, &expected);
 
                         if function.kind.is_function() {
                             if let Some(kind) = function.kind.unwrap_function().output {
@@ -666,47 +748,98 @@ impl<'element> Resolvable<'element> for Element<'element> {
             }
 
             ElementKind::Construct(construct) => {
-                construct.target.resolve(resolver);
-                self.reference = construct.target.reference;
+                let mut resolved = Vec::with_capacity(construct.members.len());
 
-                let mut layout = Vec::new();
-                let mut typing = None;
-
-                if let Some(reference) = construct.target.reference {
-                    if let Some(symbol) = resolver.get_symbol(reference).cloned() {
-                        match &symbol.typing.kind {
-                            TypeKind::Structure(aggregate) => {
-                                layout = aggregate.members.clone();
-                                typing = Some(TypeKind::Structure(aggregate.clone()));
-                            }
-                            TypeKind::Union(aggregate) => {
-                                layout = aggregate.members.clone();
-                                typing = Some(TypeKind::Union(aggregate.clone()));
-                            }
-                            _ => {}
+                for member in &mut construct.members {
+                    match &mut member.kind {
+                        ElementKind::Binary(binary)
+                            if matches!(
+                                &binary.operator.kind,
+                                TokenKind::Operator(operator) if operator.as_slice() == [OperatorKind::Equal]
+                            ) && binary.left.target().is_some() =>
+                        {
+                            binary.right.resolve(resolver);
+                            resolved.push((binary.left.target(), binary.right.typing.clone()));
                         }
-
-                        if typing.is_some() {
-                            resolver.enter_scope(*symbol.scope.clone());
-                            for (index, member) in construct.members.iter_mut().enumerate() {
-                                member.resolve(resolver);
-                                if let Some(expect) = layout.get(index) {
-                                    resolver.unify(member.span, &member.typing, expect);
-                                }
-                            }
-                            resolver.exit();
+                        _ => {
+                            member.resolve(resolver);
+                            resolved.push((None, member.typing.clone()));
                         }
                     }
                 }
 
-                let head = construct.target.target().unwrap_or_default();
-                let aggregate = Aggregate::new(head, layout);
-                let reference = construct.target.reference.unwrap_or(0);
+                let make_requirements = |layout: Option<&Vec<Type<'element>>>| {
+                    let members = resolved
+                        .iter()
+                        .enumerate()
+                        .map(|(index, (name, typing))| {
+                            let label = name
+                                .clone()
+                                .or_else(|| layout.and_then(|items| items.get(index)).and_then(member_name));
 
-                Type::new(
-                    reference,
-                    typing.unwrap_or(TypeKind::Structure(Box::from(aggregate))),
-                )
+                            if let Some(name) = label {
+                                Type::from(TypeKind::Has(Box::new(Type::from(TypeKind::Binding(
+                                    Box::new(Binding::new(
+                                        name,
+                                        Some(Box::new(typing.clone())),
+                                        None,
+                                        BindingKind::Let,
+                                    )),
+                                )))))
+                            } else {
+                                typing.clone()
+                            }
+                        })
+                        .collect::<Vec<_>>();
+
+                    combine_types(members)
+                };
+
+                let mut selected = None;
+                for symbol in resolver.candidates(&construct.target) {
+                    let layout = match &symbol.typing.kind {
+                        TypeKind::Structure(aggregate) | TypeKind::Union(aggregate) => {
+                            Some(&aggregate.members)
+                        }
+                        _ => None,
+                    };
+
+                    let Some(requirements) = make_requirements(layout) else {
+                        selected = Some(symbol);
+                        break;
+                    };
+
+                    let mut trial = resolver.clone();
+                    let before = trial.errors.len();
+                    let _ = trial.unify(self.span, &requirements, &symbol.typing);
+
+                    if trial.errors.len() == before {
+                        selected = Some(symbol);
+                        break;
+                    }
+                }
+
+                if let Some(symbol) = selected {
+                    construct.target.reference = Some(symbol.identity);
+                    construct.target.typing = symbol.typing.clone();
+                    self.reference = Some(symbol.identity);
+                } else {
+                    construct.target.resolve(resolver);
+                    self.reference = construct.target.reference;
+                }
+
+                let layout = match &construct.target.typing.kind {
+                    TypeKind::Structure(aggregate) | TypeKind::Union(aggregate) => {
+                        Some(&aggregate.members)
+                    }
+                    _ => None,
+                };
+
+                if let Some(requirements) = make_requirements(layout) {
+                    resolver.unify(self.span, &requirements, &construct.target.typing)
+                } else {
+                    construct.target.typing.clone()
+                }
             }
 
             ElementKind::Symbolize(symbol) => {

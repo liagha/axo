@@ -10,10 +10,7 @@ use {
     crate::{
         analyzer::{Analysis, AnalysisKind},
         combinator::{Action, Operation, Operator},
-        data::{
-            memory::{null_mut, Arc},
-            CString, Function, Identity, Interface, Str,
-        },
+        data::{memory::{null_mut, Arc}, CString, Function, Identity, Interface, Str},
         internal::{
             foreign::{CChar, CStr, CVoid},
             platform::{temp_dir, Lock, DLL_EXTENSION},
@@ -85,6 +82,76 @@ impl<'source> Action<
 }
 
 impl<'source> Interpreter<'source> {
+    fn member_name(typing: &Type<'source>) -> Option<Str<'source>> {
+        match &typing.kind {
+            TypeKind::Binding(binding) => Some(binding.target),
+            TypeKind::Function(function) if !function.target.is_empty() => Some(function.target),
+            TypeKind::Has(target) => Self::member_name(target),
+            _ => None,
+        }
+    }
+
+    fn value_type(typing: &Type<'source>) -> Type<'source> {
+        match &typing.kind {
+            TypeKind::Binding(binding) => binding
+                .value
+                .as_deref()
+                .cloned()
+                .or_else(|| binding.annotation.as_deref().cloned())
+                .unwrap_or_else(|| Type::from(TypeKind::Unknown)),
+            _ => typing.clone(),
+        }
+    }
+
+    fn bind_shapes(session: &Session<'source>, core: &mut Interpreter<'source>) {
+        core.shapes.clear();
+
+        for symbol in session.resolver.registry.values() {
+            match &symbol.typing.kind {
+                TypeKind::Structure(aggregate) | TypeKind::Union(aggregate) => {
+                    let members = aggregate
+                        .members
+                        .iter()
+                        .filter_map(Self::member_name)
+                        .collect::<Vec<_>>();
+
+                    core.shapes.insert(symbol.typing.identity, members);
+                }
+                _ => {}
+            }
+        }
+    }
+
+    fn literal(element: &crate::parser::Element<'source>) -> Option<Value> {
+        match &element.kind {
+            crate::parser::ElementKind::Literal(token) => match &token.kind {
+                crate::scanner::TokenKind::Integer(value) => Some(Value::Integer(*value as i64)),
+                crate::scanner::TokenKind::Float(value) => Some(Value::Float(f64::from(*value))),
+                crate::scanner::TokenKind::Boolean(value) => Some(Value::Boolean(*value)),
+                crate::scanner::TokenKind::Character(value) => Some(Value::Character(*value as char)),
+                crate::scanner::TokenKind::String(value) => Some(Value::Text(value.to_string())),
+                _ => None,
+            },
+            _ => None,
+        }
+    }
+
+    fn bind_values(session: &Session<'source>, core: &mut Interpreter<'source>) {
+        core.values.clear();
+
+        for symbol in session.resolver.registry.values() {
+            if let crate::parser::SymbolKind::Binding(binding) = &symbol.kind {
+                if let Some(value) = &binding.value {
+                    if let Some(name) = binding.target.target() {
+                        if let Some(value) = Self::literal(value) {
+                            core.bind_value(name, value);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     pub fn execute(
         session: &mut Session<'source>,
         core: &mut Interpreter<'source>,
@@ -110,6 +177,9 @@ impl<'source> Interpreter<'source> {
         let library = Self::load_library(session);
         let start = core.code.len();
 
+        Self::bind_shapes(session, core);
+        Self::bind_values(session, core);
+
         for key in &sources {
             let Some(record) = session.records.get(key) else {
                 continue;
@@ -128,7 +198,7 @@ impl<'source> Interpreter<'source> {
             for analysis in &analyses {
                 if let AnalysisKind::Function(function) = &analysis.kind {
                     if matches!(function.interface, Interface::C) {
-                        Self::bind_function(core, function, &library);
+                        Self::bind_function(core, function, &analysis.typing, &library);
                     }
                 }
             }
@@ -163,8 +233,9 @@ impl<'source> Interpreter<'source> {
     }
 
     fn bind_function(
-        core: &mut Interpreter,
-        function: &Function<Str, Analysis, Option<Box<Analysis>>, Option<Type>>,
+        core: &mut Interpreter<'source>,
+        function: &Function<Str<'source>, Analysis<'source>, Option<Box<Analysis<'source>>>, Option<Type<'source>>>,
+        typing: &Type<'source>,
         library: &Option<Library>,
     ) {
         let name = function.target.as_str().unwrap_or_default();
@@ -179,7 +250,9 @@ impl<'source> Interpreter<'source> {
                 let mut members = Vec::with_capacity(function.members.len());
 
                 for member in &function.members {
-                    members.push(match &member.typing.kind {
+                    let typing = Self::value_type(&member.typing);
+
+                    members.push(match &typing.kind {
                         TypeKind::Integer { .. } => NativeType::Integer,
                         TypeKind::Float { .. } => NativeType::Float,
                         TypeKind::Boolean => NativeType::Boolean,
@@ -216,7 +289,7 @@ impl<'source> Interpreter<'source> {
 
         core.foreign.push(Foreign::Dynamic(closure));
         let index = core.foreign.len() - 1;
-        core.native(name, index);
+        core.native(name, typing.clone(), index);
     }
 }
 

@@ -1,39 +1,51 @@
 use crate::{
     analyzer::{Analysis, AnalysisKind},
     data::{
-        Invoke, Str,
+        Function,
+        Invoke,
+        Str,
         memory::take,
     },
-    interpreter::{error::ErrorKind, Address, Entity, Index, Instruction, Interpreter, Opcode, Value},
+    interpreter::{Call, Instruction, Interpreter, Opcode, Slot, Value, error::ErrorKind},
+    resolver::{Type, TypeKind},
     tracker::Span,
 };
 
-impl<'error> Interpreter<'error> {
-    pub fn native(&mut self, name: &str, index: Index) {
-        self.insert_entity(Str::from(name.to_string()), Entity::Foreign(index));
+fn value_type<'a>(typing: &Type<'a>) -> Type<'a> {
+    match &typing.kind {
+        TypeKind::Binding(binding) => binding
+            .value
+            .as_deref()
+            .cloned()
+            .or_else(|| binding.annotation.as_deref().cloned())
+            .unwrap_or_else(|| Type::from(TypeKind::Unknown)),
+        _ => typing.clone(),
+    }
+}
+
+fn member_name<'a>(typing: &Type<'a>) -> Option<Str<'a>> {
+    match &typing.kind {
+        TypeKind::Binding(binding) => Some(binding.target),
+        TypeKind::Function(function) if !function.target.is_empty() => Some(function.target),
+        TypeKind::Has(target) => member_name(target),
+        _ => None,
+    }
+}
+
+impl<'a> Interpreter<'a> {
+    pub fn native(&mut self, name: &str, typing: Type<'a>, index: usize) {
+        self.register_call(Str::from(name.to_string()), typing, Call::Foreign(index));
     }
 
-    pub fn address(&self, name: &Str<'error>) -> Option<Address> {
-        match self.raw_entity(name) {
-            Some(Entity::Function(Some(address))) => Some(address),
-            _ => None,
-        }
-    }
-
-    fn emit(&mut self, opcode: Opcode, span: Span) {
+    fn emit(&mut self, opcode: Opcode<'a>, span: Span) {
         self.code.push(Instruction { opcode, span });
     }
 
-    fn patch(&mut self, index: Address, opcode: Opcode) {
+    fn patch(&mut self, index: usize, opcode: Opcode<'a>) {
         self.code[index].opcode = opcode;
     }
 
-    fn scope(
-        &mut self,
-        stem: Str<'error>,
-        action: fn(&mut Self, Vec<Analysis<'error>>),
-        analyses: Vec<Analysis<'error>>,
-    ) {
+    fn scope(&mut self, stem: Str<'a>, action: fn(&mut Self, Vec<Analysis<'a>>), analyses: Vec<Analysis<'a>>) {
         let previous = self.current_module;
         self.current_module = stem;
         action(self, analyses);
@@ -46,23 +58,28 @@ impl<'error> Interpreter<'error> {
 
         for module in &modules {
             let analyses = self.modules.get(module).cloned().unwrap_or_default();
-            self.current_module = module.clone();
+            self.current_module = *module;
             self.declare(analyses);
         }
 
         for module in &modules {
             let analyses = self.modules.get(module).cloned().unwrap_or_default();
-            self.current_module = module.clone();
+            self.current_module = *module;
             self.generate(analyses);
         }
 
-        let entry = Str::from("main".to_string());
+        let main = Str::from("main".to_string());
+        let typing = self
+            .calls
+            .get(&main)
+            .and_then(|items| items.first())
+            .map(|(typing, _)| typing.clone());
 
-        if self.address(&entry).is_some() {
+        if let Some(typing) = typing {
             if let Some(span) = self.code.last().map(|instruction| instruction.span.clone()) {
                 let place = self.code.len();
                 self.emit(Opcode::Call(0), span);
-                self.calls.push((place, entry));
+                self.pending.push((place, main, typing));
             }
         }
 
@@ -70,17 +87,10 @@ impl<'error> Interpreter<'error> {
             self.emit(Opcode::Halt, span);
         }
 
-        let calls = take(&mut self.calls);
-        for (index, target) in calls {
-            if let Some(address) = self.address(&target) {
-                self.patch(index, Opcode::Call(address));
-            } else {
-                self.patch(index, Opcode::Trap(ErrorKind::MissingSymbol));
-            }
-        }
+        self.finish_calls();
     }
 
-    pub fn extend(&mut self, module: Str<'error>, analyses: Vec<Analysis<'error>>) -> Address {
+    pub fn extend(&mut self, module: Str<'a>, analyses: Vec<Analysis<'a>>) -> usize {
         let start = self.code.len();
         let previous = self.current_module;
 
@@ -88,61 +98,50 @@ impl<'error> Interpreter<'error> {
         self.declare(analyses.clone());
         self.generate(analyses);
         self.current_module = previous;
-
-        let calls = take(&mut self.calls);
-        for (index, target) in calls {
-            if let Some(address) = self.address(&target) {
-                self.patch(index, Opcode::Call(address));
-            } else {
-                self.patch(index, Opcode::Trap(ErrorKind::MissingSymbol));
-            }
-        }
+        self.finish_calls();
 
         start
     }
 
-    fn declare(&mut self, analyses: Vec<Analysis<'error>>) {
+    fn finish_calls(&mut self) {
+        let pending = take(&mut self.pending);
+
+        for (index, name, typing) in pending {
+            match self.routine(&name, &typing) {
+                Some(Call::Foreign(target)) => self.patch(index, Opcode::CallForeign(target, 0)),
+                Some(Call::Local(Some(target))) => self.patch(index, Opcode::Call(target)),
+                Some(Call::Local(None)) => self.pending.push((index, name, typing)),
+                None => self.patch(index, Opcode::Trap(ErrorKind::MissingSymbol)),
+            }
+        }
+    }
+
+    fn declare(&mut self, analyses: Vec<Analysis<'a>>) {
         for analysis in analyses {
             match analysis.kind {
+                AnalysisKind::Function(function) => {
+                    if !matches!(function.interface, crate::data::Interface::C) {
+                        self.register_call(function.target, analysis.typing, Call::Local(None));
+                    }
+                }
                 AnalysisKind::Structure(structure) => {
-                    let items = Self::members(structure.members.clone());
-                    self.insert_entity(
-                        structure.target,
-                        Entity::Structure {
-                            identity: analysis.typing.identity,
-                            members: items,
-                        },
-                    );
                     self.scope(structure.target, Self::declare, structure.members);
                 }
                 AnalysisKind::Union(union) => {
-                    let items = Self::members(union.members.clone());
-                    self.insert_entity(
-                        union.target,
-                        Entity::Union {
-                            identity: analysis.typing.identity,
-                            members: items,
-                        },
-                    );
                     self.scope(union.target, Self::declare, union.members);
                 }
-                AnalysisKind::Function(function) => {
-                    if !matches!(function.interface, crate::data::Interface::C) {
-                        self.insert_entity(function.target, Entity::Function(None));
-                    }
-                }
-                AnalysisKind::Module(stem, inner) => self.scope(stem.clone(), Self::declare, inner),
+                AnalysisKind::Module(stem, inner) => self.scope(stem, Self::declare, inner),
                 _ => {}
             }
         }
     }
 
-    fn generate(&mut self, analyses: Vec<Analysis<'error>>) {
+    fn generate(&mut self, analyses: Vec<Analysis<'a>>) {
         for analysis in analyses {
             match analysis.kind {
                 AnalysisKind::Function(function) => {
                     if !matches!(function.interface, crate::data::Interface::C) {
-                        self.define(function.clone(), analysis.span.clone());
+                        self.define(function, analysis.typing, analysis.span.clone());
                     }
                 }
                 AnalysisKind::Structure(structure) => {
@@ -151,9 +150,7 @@ impl<'error> Interpreter<'error> {
                 AnalysisKind::Union(union) => {
                     self.scope(union.target, Self::generate, union.members);
                 }
-                AnalysisKind::Module(stem, inner) => {
-                    self.scope(stem.clone(), Self::generate, inner.clone());
-                }
+                AnalysisKind::Module(stem, inner) => self.scope(stem, Self::generate, inner),
                 _ => self.walk(analysis),
             }
         }
@@ -161,21 +158,17 @@ impl<'error> Interpreter<'error> {
 
     fn define(
         &mut self,
-        function: crate::data::Function<
-            Str<'error>,
-            Analysis<'error>,
-            Option<Box<Analysis<'error>>>,
-            Option<crate::resolver::Type<'error>>,
-        >,
+        function: Function<Str<'a>, Analysis<'a>, Option<Box<Analysis<'a>>>, Option<Type<'a>>>,
+        typing: Type<'a>,
         span: Span,
     ) {
         let bypass = self.code.len();
         self.emit(Opcode::Jump(0), span.clone());
 
         let address = self.code.len();
-        self.insert_entity(function.target, Entity::Function(Some(address)));
+        self.set_call(function.target, &typing, address);
 
-        let entities = self.entities.clone();
+        let slots = self.slots.clone();
         let memory = self.memory_top;
 
         let mut members = function.members.clone();
@@ -186,14 +179,14 @@ impl<'error> Interpreter<'error> {
                 AnalysisKind::Usage(target) => {
                     let address = self.memory_top;
                     self.memory_top += 1;
-                    self.insert_entity(*target, Entity::Variable { address, typing: member.typing.clone() });
+                    self.bind_slot(*target, Slot { address, typing: member.typing.clone() });
                     self.emit(Opcode::Store(address), span.clone());
                 }
                 AnalysisKind::Binding(binding) => {
                     if let AnalysisKind::Usage(target) = &binding.target.kind {
                         let address = self.memory_top;
                         self.memory_top += 1;
-                        self.insert_entity(*target, Entity::Variable { address, typing: member.typing.clone() });
+                        self.bind_slot(*target, Slot { address, typing: value_type(&member.typing) });
                         self.emit(Opcode::Store(address), span.clone());
                     }
                 }
@@ -205,146 +198,76 @@ impl<'error> Interpreter<'error> {
             self.walk(*body);
         }
 
-        self.function_frames
-            .insert(address, (memory, self.memory_top - memory));
+        self.function_frames.insert(address, (memory, self.memory_top - memory));
         self.emit(Opcode::Return, span.clone());
-        self.entities = entities;
+        self.slots = slots;
         self.memory_top = memory;
         self.patch(bypass, Opcode::Jump(self.code.len()));
     }
 
-    fn aggregate(&self, typing: &crate::resolver::Type<'error>) -> Option<&Entity<'error>> {
-        let mut current = typing;
-        while let crate::resolver::TypeKind::Pointer { target } = &current.kind {
-            current = target;
-        }
-
-        if let crate::resolver::TypeKind::Structure(aggregate)
-        | crate::resolver::TypeKind::Union(aggregate) = &current.kind
-        {
-            if let Some(entity @ (Entity::Structure { .. } | Entity::Union { .. })) =
-                self.get_entity(&aggregate.target)
-            {
-                return Some(entity);
-            }
-        }
-
-        for (name, entity) in &self.entities {
-            match entity {
-                Entity::Structure { identity, .. } | Entity::Union { identity, .. }
-                if *identity == current.identity =>
-                    {
-                        return Some(entity);
-                    }
-                _ => {}
-            }
-        }
-
-        None
-    }
-
-    fn position(&self, typing: &crate::resolver::Type<'error>, field: &str) -> Option<Index> {
-        match self.aggregate(typing) {
-            Some(Entity::Structure { members, .. }) | Some(Entity::Union { members, .. }) => {
-                members.iter().position(|item| item == field)
-            }
-            _ => None,
+    fn member(&self, typing: &Type<'a>, field: &Str<'a>) -> bool {
+        match &value_type(typing).kind {
+            TypeKind::Pointer { target } => self.member(target, field),
+            TypeKind::Has(target) => member_name(target).is_some_and(|name| &name == field),
+            TypeKind::And(left, right) => self.member(left, field) || self.member(right, field),
+            TypeKind::Structure(aggregate) | TypeKind::Union(aggregate) => aggregate.members.iter().any(|member| {
+                member_name(member).is_some_and(|name| name == *field)
+            }),
+            _ => false,
         }
     }
 
-    fn raw_entity(&self, name: &Str<'error>) -> Option<Entity<'error>> {
-        self.get_entity(name)
-            .cloned()
-            .or_else(|| self.has_module(name).then_some(Entity::Module))
+    fn module(&self, analysis: &Analysis<'a>) -> bool {
+        match &analysis.kind {
+            AnalysisKind::Usage(name) => self.has_module(name),
+            AnalysisKind::Access(left, _) => self.module(left),
+            _ => matches!(analysis.typing.kind, TypeKind::Module(_)),
+        }
     }
 
-    fn symbol(&self, analysis: &Analysis<'error>) -> Option<Str<'error>> {
+    fn call_name(&self, analysis: &Analysis<'a>) -> Option<Str<'a>> {
         match &analysis.kind {
             AnalysisKind::Usage(name) => Some(*name),
-            AnalysisKind::Access(target, member) if self.namespace(target) => match &member.kind {
+            AnalysisKind::Access(target, member) if self.module(target) => match &member.kind {
                 AnalysisKind::Usage(name) => Some(*name),
-                AnalysisKind::Access(_, _) => self.symbol(member),
                 _ => None,
             },
             _ => None,
         }
     }
 
-    fn entity(&self, analysis: &Analysis<'error>) -> Option<Entity<'error>> {
-        self.symbol(analysis)
-            .and_then(|name| self.raw_entity(&name))
-            .filter(|entity| !matches!(entity, Entity::Variable { .. }))
-    }
-
-    fn namespace(&self, analysis: &Analysis<'error>) -> bool {
-        matches!(
-            self.entity(analysis),
-            Some(Entity::Module | Entity::Structure { .. } | Entity::Union { .. })
-        )
-    }
-
-    fn field(&self, target: &Analysis<'error>, field: &Str<'error>) -> Option<Index> {
-        let typing = match &target.kind {
-            AnalysisKind::Usage(name) => self
-                .variable(name)
-                .map(|(_, typing)| typing)
-                .unwrap_or(&target.typing),
-            _ => &target.typing,
-        };
-
-        self.position(typing, field.as_str().unwrap_or_default())
-    }
-
-    fn variable(&self, name: &Str<'error>) -> Option<(Address, &crate::resolver::Type<'error>)> {
-        match self.get_entity(name) {
-            Some(Entity::Variable { address, typing }) => Some((*address, typing)),
-            _ => None,
-        }
-    }
-
-    fn alias(&mut self, target: Str<'error>, value: &Analysis<'error>) -> bool {
-        if let Some(entity) = self.entity(value) {
-            self.insert_entity(target, entity);
-            true
-        } else {
-            false
-        }
-    }
-
-    fn invoke(&mut self, invoke: Invoke<Box<Analysis<'error>>, Analysis<'error>>, span: Span) {
+    fn invoke(&mut self, invoke: Invoke<Box<Analysis<'a>>, Analysis<'a>>, span: Span) {
         let count = invoke.members.len();
+        let typing = invoke.target.typing.clone();
+
         for member in invoke.members {
             self.walk(member);
         }
 
-        match self.entity(invoke.target.as_ref()) {
-            Some(Entity::Foreign(index)) => self.emit(Opcode::CallForeign(index, count), span),
-            Some(Entity::Function(Some(address))) => self.emit(Opcode::Call(address), span),
-            Some(Entity::Function(None)) => {
-                let place = self.code.len();
-                self.emit(Opcode::Call(0), span);
-                if let Some(target) = self.symbol(invoke.target.as_ref()) {
-                    self.calls.push((place, target));
-                } else {
-                    self.patch(place, Opcode::Trap(ErrorKind::MissingSymbol));
+        if let Some(name) = self.call_name(invoke.target.as_ref()) {
+            match self.routine(&name, &typing) {
+                Some(Call::Foreign(index)) => self.emit(Opcode::CallForeign(index, count), span),
+                Some(Call::Local(Some(address))) => self.emit(Opcode::Call(address), span),
+                Some(Call::Local(None)) => {
+                    let place = self.code.len();
+                    self.emit(Opcode::Call(0), span);
+                    self.pending.push((place, name, typing));
                 }
+                None => self.emit(Opcode::Trap(ErrorKind::MissingSymbol), span),
             }
-            None => self.emit(Opcode::Trap(ErrorKind::MissingSymbol), span),
-            _ => self.emit(Opcode::Trap(ErrorKind::InvalidCall), span),
+        } else {
+            self.emit(Opcode::Trap(ErrorKind::InvalidCall), span);
         }
     }
 
-    fn access(
-        &mut self,
-        target: Box<Analysis<'error>>,
-        member: Box<Analysis<'error>>,
-        span: Span,
-    ) {
-        if self.namespace(&target) {
+    fn access(&mut self, target: Box<Analysis<'a>>, member: Box<Analysis<'a>>, span: Span) {
+        if self.module(&target) {
             match member.kind {
                 AnalysisKind::Usage(name) => {
-                    if let Some((address, _)) = self.variable(&name) {
-                        self.emit(Opcode::Load(address), span);
+                    if let Some(slot) = self.slot(&name) {
+                        self.emit(Opcode::Load(slot.address), span);
+                    } else if let Some(value) = self.values.get(&name).cloned() {
+                        self.emit(Opcode::Push(value), span);
                     } else {
                         self.emit(Opcode::Trap(ErrorKind::InvalidAccess), span);
                     }
@@ -356,23 +279,75 @@ impl<'error> Interpreter<'error> {
         }
 
         if let AnalysisKind::Usage(name) = member.kind {
-            let index = self.field(&target, &name);
-
-            self.walk(*target);
-
-            if let Some(index) = index {
-                self.emit(Opcode::ExtractField(index), span);
+            if self.member(&target.typing, &name) {
+                self.walk(*target);
+                self.emit(Opcode::ExtractField(name), span);
             } else {
                 self.emit(Opcode::Trap(ErrorKind::InvalidAccess), span);
             }
         } else {
-            self.walk(*target);
             self.emit(Opcode::Trap(ErrorKind::InvalidAccess), span);
         }
     }
 
-    fn walk(&mut self, node: Analysis<'error>) {
-        let span = node.span;
+    fn shape(&self, typing: &Type<'a>) -> Vec<Str<'a>> {
+        match &value_type(typing).kind {
+            TypeKind::Structure(aggregate) | TypeKind::Union(aggregate) => aggregate
+                .members
+                .iter()
+                .filter_map(member_name)
+                .collect(),
+            _ => Vec::new(),
+        }
+    }
+
+    fn constructor(&mut self, typing: Type<'a>, span: Span, aggregate: crate::data::Aggregate<Str<'a>, Analysis<'a>>) {
+        let identity = value_type(&typing).identity;
+        let layout = self.shape(&typing);
+
+        if layout.is_empty() {
+            let size = aggregate.members.len();
+            for member in aggregate.members {
+                if let AnalysisKind::Assign(_, value) = member.kind {
+                    self.walk(*value);
+                } else {
+                    self.walk(member);
+                }
+            }
+            self.emit(Opcode::MakeStructure(identity, size), span);
+            return;
+        }
+
+        let mut named = std::collections::BTreeMap::new();
+        let mut values = Vec::new();
+
+        for member in aggregate.members {
+            match member.kind {
+                AnalysisKind::Assign(name, value) => {
+                    named.insert(name, *value);
+                }
+                _ => values.push(member),
+            }
+        }
+
+        let size = layout.len();
+        let mut values_iter = values.into_iter();
+
+        for field in layout {
+            if let Some(value) = named.remove(&field) {
+                self.walk(value);
+            } else if let Some(value) = values_iter.next() {
+                self.walk(value);
+            } else {
+                self.emit(Opcode::Push(Value::Empty), span.clone());
+            }
+        }
+
+        self.emit(Opcode::MakeStructure(identity, size), span);
+    }
+
+    fn walk(&mut self, node: Analysis<'a>) {
+        let span = node.span.clone();
         match node.kind {
             AnalysisKind::Integer { value, .. } => self.emit(Opcode::Push(Value::Integer(value as i64)), span),
             AnalysisKind::Float { value, .. } => self.emit(Opcode::Push(Value::Float(f64::from(value))), span),
@@ -391,7 +366,7 @@ impl<'error> Interpreter<'error> {
                 for element in elements {
                     self.walk(element);
                 }
-                self.emit(Opcode::MakeStructure(size), span);
+                self.emit(Opcode::MakeStructure(0, size), span);
             }
             AnalysisKind::Negate(value) => {
                 self.walk(*value);
@@ -573,105 +548,66 @@ impl<'error> Interpreter<'error> {
             }
             AnalysisKind::Binding(binding) => {
                 if let AnalysisKind::Usage(target) = binding.target.kind {
-                    let mut init = false;
-
-                    if let Some(value) = binding.value {
-                        if self.alias(target, &value) {
-                            return;
-                        }
-
-                        self.walk(*value);
-                        init = true;
-                    }
-
                     let address = self.memory_top;
                     self.memory_top += 1;
+                    self.bind_slot(target, Slot { address, typing: value_type(&binding.annotation) });
 
-                    self.insert_entity(
-                        target,
-                        Entity::Variable {
-                            address,
-                            typing: binding.annotation,
-                        },
-                    );
-
-                    if init {
+                    if let Some(value) = binding.value {
+                        self.walk(*value);
                         self.emit(Opcode::Store(address), span);
                     }
                 }
             }
             AnalysisKind::Usage(name) => {
-                if let Some((address, _)) = self.variable(&name) {
-                    self.emit(Opcode::Load(address), span);
+                if let Some(slot) = self.slot(&name) {
+                    self.emit(Opcode::Load(slot.address), span);
+                } else if let Some(value) = self.values.get(&name).cloned() {
+                    self.emit(Opcode::Push(value), span);
                 } else {
                     self.emit(Opcode::Trap(ErrorKind::MissingSymbol), span);
                 }
             }
             AnalysisKind::Assign(name, value) => {
                 self.walk(*value);
-                if let Some((address, _)) = self.variable(&name) {
-                    self.emit(Opcode::Store(address), span);
+                if let Some(slot) = self.slot(&name) {
+                    self.emit(Opcode::Store(slot.address), span);
                 } else {
                     self.emit(Opcode::Trap(ErrorKind::InvalidStore), span);
                 }
             }
-            AnalysisKind::Function(function) => self.define(function, span),
+            AnalysisKind::Function(function) => self.define(function, node.typing, span),
             AnalysisKind::Return(operand) => {
                 if let Some(value) = operand {
                     self.walk(*value);
                 }
                 self.emit(Opcode::Return, span);
             }
-            AnalysisKind::Module(stem, analyses) => self.scope(stem.clone(), Self::generate, analyses),
+            AnalysisKind::Module(stem, analyses) => self.scope(stem, Self::generate, analyses),
             AnalysisKind::Access(left, right) => self.access(left, right, span),
             AnalysisKind::Store(target, value) => {
-                let mut valid = false;
-
-                if let AnalysisKind::Access(left, right) = &target.kind {
-                    if let (AnalysisKind::Usage(variable), AnalysisKind::Usage(field)) = (&left.kind, &right.kind) {
-                        if let (Some((address, _)), Some(index)) = (self.variable(variable), self.position(&left.typing, field.as_str().unwrap_or_default())) {
-                            self.walk(*value);
-                            self.emit(Opcode::StoreField(address, index), span.clone());
-                            valid = true;
+                let valid = match &target.kind {
+                    AnalysisKind::Access(left, right) => match (&left.kind, &right.kind) {
+                        (AnalysisKind::Usage(name), AnalysisKind::Usage(field)) => {
+                            if let Some(address) = self.slot(name).map(|slot| slot.address) {
+                                self.walk(*value);
+                                self.emit(Opcode::StoreField(address, *field), span.clone());
+                                true
+                            } else {
+                                false
+                            }
                         }
-                    }
-                }
+                        _ => false,
+                    },
+                    _ => false,
+                };
 
                 if !valid {
                     self.emit(Opcode::Trap(ErrorKind::InvalidStore), span);
                 }
             }
             AnalysisKind::Structure(_) | AnalysisKind::Union(_) => {}
-            AnalysisKind::Constructor(aggregate) => {
-                let size = aggregate.members.len();
-                for member in aggregate.members {
-                    if let AnalysisKind::Assign(_, value) = member.kind {
-                        self.walk(*value);
-                    } else {
-                        self.walk(member);
-                    }
-                }
-                self.emit(Opcode::MakeStructure(size), span);
-            }
+            AnalysisKind::Constructor(aggregate) => self.constructor(node.typing, span, aggregate),
             _ => self.emit(Opcode::Trap(ErrorKind::InvalidAccess), span),
         }
-    }
-}
-
-impl Interpreter<'_> {
-    fn extract_name<'error>(analysis: &Analysis<'error>) -> Option<Str<'error>> {
-        match &analysis.kind {
-            AnalysisKind::Usage(name) => Some(*name),
-            AnalysisKind::Assign(name, _) => Some(*name),
-            AnalysisKind::Binding(binding) => Self::extract_name(binding.target.as_ref()),
-            AnalysisKind::Function(function) => Some(function.target),
-            AnalysisKind::Structure(structure) => Some(structure.target),
-            AnalysisKind::Union(union) => Some(union.target),
-            _ => None,
-        }
-    }
-
-    fn members(analyses: Vec<Analysis>) -> Vec<Str> {
-        analyses.iter().filter_map(Self::extract_name).collect()
     }
 }
