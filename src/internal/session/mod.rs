@@ -7,7 +7,7 @@ use {
         analyzer::Analyzer,
         combinator::{Action, Operation, Operator},
         data::{
-            memory::{transmute, Arc},
+            memory::{transmute, Arc, PhantomData},
             Identity, Str,
         },
         internal::{
@@ -32,19 +32,37 @@ use crate::{
 use crate::generator::{EmitAction, GenerateAction, RunAction};
 
 pub struct Prepare;
-pub struct Restore {
+pub struct Flow<'source> {
     pub keys: Vec<Identity>,
-}
-pub struct Cache {
-    pub keys: Vec<Identity>,
-}
-pub struct Report {
-    pub keys: Vec<Identity>,
-}
-pub struct Reactive<'source> {
-    pub keys: Vec<Identity>,
+    pub mode: Mode,
+    pub steps: Vec<Step>,
     #[cfg(feature = "interpreter")]
     pub engine: Option<Arc<Lock<Interpreter<'source>>>>,
+    pub phantom: PhantomData<&'source ()>,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub enum Mode {
+    Once,
+    Reactive,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub enum Step {
+    RestoreTokens,
+    RestoreElements,
+    RestoreAnalyses,
+    Scan,
+    Parse,
+    Resolve,
+    Analyze,
+    Interpret,
+    CacheTokens,
+    CacheElements,
+    CacheAnalyses,
+    ReportTokens,
+    ReportElements,
+    ReportAnalyses,
 }
 
 impl<'source>
@@ -74,61 +92,7 @@ Action<
     'static,
     Operator<Arc<Lock<Session<'source>>>>,
     Operation<'source, Arc<Lock<Session<'source>>>>,
-> for Restore
-{
-    fn action(
-        &self,
-        operator: &mut Operator<Arc<Lock<Session<'source>>>>,
-        operation: &mut Operation<'source, Arc<Lock<Session<'source>>>>,
-    ) {
-        let mut session = operator.store.write().unwrap();
-        session.restore_stage(&self.keys);
-        operation.set_resolve(Vec::new());
-    }
-}
-
-impl<'source>
-Action<
-    'static,
-    Operator<Arc<Lock<Session<'source>>>>,
-    Operation<'source, Arc<Lock<Session<'source>>>>,
-> for Cache
-{
-    fn action(
-        &self,
-        operator: &mut Operator<Arc<Lock<Session<'source>>>>,
-        operation: &mut Operation<'source, Arc<Lock<Session<'source>>>>,
-    ) {
-        let mut session = operator.store.write().unwrap();
-        session.cache_stage(&self.keys);
-        operation.set_resolve(Vec::new());
-    }
-}
-
-impl<'source>
-Action<
-    'static,
-    Operator<Arc<Lock<Session<'source>>>>,
-    Operation<'source, Arc<Lock<Session<'source>>>>,
-> for Report
-{
-    fn action(
-        &self,
-        operator: &mut Operator<Arc<Lock<Session<'source>>>>,
-        operation: &mut Operation<'source, Arc<Lock<Session<'source>>>>,
-    ) {
-        let session = operator.store.write().unwrap();
-        session.report_stage(&self.keys);
-        operation.set_resolve(Vec::new());
-    }
-}
-
-impl<'source>
-Action<
-    'static,
-    Operator<Arc<Lock<Session<'source>>>>,
-    Operation<'source, Arc<Lock<Session<'source>>>>,
-> for Reactive<'source>
+> for Flow<'source>
 {
     fn action(
         &self,
@@ -138,8 +102,11 @@ Action<
         let mut session = operator.store.write().unwrap();
         #[cfg(feature = "interpreter")]
         let mut core = self.engine.as_ref().map(|engine| engine.write().unwrap());
-        session.reactive_stage(
+
+        session.drive(
             &self.keys,
+            self.mode,
+            &self.steps,
             #[cfg(feature = "interpreter")]
             core.as_deref_mut(),
         );
@@ -178,6 +145,16 @@ impl<'session> Session<'session> {
         items
     }
 
+    fn all_source_keys(&self) -> Vec<Identity> {
+        let mut keys = self
+            .records
+            .iter()
+            .filter_map(|(&key, record)| (record.kind == RecordKind::Source).then_some(key))
+            .collect::<Vec<_>>();
+        keys.sort();
+        keys
+    }
+
     fn stage_value(&self, stage: u8, key: Identity) -> usize {
         self.pipeline.get(&Self::stage_key(stage, key)).copied().unwrap_or(0)
     }
@@ -187,15 +164,25 @@ impl<'session> Session<'session> {
     }
 
     fn scan_signature(&self, key: Identity) -> usize {
-        self.records.get(&key).map(|record| record.source_version).unwrap_or(0)
+        let mut hasher = DefaultHasher::new();
+
+        if let Some(record) = self.records.get(&key) {
+            record.hash.hash(&mut hasher);
+            record.source_version.hash(&mut hasher);
+        }
+
+        hasher.finish() as usize
     }
 
     fn parse_signature(&self, key: Identity) -> usize {
-        self.records.get(&key).map(|record| record.artifact_version(1)).unwrap_or(0)
-    }
+        let mut hasher = DefaultHasher::new();
 
-    fn analyze_signature(&self, key: Identity) -> usize {
-        self.records.get(&key).map(|record| record.artifact_version(2)).unwrap_or(0)
+        if let Some(record) = self.records.get(&key) {
+            record.hash.hash(&mut hasher);
+            record.artifact_version(1).hash(&mut hasher);
+        }
+
+        hasher.finish() as usize
     }
 
     fn combine_signature(&self, keys: &[Identity], artifact: u8) -> usize {
@@ -203,14 +190,50 @@ impl<'session> Session<'session> {
 
         for key in self.source_keys(keys) {
             key.hash(&mut hasher);
-            self.records
-                .get(&key)
-                .map(|record| record.artifact_version(artifact))
-                .unwrap_or(0)
-                .hash(&mut hasher);
+            if let Some(record) = self.records.get(&key) {
+                record.hash.hash(&mut hasher);
+                record.artifact_version(artifact).hash(&mut hasher);
+            }
         }
 
         hasher.finish() as usize
+    }
+
+    fn step_signature(&self, step: Step, keys: &[Identity]) -> usize {
+        match step {
+            Step::Scan => {
+                let mut hasher = DefaultHasher::new();
+                for key in self.source_keys(keys) {
+                    key.hash(&mut hasher);
+                    self.scan_signature(key).hash(&mut hasher);
+                }
+                hasher.finish() as usize
+            }
+            Step::Parse => {
+                let mut hasher = DefaultHasher::new();
+                for key in self.source_keys(keys) {
+                    key.hash(&mut hasher);
+                    self.parse_signature(key).hash(&mut hasher);
+                }
+                hasher.finish() as usize
+            }
+            Step::Resolve => self.combine_signature(&self.all_source_keys(), 2),
+            Step::Analyze => {
+                let mut hasher = DefaultHasher::new();
+                self.combine_signature(&self.all_source_keys(), 2).hash(&mut hasher);
+                self.stage_value(RESOLVE_STAGE, 0).hash(&mut hasher);
+                hasher.finish() as usize
+            }
+            Step::Interpret => self.combine_signature(&self.all_source_keys(), 3),
+            _ => 0,
+        }
+    }
+
+    fn step_keys(&self, step: Step, keys: &[Identity]) -> Vec<Identity> {
+        match step {
+            Step::Resolve | Step::Analyze | Step::Interpret => self.all_source_keys(),
+            _ => self.source_keys(keys),
+        }
     }
 
     fn restore_tokens(&mut self, keys: &[Identity]) {
@@ -267,32 +290,50 @@ impl<'session> Session<'session> {
         }
     }
 
-    fn store_artifacts(&mut self, keys: &[Identity]) {
+    fn store_tokens(&mut self, keys: &[Identity]) {
         for key in self.source_keys(keys) {
-            let (hash, tokens, elements, analyses) = {
+            let (hash, tokens) = {
                 let record = self.records.get(&key).unwrap();
                 let tokens = match record.fetch(1) {
                     Some(Artifact::Tokens(tokens)) => Some(tokens.clone()),
                     _ => None,
                 };
-                let elements = match record.fetch(2) {
-                    Some(Artifact::Elements(elements)) => Some(elements.clone()),
-                    _ => None,
-                };
-                let analyses = match record.fetch(3) {
-                    Some(Artifact::Analyses(analyses)) => Some(analyses.clone()),
-                    _ => None,
-                };
-                (record.hash, tokens, elements, analyses)
+                (record.hash, tokens)
             };
 
             if let Some(tokens) = tokens {
                 _ = self.cache("tokens", hash, Some(tokens));
             }
+        }
+    }
+
+    fn store_elements(&mut self, keys: &[Identity]) {
+        for key in self.source_keys(keys) {
+            let (hash, elements) = {
+                let record = self.records.get(&key).unwrap();
+                let elements = match record.fetch(2) {
+                    Some(Artifact::Elements(elements)) => Some(elements.clone()),
+                    _ => None,
+                };
+                (record.hash, elements)
+            };
 
             if let Some(elements) = elements {
                 _ = self.cache("elements", hash, Some(elements));
             }
+        }
+    }
+
+    fn store_analyses(&mut self, keys: &[Identity]) {
+        for key in self.source_keys(keys) {
+            let (hash, analyses) = {
+                let record = self.records.get(&key).unwrap();
+                let analyses = match record.fetch(3) {
+                    Some(Artifact::Analyses(analyses)) => Some(analyses.clone()),
+                    _ => None,
+                };
+                (record.hash, analyses)
+            };
 
             if let Some(analyses) = analyses {
                 _ = self.cache("analyses", hash, Some(analyses));
@@ -300,7 +341,7 @@ impl<'session> Session<'session> {
         }
     }
 
-    fn report_artifacts(&self, keys: &[Identity]) {
+    fn report_tokens(&self, keys: &[Identity]) {
         let Some(stencil) = self.get_stencil() else {
             return;
         };
@@ -316,10 +357,40 @@ impl<'session> Session<'session> {
             if let Some(Artifact::Tokens(tokens)) = record.fetch(1) {
                 self.report_section("Tokens", Color::Cyan, tokens.format(stencil.clone()).to_string());
             }
+        }
+    }
+
+    fn report_elements(&self, keys: &[Identity]) {
+        let Some(stencil) = self.get_stencil() else {
+            return;
+        };
+
+        use crate::format::Show;
+        use broccli::Color;
+
+        for key in self.source_keys(keys) {
+            let Some(record) = self.records.get(&key) else {
+                continue;
+            };
 
             if let Some(Artifact::Elements(elements)) = record.fetch(2) {
                 self.report_section("Elements", Color::Cyan, elements.format(stencil.clone()).to_string());
             }
+        }
+    }
+
+    fn report_analyses(&self, keys: &[Identity]) {
+        let Some(stencil) = self.get_stencil() else {
+            return;
+        };
+
+        use crate::format::Show;
+        use broccli::Color;
+
+        for key in self.source_keys(keys) {
+            let Some(record) = self.records.get(&key) else {
+                continue;
+            };
 
             if let Some(Artifact::Analyses(analyses)) = record.fetch(3) {
                 self.report_section("Analysis", Color::Blue, analyses.format(stencil.clone()).to_string());
@@ -327,121 +398,155 @@ impl<'session> Session<'session> {
         }
     }
 
-    fn scan_changed(&mut self, keys: &[Identity]) -> bool {
-        let mut changed = false;
-
-        for key in self.source_keys(keys) {
-            let signature = self.scan_signature(key);
-            if self.stage_value(SCAN_STAGE, key) == signature && self.records.get(&key).unwrap().fetch(1).is_some() {
-                continue;
+    fn apply(
+        &mut self,
+        step: Step,
+        keys: &[Identity],
+        #[cfg(feature = "interpreter")]
+        mut core: Option<&mut Interpreter<'session>>,
+    ) -> bool {
+        match step {
+            Step::RestoreTokens => {
+                self.restore_tokens(keys);
+                false
             }
-
-            let before = self.records.get(&key).map(|record| record.artifact_version(1)).unwrap_or(0);
-            Scanner::execute(self, &[key]);
-            let after = self.records.get(&key).map(|record| record.artifact_version(1)).unwrap_or(0);
-            self.set_stage(SCAN_STAGE, key, signature);
-            changed |= before != after;
-        }
-
-        changed
-    }
-
-    fn parse_changed(&mut self, keys: &[Identity]) -> bool {
-        let mut changed = false;
-
-        for key in self.source_keys(keys) {
-            let signature = self.parse_signature(key);
-            if self.stage_value(PARSE_STAGE, key) == signature && self.records.get(&key).unwrap().fetch(2).is_some() {
-                continue;
+            Step::RestoreElements => {
+                self.restore_elements(keys);
+                false
             }
-
-            let before = self.records.get(&key).map(|record| record.artifact_version(2)).unwrap_or(0);
-            Parser::execute(self, &[key]);
-            let after = self.records.get(&key).map(|record| record.artifact_version(2)).unwrap_or(0);
-            self.set_stage(PARSE_STAGE, key, signature);
-            changed |= before != after;
-        }
-
-        changed
-    }
-
-    fn resolve_changed(&mut self, keys: &[Identity]) -> bool {
-        let signature = self.combine_signature(keys, 2);
-
-        if self.stage_value(RESOLVE_STAGE, 0) == signature {
-            return false;
-        }
-
-        let before = self.resolver.registry.len();
-        Resolver::execute(self, &self.source_keys(keys));
-        let after = self.resolver.registry.len();
-        self.set_stage(RESOLVE_STAGE, 0, signature);
-        before != after || signature != 0
-    }
-
-    fn analyze_changed(&mut self, keys: &[Identity]) -> bool {
-        let mut changed = false;
-
-        for key in self.source_keys(keys) {
-            let signature = self.analyze_signature(key);
-            if self.stage_value(ANALYZE_STAGE, key) == signature && self.records.get(&key).unwrap().fetch(3).is_some() {
-                continue;
+            Step::RestoreAnalyses => {
+                self.restore_analyses(keys);
+                false
             }
-
-            let before = self.records.get(&key).map(|record| record.artifact_version(3)).unwrap_or(0);
-            Analyzer::execute(self, &[key]);
-            let after = self.records.get(&key).map(|record| record.artifact_version(3)).unwrap_or(0);
-            self.set_stage(ANALYZE_STAGE, key, signature);
-            changed |= before != after;
+            Step::Scan => {
+                let mut changed = false;
+                for key in self.step_keys(step, keys) {
+                    let signature = self.scan_signature(key);
+                    if self.stage_value(SCAN_STAGE, key) == signature
+                        && self.records.get(&key).unwrap().fetch(1).is_some()
+                    {
+                        continue;
+                    }
+                    let before = self.records.get(&key).map(|record| record.artifact_version(1)).unwrap_or(0);
+                    Scanner::execute(self, &[key]);
+                    let after = self.records.get(&key).map(|record| record.artifact_version(1)).unwrap_or(0);
+                    self.set_stage(SCAN_STAGE, key, signature);
+                    changed |= before != after;
+                }
+                changed
+            }
+            Step::Parse => {
+                let mut changed = false;
+                for key in self.step_keys(step, keys) {
+                    let signature = self.parse_signature(key);
+                    if self.stage_value(PARSE_STAGE, key) == signature
+                        && self.records.get(&key).unwrap().fetch(2).is_some()
+                    {
+                        continue;
+                    }
+                    let before = self.records.get(&key).map(|record| record.artifact_version(2)).unwrap_or(0);
+                    Parser::execute(self, &[key]);
+                    let after = self.records.get(&key).map(|record| record.artifact_version(2)).unwrap_or(0);
+                    self.set_stage(PARSE_STAGE, key, signature);
+                    changed |= before != after;
+                }
+                changed
+            }
+            Step::Resolve => {
+                let stage = RESOLVE_STAGE;
+                let signature = self.step_signature(step, keys);
+                if self.stage_value(stage, 0) == signature {
+                    return false;
+                }
+                let before = self.resolver.registry.len();
+                let targets = self.step_keys(step, keys);
+                Resolver::execute(self, &targets);
+                let after = self.resolver.registry.len();
+                self.set_stage(stage, 0, signature);
+                before != after
+            }
+            Step::Analyze => {
+                let targets = self.step_keys(step, keys);
+                let signature = self.step_signature(step, keys);
+                if self.stage_value(ANALYZE_STAGE, 0) == signature
+                    && targets.iter().all(|key| self.records.get(key).unwrap().fetch(3).is_some())
+                {
+                    return false;
+                }
+                let before = targets
+                    .iter()
+                    .map(|key| self.records.get(key).map(|record| record.artifact_version(3)).unwrap_or(0))
+                    .sum::<usize>();
+                Analyzer::execute(self, &targets);
+                let after = targets
+                    .iter()
+                    .map(|key| self.records.get(key).map(|record| record.artifact_version(3)).unwrap_or(0))
+                    .sum::<usize>();
+                self.set_stage(ANALYZE_STAGE, 0, signature);
+                before != after
+            }
+            Step::Interpret => {
+                #[cfg(feature = "interpreter")]
+                {
+                    let signature = self.step_signature(step, keys);
+                    if self.stage_value(INTERPRET_STAGE, 0) == signature {
+                        return false;
+                    }
+                    if let Some(core) = core.as_mut() {
+                        core.reset();
+                        let targets = self.step_keys(step, keys);
+                        Interpreter::process(self, core, &targets);
+                        self.set_stage(INTERPRET_STAGE, 0, signature);
+                        return true;
+                    }
+                }
+                false
+            }
+            Step::CacheTokens | Step::CacheElements | Step::CacheAnalyses => {
+                match step {
+                    Step::CacheTokens => self.store_tokens(keys),
+                    Step::CacheElements => self.store_elements(keys),
+                    Step::CacheAnalyses => self.store_analyses(keys),
+                    _ => {}
+                }
+                false
+            }
+            Step::ReportTokens | Step::ReportElements | Step::ReportAnalyses => {
+                match step {
+                    Step::ReportTokens => self.report_tokens(keys),
+                    Step::ReportElements => self.report_elements(keys),
+                    Step::ReportAnalyses => self.report_analyses(keys),
+                    _ => {}
+                }
+                false
+            }
         }
-
-        changed
     }
 
-    fn restore_stage(&mut self, keys: &[Identity]) {
-        self.restore_tokens(keys);
-        self.restore_elements(keys);
-        self.restore_analyses(keys);
-    }
-
-    fn reactive_stage(
+    pub fn drive(
         &mut self,
         keys: &[Identity],
+        mode: Mode,
+        steps: &[Step],
         #[cfg(feature = "interpreter")]
         mut core: Option<&mut Interpreter<'session>>,
     ) {
         loop {
             let mut changed = false;
 
-            changed |= self.scan_changed(keys);
-            changed |= self.parse_changed(keys);
-            changed |= self.resolve_changed(keys);
-            changed |= self.analyze_changed(keys);
-
-            #[cfg(feature = "interpreter")]
-            if let Some(core) = core.as_mut() {
-                let signature = self.combine_signature(keys, 3);
-
-                if self.stage_value(INTERPRET_STAGE, 0) != signature {
-                    core.reset();
-                    Interpreter::process(self, core, keys);
-                    self.set_stage(INTERPRET_STAGE, 0, signature);
-                    changed = true;
-                }
+            for step in steps {
+                changed |= self.apply(
+                    *step,
+                    keys,
+                    #[cfg(feature = "interpreter")]
+                    core.as_deref_mut(),
+                );
             }
 
-            if !changed {
+            if mode != Mode::Reactive || !changed {
                 break;
             }
         }
-    }
-
-    fn cache_stage(&mut self, keys: &[Identity]) {
-        self.store_artifacts(keys);
-    }
-
-    fn report_stage(&self, keys: &[Identity]) {
-        self.report_artifacts(keys);
     }
 
     fn decode<T: Deserialize<'session>>(bytes: &'session [u8]) -> Option<T> {
@@ -707,16 +812,40 @@ impl<'session> Session<'session> {
         #[cfg(feature = "interpreter")]
         engine: Option<Arc<Lock<Interpreter<'session>>>>,
     ) -> Operation<'session, Arc<Lock<Session<'session>>>> {
-        let mut states = vec![
+        let states = vec![
             Operation::new(Arc::new(Prepare)),
-            Operation::new(Arc::new(Restore { keys: keys.clone() })),
-            Operation::new(Arc::new(Reactive {
+            Operation::new(Arc::new(Flow {
                 keys: keys.clone(),
+                mode: Mode::Once,
+                steps: vec![Step::RestoreTokens, Step::RestoreElements, Step::RestoreAnalyses],
+                #[cfg(feature = "interpreter")]
+                engine: engine.clone(),
+                phantom: PhantomData,
+            })),
+            Operation::new(Arc::new(Flow {
+                keys: keys.clone(),
+                mode: Mode::Reactive,
+                steps: vec![Step::Scan, Step::Parse, Step::Resolve, Step::Analyze, Step::Interpret],
+                #[cfg(feature = "interpreter")]
+                engine: engine.clone(),
+                phantom: PhantomData,
+            })),
+            Operation::new(Arc::new(Flow {
+                keys: keys.clone(),
+                mode: Mode::Once,
+                steps: vec![Step::CacheTokens, Step::CacheElements, Step::CacheAnalyses],
+                #[cfg(feature = "interpreter")]
+                engine: engine.clone(),
+                phantom: PhantomData,
+            })),
+            Operation::new(Arc::new(Flow {
+                keys,
+                mode: Mode::Once,
+                steps: vec![Step::ReportTokens, Step::ReportElements, Step::ReportAnalyses],
                 #[cfg(feature = "interpreter")]
                 engine,
+                phantom: PhantomData,
             })),
-            Operation::new(Arc::new(Cache { keys: keys.clone() })),
-            Operation::new(Arc::new(Report { keys })),
         ];
 
         #[cfg(feature = "generator")]

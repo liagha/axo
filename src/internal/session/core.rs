@@ -294,10 +294,36 @@ impl<'session> Session<'session> {
             return;
         }
 
-        session.restore_stage(keys);
-        session.reactive_stage(keys, Some(core));
-        session.cache_stage(keys);
-        session.report_stage(keys);
+        session.drive(
+            keys,
+            super::Mode::Once,
+            &[super::Step::RestoreTokens, super::Step::RestoreElements, super::Step::RestoreAnalyses],
+            Some(core),
+        );
+        session.drive(
+            keys,
+            super::Mode::Reactive,
+            &[
+                super::Step::Scan,
+                super::Step::Parse,
+                super::Step::Resolve,
+                super::Step::Analyze,
+                super::Step::Interpret,
+            ],
+            Some(core),
+        );
+        session.drive(
+            keys,
+            super::Mode::Once,
+            &[super::Step::CacheTokens, super::Step::CacheElements, super::Step::CacheAnalyses],
+            Some(core),
+        );
+        session.drive(
+            keys,
+            super::Mode::Once,
+            &[super::Step::ReportTokens, super::Step::ReportElements, super::Step::ReportAnalyses],
+            Some(core),
+        );
         session.report_all();
     }
 

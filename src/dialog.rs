@@ -11,6 +11,21 @@ use crate::{
     parser::Symbol,
     tracker::Location,
 };
+#[cfg(unix)]
+use std::io::IsTerminal;
+
+fn keep(session: &Session, identity: usize) -> bool {
+    let Some(record) = session.records.get(&identity) else {
+        return false;
+    };
+
+    match record.fetch(2) {
+        Some(crate::internal::Artifact::Elements(elements)) => {
+            !elements.is_empty() && elements.iter().all(|element| element.kind.is_symbolize())
+        }
+        _ => false,
+    }
+}
 
 pub struct Dialog {
     pub history: Vec<String>,
@@ -25,6 +40,26 @@ impl Dialog {
 
     #[cfg(unix)]
     pub fn read(&mut self, prompt: &str) -> Option<String> {
+        if !stdin().is_terminal() {
+            print!("{}", prompt);
+            let _ = stdout().flush();
+
+            let mut input = String::new();
+            if stdin().read_line(&mut input).ok()? == 0 {
+                return None;
+            }
+
+            while input.ends_with('\n') || input.ends_with('\r') {
+                input.pop();
+            }
+
+            if !input.trim().is_empty() {
+                self.history.push(input.clone());
+            }
+
+            return Some(input);
+        }
+
         let _ = Command::new("stty").args(["raw", "-echo"]).status();
 
         let mut input = stdin();
@@ -208,6 +243,7 @@ pub fn start(bare: bool, directives: Vec<Symbol>, flag: Str) {
         session.records.insert(identity, record);
 
         Session::execute(&mut session, &mut core, &[identity]);
+        let stay = session.errors.is_empty() && keep(&session, identity);
 
         if session.errors.is_empty() {
             if let Some(result) = core.extract() {
@@ -215,6 +251,10 @@ pub fn start(bare: bool, directives: Vec<Symbol>, flag: Str) {
                     println!("{:?}", result);
                 }
             }
+        }
+
+        if !stay {
+            session.records.remove(&identity);
         }
     }
 }

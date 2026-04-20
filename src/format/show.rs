@@ -2,12 +2,12 @@ use crate::{data::Str, format::Stencil, internal::hash::Set};
 
 pub trait Show<'show> {
     fn format(&self, config: Stencil) -> Stencil;
+
     fn indent(&self, stencil: Stencil) -> Str<'show> {
         Str::from(
             self.format(stencil)
                 .to_string()
                 .lines()
-                .into_iter()
                 .map(|line| format!("    {}", line))
                 .collect::<Vec<_>>()
                 .join("\n"),
@@ -41,10 +41,17 @@ impl<'show, Item: Show<'show>> Show<'show> for [Item] {
         if self.is_empty() {
             return Stencil::from("[]");
         }
+
         let mut stencil = config.clone();
+        stencil.name = String::new();
+        stencil.variant = None;
+        stencil.open = "[".to_string();
+        stencil.close = "]".to_string();
+
         for item in self {
             stencil = stencil.field("", item.format(config.clone()));
         }
+
         stencil
     }
 }
@@ -57,7 +64,8 @@ impl<'show, Item: Show<'show>> Show<'show> for Vec<Item> {
 
 impl<'show, Item: Show<'show>> Show<'show> for Set<Item> {
     fn format(&self, config: Stencil) -> Stencil {
-        self.iter().collect::<Vec<&Item>>().format(config)
+        let items: Vec<&Item> = self.iter().collect();
+        items.format(config)
     }
 }
 

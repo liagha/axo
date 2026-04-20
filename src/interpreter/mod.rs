@@ -204,7 +204,7 @@ impl<'source> Interpreter<'source> {
             }
 
             let stem = Str::from(stem.to_string());
-            core.modules.insert(stem, analyses);
+            core.modules.entry(stem).or_default().extend(analyses);
         }
 
         core.compile();

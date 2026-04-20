@@ -1,6 +1,6 @@
 use crate::{
     data::Str,
-    format::{Display, Formatter, Result as FormatResult},
+    format::{Display, Formatter, Result},
 };
 
 #[derive(Clone)]
@@ -27,26 +27,7 @@ pub struct Stencil {
 
 impl Default for Stencil {
     fn default() -> Self {
-        Self {
-            name: String::new(),
-            variant: None,
-            fields: Vec::new(),
-            open: "(".to_string(),
-            close: ")".to_string(),
-            separator: ", ".to_string(),
-            variant_separator: ".".to_string(),
-            maximum: 200,
-            indent: 4,
-            show_head: false,
-            show_variant: true,
-            show_name: true,
-            inline: false,
-            block: false,
-            trailing: false,
-            space: false,
-            fold: false,
-            text: None,
-        }
+        Self::simple()
     }
 }
 
@@ -71,6 +52,39 @@ impl Stencil {
             space: self.space,
             fold: self.fold,
             text: None,
+        }
+    }
+
+    pub fn debug() -> Self {
+        Self {
+            name: String::new(),
+            variant: None,
+            fields: Vec::new(),
+            open: "(".to_string(),
+            close: ")".to_string(),
+            separator: ", ".to_string(),
+            variant_separator: ".".to_string(),
+            maximum: 200,
+            indent: 4,
+            show_head: true,
+            show_variant: true,
+            show_name: true,
+            inline: false,
+            block: false,
+            trailing: false,
+            space: false,
+            fold: false,
+            text: None,
+        }
+
+    }
+
+    pub fn simple() -> Self {
+        Self {
+            show_head: false,
+            show_name: false,
+            fold: true,
+            ..Self::debug()
         }
     }
 
@@ -109,8 +123,19 @@ impl Stencil {
             return self.fields[0].1.build(depth);
         }
 
+        let mut active_fields = self.fields.clone();
+
+        if self.fold && active_fields.len() == 1 {
+            let inner = &active_fields[0].1;
+            let inner_shows_head = inner.show_head && !inner.name.is_empty();
+
+            if inner.variant.is_none() && inner.text.is_none() && !inner_shows_head {
+                active_fields = inner.fields.clone();
+            }
+        }
+
         let mut head = String::new();
-        if self.show_head {
+        if self.show_head && !self.name.is_empty() {
             head.push_str(&self.name);
         }
 
@@ -123,11 +148,12 @@ impl Stencil {
             }
         }
 
-        let show_delimiters = !head.is_empty() || self.fields.len() != 1;
+        let show_delimiters = !head.is_empty() || active_fields.len() != 1 || self.name.is_empty();
         let child_depth = if show_delimiters { depth + 1 } else { depth };
 
         let mut items = Vec::new();
-        for (key, val) in &self.fields {
+
+        for (key, val) in &active_fields {
             let out = val.build(child_depth);
             if self.show_name && !key.is_empty() {
                 items.push(format!("{}: {}", key, out));
@@ -165,7 +191,7 @@ impl Stencil {
         }
 
         let pad = " ".repeat(depth * self.indent);
-        let inner = " ".repeat(child_depth * self.indent);
+        let inner_pad = " ".repeat(child_depth * self.indent);
         let mut tree = head;
 
         if !self.open.is_empty() {
@@ -176,7 +202,7 @@ impl Stencil {
         }
         tree.push('\n');
 
-        let mut current_line = inner.clone();
+        let mut current_line = inner_pad.clone();
 
         for (i, item) in items.iter().enumerate() {
             let mut chunk = String::new();
@@ -188,10 +214,10 @@ impl Stencil {
             let is_multiline = item.contains('\n');
             let exceeds_max = current_line.len() + chunk.len() > self.maximum;
 
-            if (is_multiline || exceeds_max) && current_line.len() > inner.len() {
+            if (is_multiline || exceeds_max) && current_line.len() > inner_pad.len() {
                 tree.push_str(&current_line);
                 tree.push('\n');
-                current_line = inner.clone();
+                current_line = inner_pad.clone();
             }
 
             current_line.push_str(&chunk);
@@ -199,11 +225,11 @@ impl Stencil {
             if is_multiline {
                 tree.push_str(&current_line);
                 tree.push('\n');
-                current_line = inner.clone();
+                current_line = inner_pad.clone();
             }
         }
 
-        if current_line.len() > inner.len() {
+        if current_line.len() > inner_pad.len() {
             tree.push_str(&current_line);
             tree.push('\n');
         }
@@ -232,7 +258,7 @@ impl From<String> for Stencil {
 }
 
 impl Display for Stencil {
-    fn fmt(&self, f: &mut Formatter<'_>) -> FormatResult {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         write!(f, "{}", self.format())
     }
 }

@@ -5,7 +5,10 @@ use crate::{
 
 impl<'analysis> Show<'analysis> for Analysis<'analysis> {
     fn format(&self, config: Stencil) -> Stencil {
-        self.kind.format(config)
+        config
+            .clone()
+            .new("Analysis")
+            .field("kind", self.kind.format(config.clone()))
     }
 }
 
@@ -116,8 +119,12 @@ impl<'analysis> Show<'analysis> for AnalysisKind<'analysis> {
             AnalysisKind::Dereference(value) => base
                 .variant("Dereference")
                 .field("target", value.format(config.clone())),
-            AnalysisKind::Index(index) => index.format(config.clone()),
-            AnalysisKind::Invoke(invoke) => invoke.format(config.clone()),
+            AnalysisKind::Index(index) => base
+                .variant("Index")
+                .field("value", index.format(config.clone())),
+            AnalysisKind::Invoke(invoke) => base
+                .variant("Invoke")
+                .field("value", invoke.format(config.clone())),
             AnalysisKind::Block(block) => base
                 .variant("Block")
                 .field("statements", block.format(config.clone())),
@@ -158,7 +165,9 @@ impl<'analysis> Show<'analysis> for AnalysisKind<'analysis> {
                 .variant("Access")
                 .field("target", target.format(config.clone()))
                 .field("value", value.format(config.clone())),
-            AnalysisKind::Constructor(constructor) => constructor.format(config.clone()),
+            AnalysisKind::Constructor(constructor) => base
+                .variant("Constructor")
+                .field("value", constructor.format(config.clone())),
             AnalysisKind::Assign(target, value) => base
                 .variant("Assign")
                 .field("target", target.format(config.clone()))
@@ -167,14 +176,18 @@ impl<'analysis> Show<'analysis> for AnalysisKind<'analysis> {
                 .variant("Store")
                 .field("target", target.format(config.clone()))
                 .field("value", value.format(config.clone())),
-            AnalysisKind::Binding(binding) => binding.format(config.clone()),
+            AnalysisKind::Binding(binding) => base
+                .variant("Binding")
+                .field("value", binding.format(config.clone())),
             AnalysisKind::Structure(structure) => base
                 .variant("Structure")
-                .field("structure", structure.format(config.clone())),
+                .field("value", structure.format(config.clone())),
             AnalysisKind::Union(union) => base
                 .variant("Union")
-                .field("union", union.format(config.clone())),
-            AnalysisKind::Function(function) => function.format(config.clone()),
+                .field("value", union.format(config.clone())),
+            AnalysisKind::Function(function) => base
+                .variant("Function")
+                .field("value", function.format(config.clone())),
             AnalysisKind::Module(name, members) => base
                 .variant("Module")
                 .field("name", name.format(config.clone()))

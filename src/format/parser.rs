@@ -5,23 +5,39 @@ use crate::{
 
 impl<'element> Show<'element> for Element<'element> {
     fn format(&self, config: Stencil) -> Stencil {
-        self.kind.format(config)
+        config
+            .clone()
+            .new("Element")
+            .field("kind", self.kind.format(config.clone()))
     }
 }
 
 impl<'element> Show<'element> for ElementKind<'element> {
     fn format(&self, config: Stencil) -> Stencil {
+        let base = config.clone().new("ElementKind");
         match self {
-            ElementKind::Literal(literal) => literal.format(config),
-            ElementKind::Delimited(delimited) => delimited.format(config),
-            ElementKind::Binary(binary) => binary.format(config),
-            ElementKind::Unary(unary) => unary.format(config),
-            ElementKind::Index(index) => index.format(config),
-            ElementKind::Invoke(invoke) => invoke.format(config),
-            ElementKind::Symbolize(symbol) => symbol.format(config),
-            ElementKind::Construct(construct) => config
-                .clone()
-                .new("ElementKind")
+            ElementKind::Literal(literal) => base
+                .variant("Literal")
+                .field("value", literal.format(config.clone())),
+            ElementKind::Delimited(delimited) => base
+                .variant("Delimited")
+                .field("value", delimited.format(config.clone())),
+            ElementKind::Binary(binary) => base
+                .variant("Binary")
+                .field("value", binary.format(config.clone())),
+            ElementKind::Unary(unary) => base
+                .variant("Unary")
+                .field("value", unary.format(config.clone())),
+            ElementKind::Index(index) => base
+                .variant("Index")
+                .field("value", index.format(config.clone())),
+            ElementKind::Invoke(invoke) => base
+                .variant("Invoke")
+                .field("value", invoke.format(config.clone())),
+            ElementKind::Symbolize(symbol) => base
+                .variant("Symbolize")
+                .field("value", symbol.format(config.clone())),
+            ElementKind::Construct(construct) => base
                 .variant("Construct")
                 .field("value", construct.format(config.clone())),
         }
@@ -39,32 +55,23 @@ impl<'symbol> Show<'symbol> for Symbol<'symbol> {
 
 impl<'symbol> Show<'symbol> for SymbolKind<'symbol> {
     fn format(&self, config: Stencil) -> Stencil {
+        let base = config.clone().new("SymbolKind");
         match self {
-            SymbolKind::Binding(binding) => config
-                .clone()
-                .new("SymbolKind")
+            SymbolKind::Binding(binding) => base
                 .variant("Binding")
-                .field("binding", binding.format(config.clone())),
-            SymbolKind::Function(function) => config
-                .clone()
-                .new("SymbolKind")
+                .field("value", binding.format(config.clone())),
+            SymbolKind::Function(function) => base
                 .variant("Function")
-                .field("function", function.format(config.clone())),
-            SymbolKind::Module(module) => config
-                .clone()
-                .new("SymbolKind")
+                .field("value", function.format(config.clone())),
+            SymbolKind::Module(module) => base
                 .variant("Module")
-                .field("module", module.format(config.clone())),
-            SymbolKind::Structure(structure) => config
-                .clone()
-                .new("SymbolKind")
+                .field("value", module.format(config.clone())),
+            SymbolKind::Structure(structure) => base
                 .variant("Structure")
-                .field("structure", structure.format(config.clone())),
-            SymbolKind::Union(union) => config
-                .clone()
-                .new("SymbolKind")
+                .field("value", structure.format(config.clone())),
+            SymbolKind::Union(union) => base
                 .variant("Union")
-                .field("union", union.format(config.clone())),
+                .field("value", union.format(config.clone())),
         }
     }
 }
