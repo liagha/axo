@@ -43,7 +43,7 @@ pub enum Value {
 }
 
 #[derive(Clone, Debug)]
-pub enum Opcode<'a> {
+pub enum Opcode {
     Push(Value),
     Pop,
     Add,
@@ -73,21 +73,21 @@ pub enum Opcode<'a> {
     JumpFalse(Address),
     Load(Address),
     Store(Address),
-    StoreField(Address, Str<'a>),
+    StoreField(Address, Index),
     Call(Address),
     CallForeign(Index, Scale),
     Return,
     Halt,
     MakeSequence(Scale),
     MakeStructure(Identity, Scale),
-    ExtractField(Str<'a>),
+    ExtractField(Index),
     Index,
     Trap(ErrorKind),
 }
 
 #[derive(Clone, Debug)]
-pub struct Instruction<'a> {
-    pub opcode: Opcode<'a>,
+pub struct Instruction {
+    pub opcode: Opcode,
     pub span: Span,
 }
 
@@ -114,16 +114,15 @@ pub struct Interpreter<'a> {
     pub stack: Vec<Value>,
     pub frames: Vec<Frame>,
     pub memory: Vec<Value>,
-    pub code: Vec<Instruction<'a>>,
+    pub code: Vec<Instruction>,
     pub foreign: Vec<Foreign<'a>>,
     pub slots: Map<Str<'a>, Slot<'a>>,
-    pub calls: Map<Str<'a>, Vec<(Type<'a>, Call)>>,
-    pub shapes: Map<Identity, Vec<Str<'a>>>,
+    pub calls: Map<Identity, Vec<(Type<'a>, Call)>>,
     pub values: Map<Str<'a>, Value>,
     pub function_frames: Map<Address, (Address, Scale)>,
     pub modules: Map<Str<'a>, Vec<Analysis<'a>>>,
     pub current_module: Str<'a>,
-    pub pending: Vec<(Address, Str<'a>, Type<'a>)>,
+    pub pending: Vec<(Address, Identity, Type<'a>)>,
     pub loops: Vec<(Address, Vec<Address>)>,
     pub memory_top: Address,
     pub pointer: Address,
@@ -140,7 +139,6 @@ impl<'a> Interpreter<'a> {
             foreign: Vec::new(),
             slots: Map::new(),
             calls: Map::new(),
-            shapes: Map::new(),
             values: Map::new(),
             function_frames: Map::new(),
             modules: Map::new(),
@@ -183,7 +181,6 @@ impl<'a> Interpreter<'a> {
         self.memory.fill(Value::Empty);
         self.code.clear();
         self.slots.clear();
-        self.shapes.clear();
         self.values.clear();
         self.function_frames.clear();
         self.modules.clear();
@@ -198,12 +195,12 @@ impl<'a> Interpreter<'a> {
         });
     }
 
-    pub fn register_call(&mut self, name: Str<'a>, typing: Type<'a>, call: Call) {
-        self.calls.entry(name).or_default().push((typing, call));
+    pub fn register_call(&mut self, identity: Identity, typing: Type<'a>, call: Call) {
+        self.calls.entry(identity).or_default().push((typing, call));
     }
 
-    pub fn set_call(&mut self, name: Str<'a>, typing: &Type<'a>, address: Address) {
-        if let Some(items) = self.calls.get_mut(&name) {
+    pub fn set_call(&mut self, identity: Identity, typing: &Type<'a>, address: Address) {
+        if let Some(items) = self.calls.get_mut(&identity) {
             for (item, call) in items {
                 if item == typing {
                     *call = Call::Local(Some(address));
@@ -213,21 +210,14 @@ impl<'a> Interpreter<'a> {
         }
     }
 
-    pub fn routine(&self, name: &Str<'a>, typing: &Type<'a>) -> Option<Call> {
-        let items = self.calls.get(name)?;
+    pub fn routine(&self, identity: Identity, typing: &Type<'a>) -> Option<Call> {
+        let items = self.calls.get(&identity)?;
 
         items
             .iter()
             .find(|(item, _)| item == typing)
             .or_else(|| (items.len() == 1).then_some(&items[0]))
             .map(|(_, call)| call.clone())
-    }
-
-    pub fn field(&self, identity: Identity, name: &Str<'a>) -> Option<Index> {
-        self.shapes
-            .get(&identity)?
-            .iter()
-            .position(|item| item == name)
     }
 
     pub fn run(&mut self) -> Result<(), InterpretError<'a>> {
@@ -705,27 +695,20 @@ impl<'a> Interpreter<'a> {
         Ok(())
     }
 
-    fn store_field(&mut self, address: Address, field: Str<'a>) -> Result<(), InterpretError<'a>> {
+    fn store_field(&mut self, address: Address, field: Index) -> Result<(), InterpretError<'a>> {
         let span = self.current();
         if address >= self.memory.len() {
             return Err(self.error(ErrorKind::MemoryAccessViolation, span));
         }
         let value = self.stack.pop().ok_or_else(|| self.error(ErrorKind::StackUnderflow, span))?;
-        let identity = match &self.memory[address] {
-            Value::Structure(identity, _) => *identity,
-            _ => return Err(self.error(ErrorKind::TypeMismatch, span)),
-        };
-
-        let index = self
-            .field(identity, &field)
-            .ok_or_else(|| self.error(ErrorKind::InvalidAccess, span))?;
-
         if let Value::Structure(_, fields) = &mut self.memory[address] {
-            if index >= fields.len() {
+            if field >= fields.len() {
                 return Err(self.error(ErrorKind::OutOfBounds, span));
             }
 
-            fields[index] = value;
+            fields[field] = value;
+        } else {
+            return Err(self.error(ErrorKind::TypeMismatch, span));
         }
         Ok(())
     }
@@ -820,17 +803,13 @@ impl<'a> Interpreter<'a> {
         Ok(())
     }
 
-    fn extract_field(&mut self, field: Str<'a>) -> Result<(), InterpretError<'a>> {
+    fn extract_field(&mut self, field: Index) -> Result<(), InterpretError<'a>> {
         let span = self.current();
         let target = self.stack.pop().ok_or_else(|| self.error(ErrorKind::StackUnderflow, span))?;
 
         match target {
-            Value::Structure(identity, fields) => {
-                let index = self
-                    .field(identity, &field)
-                    .ok_or_else(|| self.error(ErrorKind::InvalidAccess, span))?;
-
-                let value = fields.get(index).ok_or_else(|| self.error(ErrorKind::OutOfBounds, span))?.clone();
+            Value::Structure(_, fields) => {
+                let value = fields.get(field).ok_or_else(|| self.error(ErrorKind::OutOfBounds, span))?.clone();
                 self.stack.push(value);
             }
             _ => return Err(self.error(ErrorKind::TypeMismatch, span)),

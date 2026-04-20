@@ -33,15 +33,15 @@ fn member_name<'a>(typing: &Type<'a>) -> Option<Str<'a>> {
 }
 
 impl<'a> Interpreter<'a> {
-    pub fn native(&mut self, name: &str, typing: Type<'a>, index: usize) {
-        self.register_call(Str::from(name.to_string()), typing, Call::Foreign(index));
+    pub fn native(&mut self, typing: Type<'a>, index: usize) {
+        self.register_call(typing.identity, typing, Call::Foreign(index));
     }
 
-    fn emit(&mut self, opcode: Opcode<'a>, span: Span) {
+    fn emit(&mut self, opcode: Opcode, span: Span) {
         self.code.push(Instruction { opcode, span });
     }
 
-    fn patch(&mut self, index: usize, opcode: Opcode<'a>) {
+    fn patch(&mut self, index: usize, opcode: Opcode) {
         self.code[index].opcode = opcode;
     }
 
@@ -68,18 +68,20 @@ impl<'a> Interpreter<'a> {
             self.generate(analyses);
         }
 
-        let main = Str::from("main".to_string());
-        let typing = self
-            .calls
-            .get(&main)
-            .and_then(|items| items.first())
-            .map(|(typing, _)| typing.clone());
+        let entry = self.calls.iter().find_map(|(&identity, items)| {
+            items.first().and_then(|(typing, _)| match &typing.kind {
+                TypeKind::Function(function) if function.target == Str::from("main".to_string()) => {
+                    Some((identity, typing.clone()))
+                }
+                _ => None,
+            })
+        });
 
-        if let Some(typing) = typing {
+        if let Some((identity, typing)) = entry {
             if let Some(span) = self.code.last().map(|instruction| instruction.span.clone()) {
                 let place = self.code.len();
                 self.emit(Opcode::Call(0), span);
-                self.pending.push((place, main, typing));
+                self.pending.push((place, identity, typing));
             }
         }
 
@@ -106,11 +108,11 @@ impl<'a> Interpreter<'a> {
     fn finish_calls(&mut self) {
         let pending = take(&mut self.pending);
 
-        for (index, name, typing) in pending {
-            match self.routine(&name, &typing) {
+        for (index, identity, typing) in pending {
+            match self.routine(identity, &typing) {
                 Some(Call::Foreign(target)) => self.patch(index, Opcode::CallForeign(target, 0)),
                 Some(Call::Local(Some(target))) => self.patch(index, Opcode::Call(target)),
-                Some(Call::Local(None)) => self.pending.push((index, name, typing)),
+                Some(Call::Local(None)) => self.pending.push((index, identity, typing)),
                 None => self.patch(index, Opcode::Trap(ErrorKind::MissingSymbol)),
             }
         }
@@ -121,7 +123,7 @@ impl<'a> Interpreter<'a> {
             match analysis.kind {
                 AnalysisKind::Function(function) => {
                     if !matches!(function.interface, crate::data::Interface::C) {
-                        self.register_call(function.target, analysis.typing, Call::Local(None));
+                        self.register_call(analysis.typing.identity, analysis.typing, Call::Local(None));
                     }
                 }
                 AnalysisKind::Structure(structure) => {
@@ -166,7 +168,7 @@ impl<'a> Interpreter<'a> {
         self.emit(Opcode::Jump(0), span.clone());
 
         let address = self.code.len();
-        self.set_call(function.target, &typing, address);
+        self.set_call(typing.identity, &typing, address);
 
         let slots = self.slots.clone();
         let memory = self.memory_top;
@@ -225,17 +227,6 @@ impl<'a> Interpreter<'a> {
         }
     }
 
-    fn call_name(&self, analysis: &Analysis<'a>) -> Option<Str<'a>> {
-        match &analysis.kind {
-            AnalysisKind::Usage(name) => Some(*name),
-            AnalysisKind::Access(target, member) if self.module(target) => match &member.kind {
-                AnalysisKind::Usage(name) => Some(*name),
-                _ => None,
-            },
-            _ => None,
-        }
-    }
-
     fn invoke(&mut self, invoke: Invoke<Box<Analysis<'a>>, Analysis<'a>>, span: Span) {
         let count = invoke.members.len();
         let typing = invoke.target.typing.clone();
@@ -244,14 +235,14 @@ impl<'a> Interpreter<'a> {
             self.walk(member);
         }
 
-        if let Some(name) = self.call_name(invoke.target.as_ref()) {
-            match self.routine(&name, &typing) {
+        if typing.identity != 0 {
+            match self.routine(typing.identity, &typing) {
                 Some(Call::Foreign(index)) => self.emit(Opcode::CallForeign(index, count), span),
                 Some(Call::Local(Some(address))) => self.emit(Opcode::Call(address), span),
                 Some(Call::Local(None)) => {
                     let place = self.code.len();
                     self.emit(Opcode::Call(0), span);
-                    self.pending.push((place, name, typing));
+                    self.pending.push((place, typing.identity, typing));
                 }
                 None => self.emit(Opcode::Trap(ErrorKind::MissingSymbol), span),
             }
@@ -279,9 +270,9 @@ impl<'a> Interpreter<'a> {
         }
 
         if let AnalysisKind::Usage(name) = member.kind {
-            if self.member(&target.typing, &name) {
+            if let Some(field) = self.field(&target.typing, &name) {
                 self.walk(*target);
-                self.emit(Opcode::ExtractField(name), span);
+                self.emit(Opcode::ExtractField(field), span);
             } else {
                 self.emit(Opcode::Trap(ErrorKind::InvalidAccess), span);
             }
@@ -299,6 +290,10 @@ impl<'a> Interpreter<'a> {
                 .collect(),
             _ => Vec::new(),
         }
+    }
+
+    fn field(&self, typing: &Type<'a>, field: &Str<'a>) -> Option<usize> {
+        self.shape(typing).iter().position(|name| name == field)
     }
 
     fn constructor(&mut self, typing: Type<'a>, span: Span, aggregate: crate::data::Aggregate<Str<'a>, Analysis<'a>>) {
@@ -588,9 +583,12 @@ impl<'a> Interpreter<'a> {
                 let valid = match &target.kind {
                     AnalysisKind::Access(left, right) => match (&left.kind, &right.kind) {
                         (AnalysisKind::Usage(name), AnalysisKind::Usage(field)) => {
-                            if let Some(address) = self.slot(name).map(|slot| slot.address) {
+                            if let Some((address, field)) = self
+                                .slot(name)
+                                .and_then(|slot| self.field(&left.typing, field).map(|field| (slot.address, field)))
+                            {
                                 self.walk(*value);
-                                self.emit(Opcode::StoreField(address, *field), span.clone());
+                                self.emit(Opcode::StoreField(address, field), span.clone());
                                 true
                             } else {
                                 false

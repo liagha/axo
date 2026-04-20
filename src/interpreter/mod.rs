@@ -103,25 +103,6 @@ impl<'source> Interpreter<'source> {
         }
     }
 
-    fn bind_shapes(session: &Session<'source>, core: &mut Interpreter<'source>) {
-        core.shapes.clear();
-
-        for symbol in session.resolver.registry.values() {
-            match &symbol.typing.kind {
-                TypeKind::Structure(aggregate) | TypeKind::Union(aggregate) => {
-                    let members = aggregate
-                        .members
-                        .iter()
-                        .filter_map(Self::member_name)
-                        .collect::<Vec<_>>();
-
-                    core.shapes.insert(symbol.typing.identity, members);
-                }
-                _ => {}
-            }
-        }
-    }
-
     fn literal(element: &crate::parser::Element<'source>) -> Option<Value> {
         match &element.kind {
             crate::parser::ElementKind::Literal(token) => match &token.kind {
@@ -177,7 +158,6 @@ impl<'source> Interpreter<'source> {
         let library = Self::load_library(session);
         let start = core.code.len();
 
-        Self::bind_shapes(session, core);
         Self::bind_values(session, core);
 
         for key in &sources {
