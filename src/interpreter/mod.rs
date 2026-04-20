@@ -152,7 +152,7 @@ impl<'source> Interpreter<'source> {
         }
     }
 
-    pub fn execute(
+    pub fn process(
         session: &mut Session<'source>,
         core: &mut Interpreter<'source>,
         keys: &[Identity],
@@ -218,6 +218,14 @@ impl<'source> Interpreter<'source> {
                 session.errors.push(SessionError::Interpret(error));
             }
         }
+    }
+
+    pub fn execute(
+        session: &mut Session<'source>,
+        core: &mut Interpreter<'source>,
+        keys: &[Identity],
+    ) {
+        Self::process(session, core, keys);
     }
 
     fn load_library(session: &Session) -> Option<Library> {

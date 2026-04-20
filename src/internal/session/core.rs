@@ -93,6 +93,8 @@ pub struct Record<'session> {
     pub hash: u64,
     pub dirty: bool,
     pub version: usize,
+    pub source_version: usize,
+    pub artifacts_version: Map<u8, usize>,
     pub artifacts: Map<u8, Artifact<'session>>,
 }
 
@@ -106,6 +108,8 @@ impl<'session> Record<'session> {
             hash: 0,
             dirty: true,
             version: 0,
+            source_version: 0,
+            artifacts_version: Map::default(),
             artifacts: Map::default(),
         }
     }
@@ -113,11 +117,13 @@ impl<'session> Record<'session> {
     pub fn set_content(&mut self, content: Str<'session>) {
         self.rows = Some(Self::rows(&content));
         self.content = Some(content);
+        self.source_version += 1;
         self.version += 1;
     }
 
     pub fn store(&mut self, key: u8, artifact: Artifact<'session>) {
         self.artifacts.insert(key, artifact);
+        *self.artifacts_version.entry(key).or_insert(0) += 1;
         self.version += 1;
     }
 
@@ -128,6 +134,10 @@ impl<'session> Record<'session> {
     pub fn fetch_mut(&mut self, key: u8) -> Option<&mut Artifact<'session>> {
         self.version += 1;
         self.artifacts.get_mut(&key)
+    }
+
+    pub fn artifact_version(&self, key: u8) -> usize {
+        self.artifacts_version.get(&key).copied().unwrap_or(0)
     }
 
     pub fn rows(content: &str) -> Vec<Offset> {
@@ -165,6 +175,7 @@ pub struct Session<'session> {
     pub errors: Vec<SessionError<'session>>,
     pub target: Option<Location<'session>>,
     pub cache: Map<Location<'session>, u64>,
+    pub pipeline: Map<Identity, usize>,
     pub buffers: Vec<Vec<u8>>,
 }
 
@@ -221,6 +232,7 @@ impl<'session> Session<'session> {
             errors: failures,
             target: None,
             cache,
+            pipeline: Map::default(),
             buffers: Vec::new(),
         }
     }
@@ -276,23 +288,16 @@ impl<'session> Session<'session> {
 
     #[cfg(feature = "interpreter")]
     pub fn execute(session: &mut Self, core: &mut Interpreter<'session>, keys: &[Identity]) {
-        use crate::{
-            analyzer::Analyzer, parser::Parser, resolver::Resolver, scanner::Scanner,
-        };
-
         session.errors.clear();
-
         if !session.prepare() {
             session.report_all();
             return;
         }
 
-        Scanner::execute(session, keys);
-        Parser::execute(session, keys);
-        Resolver::execute(session, keys);
-        Analyzer::execute(session, keys);
-        Interpreter::execute(session, core, keys);
-
+        session.restore_stage(keys);
+        session.reactive_stage(keys, Some(core));
+        session.cache_stage(keys);
+        session.report_stage(keys);
         session.report_all();
     }
 

@@ -7,7 +7,6 @@ use crate::{
     resolver::Resolver,
     data::{Identity, Binding, Aggregate, Function},
 };
-use broccli::Color;
 
 pub struct Analyzer<'analyzer> {
     pub input: Vec<Element<'analyzer>>,
@@ -40,39 +39,22 @@ impl<'analyzer> Analyzer<'analyzer> {
     }
 
     fn process(session: &mut Session<'analyzer>, key: Identity) {
-        let (kind, hash, dirty, elements) = {
+        let (kind, elements) = {
             let record = session.records.get(&key).unwrap();
             let elements = if let Some(Artifact::Elements(elements)) = record.fetch(2) {
                 Some(elements.clone())
             } else {
                 None
             };
-            (record.kind.clone(), record.hash, record.dirty, elements)
+            (record.kind.clone(), elements)
         };
 
         if kind != RecordKind::Source {
             return;
         }
 
-        if !dirty {
-            if let Some(mut analyses) = session.cache::<Vec<Analysis>>("analyses", hash, None) {
-                analyses.shrink_to_fit();
-                let record = session.records.get_mut(&key).unwrap();
-                record.store(3, Artifact::Analyses(analyses));
-                return;
-            }
-        }
-
         let mut analyzer = Analyzer::new(elements.unwrap_or_default());
         analyzer.analyze(&mut session.resolver);
-
-        if let Some(stencil) = session.get_stencil() {
-            session.report_section(
-                "Analysis",
-                Color::Blue,
-                analyzer.output.format(stencil).to_string(),
-            );
-        }
 
         analyzer.output.shrink_to_fit();
 
@@ -83,10 +65,8 @@ impl<'analyzer> Analyzer<'analyzer> {
                 .map(|error| SessionError::Analyze(error.clone())),
         );
 
-        if let Some(analyses) = session.cache("analyses", hash, Some(analyzer.output)) {
-            let record = session.records.get_mut(&key).unwrap();
-            record.store(3, Artifact::Analyses(analyses));
-        }
+        let record = session.records.get_mut(&key).unwrap();
+        record.store(3, Artifact::Analyses(analyzer.output));
     }
 }
 

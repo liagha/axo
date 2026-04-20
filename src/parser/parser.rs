@@ -6,7 +6,6 @@ use crate::{
     scanner::{PunctuationKind, Token, TokenKind},
     tracker::{Peekable, Position},
 };
-use broccli::Color;
 
 pub struct Parser<'a> {
     pub index: Offset,
@@ -175,32 +174,18 @@ impl<'a: 'source, 'source> Parser<'a> {
     }
 
     fn process(session: &mut Session<'a>, key: Identity) {
-        let (kind, hash, dirty, tokens) = {
+        let (kind, tokens) = {
             let record = session.records.get(&key).unwrap();
             let tokens = if let Some(Artifact::Tokens(tokens)) = record.fetch(1) {
                 Some(tokens.clone())
             } else {
                 None
             };
-            (
-                record.kind.clone(),
-                record.hash,
-                record.dirty,
-                tokens,
-            )
+            (record.kind.clone(), tokens)
         };
 
         if kind != RecordKind::Source {
             return;
-        }
-
-        if !dirty {
-            if let Some(mut elements) = session.cache::<Vec<Element>>("elements", hash, None) {
-                elements.shrink_to_fit();
-                let record = session.records.get_mut(&key).unwrap();
-                record.store(2, Artifact::Elements(elements));
-                return;
-            }
         }
 
         let mut parser = Parser::new();
@@ -208,15 +193,6 @@ impl<'a: 'source, 'source> Parser<'a> {
             parser.set_input(tokens);
         }
         parser.parse();
-
-        if let Some(stencil) = session.get_stencil() {
-            use crate::format::Show;
-            session.report_section(
-                "Elements",
-                Color::Cyan,
-                parser.output.format(stencil).to_string(),
-            );
-        }
 
         parser.output.shrink_to_fit();
 
@@ -227,9 +203,7 @@ impl<'a: 'source, 'source> Parser<'a> {
                 .map(SessionError::Parse),
         );
 
-        if let Some(elements) = session.cache("elements", hash, Some(parser.output)) {
-            let record = session.records.get_mut(&key).unwrap();
-            record.store(2, Artifact::Elements(elements));
-        }
+        let record = session.records.get_mut(&key).unwrap();
+        record.store(2, Artifact::Elements(parser.output));
     }
 }

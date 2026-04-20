@@ -177,6 +177,27 @@ impl<'a> Interpreter<'a> {
         self.modules.contains_key(name)
     }
 
+    pub fn reset(&mut self) {
+        self.stack.clear();
+        self.frames.clear();
+        self.memory.fill(Value::Empty);
+        self.code.clear();
+        self.slots.clear();
+        self.shapes.clear();
+        self.values.clear();
+        self.function_frames.clear();
+        self.modules.clear();
+        self.pending.clear();
+        self.loops.clear();
+        self.memory_top = 0;
+        self.pointer = 0;
+        self.running = false;
+        self.calls.retain(|_, items| {
+            items.retain(|(_, call)| matches!(call, Call::Foreign(_)));
+            !items.is_empty()
+        });
+    }
+
     pub fn register_call(&mut self, name: Str<'a>, typing: Type<'a>, call: Call) {
         self.calls.entry(name).or_default().push((typing, call));
     }

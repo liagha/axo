@@ -5,7 +5,6 @@ use crate::{
     scanner::{Character, ErrorKind, ScanError, Token},
     tracker::{Peekable, Position},
 };
-use broccli::Color;
 
 pub struct Scanner<'scanner> {
     pub index: Offset,
@@ -103,12 +102,10 @@ impl<'scanner> Scanner<'scanner> {
     }
 
     fn process(session: &mut Session<'scanner>, key: Identity) {
-        let (kind, hash, dirty, location, content) = {
+        let (kind, location, content) = {
             let record = session.records.get(&key).unwrap();
             (
                 record.kind.clone(),
-                record.hash,
-                record.dirty,
                 record.location,
                 record.content.clone(),
             )
@@ -116,15 +113,6 @@ impl<'scanner> Scanner<'scanner> {
 
         if kind != RecordKind::Source {
             return;
-        }
-
-        if !dirty {
-            if let Some(mut tokens) = session.cache::<Vec<Token>>("tokens", hash, None) {
-                tokens.shrink_to_fit();
-                let record = session.records.get_mut(&key).unwrap();
-                record.store(1, Artifact::Tokens(tokens));
-                return;
-            }
         }
 
         let content = if let Some(content) = content {
@@ -145,15 +133,6 @@ impl<'scanner> Scanner<'scanner> {
         let mut scanner = Scanner::new(position, content);
         scanner.scan();
 
-        if let Some(stencil) = session.get_stencil() {
-            use crate::format::Show;
-            session.report_section(
-                "Tokens",
-                Color::Cyan,
-                scanner.output.format(stencil).to_string(),
-            );
-        }
-
         scanner.output.shrink_to_fit();
 
         session.errors.extend(
@@ -163,9 +142,7 @@ impl<'scanner> Scanner<'scanner> {
                 .map(|error| SessionError::Scan(error.clone())),
         );
 
-        if let Some(tokens) = session.cache("tokens", hash, Some(scanner.output)) {
-            let record = session.records.get_mut(&key).unwrap();
-            record.store(1, Artifact::Tokens(tokens));
-        }
+        let record = session.records.get_mut(&key).unwrap();
+        record.store(1, Artifact::Tokens(scanner.output));
     }
 }
