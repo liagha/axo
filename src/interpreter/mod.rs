@@ -277,7 +277,7 @@ impl<'source> Interpreter<'source> {
 
         core.foreign.push(Foreign::Dynamic(closure));
         let index = core.foreign.len() - 1;
-        core.native(name, typing.clone(), index);
+        core.native(typing.clone(), index);
     }
 }
 

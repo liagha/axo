@@ -67,6 +67,86 @@ pub struct Generator<'backend> {
 }
 
 impl<'backend> Generator<'backend> {
+    fn value_type(&self, typing: &Type<'backend>) -> Type<'backend> {
+        match &typing.kind {
+            TypeKind::Binding(binding) => binding
+                .value
+                .as_deref()
+                .cloned()
+                .or_else(|| binding.annotation.as_deref().cloned())
+                .unwrap_or_else(|| Type::from(TypeKind::Unknown)),
+            _ => typing.clone(),
+        }
+    }
+
+    fn member_name(&self, typing: &Type<'backend>) -> Option<Str<'backend>> {
+        match &typing.kind {
+            TypeKind::Binding(binding) => Some(binding.target),
+            TypeKind::Function(function) if !function.target.is_empty() => Some(function.target),
+            TypeKind::Has(target) => self.member_name(target),
+            _ => None,
+        }
+    }
+
+    fn shape(&self, typing: &Type<'backend>) -> Vec<Str<'backend>> {
+        match &self.value_type(typing).kind {
+            TypeKind::Structure(aggregate) | TypeKind::Union(aggregate) => aggregate
+                .members
+                .iter()
+                .filter_map(|member| self.member_name(member))
+                .collect(),
+            _ => Vec::new(),
+        }
+    }
+
+    fn field(&self, typing: &Type<'backend>, field: &Str<'backend>) -> Option<usize> {
+        self.shape(typing).iter().position(|name| name == field)
+    }
+
+    fn member_type(
+        &self,
+        typing: &Type<'backend>,
+        field: &Str<'backend>,
+        span: Span,
+    ) -> Result<Option<BasicTypeEnum<'backend>>, GenerateError<'backend>> {
+        match &self.value_type(typing).kind {
+            TypeKind::Pointer { target } => self.member_type(target, field, span),
+            TypeKind::And(left, right) => Ok(self
+                .member_type(left, field, span)?
+                .or(self.member_type(right, field, span)?)),
+            TypeKind::Structure(aggregate) | TypeKind::Union(aggregate) => {
+                let member = aggregate
+                    .members
+                    .iter()
+                    .find(|member| self.member_name(member).is_some_and(|name| &name == field));
+
+                match member {
+                    Some(member) => Ok(Some(self.to_basic_type(&self.value_type(member), span)?)),
+                    None => Ok(None),
+                }
+            }
+            _ => Ok(None),
+        }
+    }
+
+    fn function_target(&self, typing: &Type<'backend>) -> Option<Str<'backend>> {
+        match &self.value_type(typing).kind {
+            TypeKind::Function(function) if !function.target.is_empty() => Some(function.target),
+            _ => None,
+        }
+    }
+
+    fn callable(&self, typing: &Type<'backend>) -> Option<FunctionValue<'backend>> {
+        let target = self.function_target(typing)?;
+
+        self.get_entity(&target)
+            .and_then(|entity| match entity {
+                Entity::Function(function) => Some(*function),
+                _ => None,
+            })
+            .or_else(|| self.current_module().get_function(target.as_str().unwrap_or_default()))
+    }
+
     pub fn get_entity(&self, name: &Str<'backend>) -> Option<&Entity<'backend>> {
         self.entities.get(name)
     }
@@ -172,6 +252,8 @@ impl<'backend> Generator<'backend> {
         typing: &Type<'backend>,
         span: Span,
     ) -> Result<BasicTypeEnum<'backend>, GenerateError<'backend>> {
+        let typing = self.value_type(typing);
+
         let typing = match &typing.kind {
             TypeKind::Integer { size: bits, .. } => match bits {
                 1 => self.context.bool_type().into(),
@@ -451,7 +533,12 @@ impl<'backend> Generator<'backend> {
                         self.errors.push(error);
                     }
                 }
-                _ => {}
+                _ => {
+                    self.builder.clear_insertion_position();
+                    if let Err(error) = self.analysis(analysis.clone()) {
+                        self.errors.push(error);
+                    }
+                }
             }
         }
 
@@ -488,72 +575,75 @@ impl<'backend> Generator<'backend> {
         &mut self,
         analysis: Analysis<'backend>,
     ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
+        let span = analysis.span;
+        let typing = analysis.typing.clone();
+
         match analysis.kind {
-            AnalysisKind::Structure(structure) => self.define_structure(structure, analysis.span),
-            AnalysisKind::Union(structure) => self.define_union(structure, analysis.span),
-            AnalysisKind::Function(function) => self.define_function(function, analysis.span),
+            AnalysisKind::Structure(structure) => self.define_structure(structure, span),
+            AnalysisKind::Union(structure) => self.define_union(structure, span),
+            AnalysisKind::Function(function) => self.define_function(function, span),
 
             AnalysisKind::Integer {
                 value,
                 size,
                 signed,
             } => Ok(self.integer(value, size, signed)),
-            AnalysisKind::Float { value, size } => self.float(value, size, analysis.span),
+            AnalysisKind::Float { value, size } => self.float(value, size, span),
             AnalysisKind::Boolean { value } => Ok(self.boolean(value)),
             AnalysisKind::Character { value } => Ok(self.character(value)),
-            AnalysisKind::String { value } => self.string(value, analysis.span),
-            AnalysisKind::Array(values) => self.array(values, analysis.span),
-            AnalysisKind::Tuple(values) => self.tuple(values, analysis.span),
-            AnalysisKind::Negate(value) => self.negate(value, analysis.span),
-            AnalysisKind::SizeOf(typing) => self.size_of(typing, analysis.span),
-            AnalysisKind::Add(left, right) => self.add(left, right, analysis.span),
-            AnalysisKind::Subtract(left, right) => self.subtract(left, right, analysis.span),
-            AnalysisKind::Multiply(left, right) => self.multiply(left, right, analysis.span),
-            AnalysisKind::Divide(left, right) => self.divide(left, right, analysis.span),
-            AnalysisKind::Modulus(left, right) => self.modulus(left, right, analysis.span),
-            AnalysisKind::LogicalAnd(left, right) => self.logical_and(left, right, analysis.span),
-            AnalysisKind::LogicalOr(left, right) => self.logical_or(left, right, analysis.span),
-            AnalysisKind::LogicalNot(operand) => self.logical_not(operand, analysis.span),
-            AnalysisKind::LogicalXOr(left, right) => self.logical_xor(left, right, analysis.span),
-            AnalysisKind::BitwiseAnd(left, right) => self.bitwise_and(left, right, analysis.span),
-            AnalysisKind::BitwiseOr(left, right) => self.bitwise_or(left, right, analysis.span),
-            AnalysisKind::BitwiseNot(operand) => self.bitwise_not(operand, analysis.span),
-            AnalysisKind::BitwiseXOr(left, right) => self.bitwise_xor(left, right, analysis.span),
-            AnalysisKind::ShiftLeft(left, right) => self.shift_left(left, right, analysis.span),
-            AnalysisKind::ShiftRight(left, right) => self.shift_right(left, right, analysis.span),
-            AnalysisKind::AddressOf(operand) => self.address_of(operand, analysis.span),
-            AnalysisKind::Dereference(operand) => self.dereference(operand, analysis.span),
-            AnalysisKind::Equal(left, right) => self.equal(left, right, analysis.span),
-            AnalysisKind::NotEqual(left, right) => self.not_equal(left, right, analysis.span),
-            AnalysisKind::Less(left, right) => self.less(left, right, analysis.span),
+            AnalysisKind::String { value } => self.string(value, span),
+            AnalysisKind::Array(values) => self.array(values, span),
+            AnalysisKind::Tuple(values) => self.tuple(values, span),
+            AnalysisKind::Negate(value) => self.negate(value, span),
+            AnalysisKind::SizeOf(typing) => self.size_of(typing, span),
+            AnalysisKind::Add(left, right) => self.add(left, right, span),
+            AnalysisKind::Subtract(left, right) => self.subtract(left, right, span),
+            AnalysisKind::Multiply(left, right) => self.multiply(left, right, span),
+            AnalysisKind::Divide(left, right) => self.divide(left, right, span),
+            AnalysisKind::Modulus(left, right) => self.modulus(left, right, span),
+            AnalysisKind::LogicalAnd(left, right) => self.logical_and(left, right, span),
+            AnalysisKind::LogicalOr(left, right) => self.logical_or(left, right, span),
+            AnalysisKind::LogicalNot(operand) => self.logical_not(operand, span),
+            AnalysisKind::LogicalXOr(left, right) => self.logical_xor(left, right, span),
+            AnalysisKind::BitwiseAnd(left, right) => self.bitwise_and(left, right, span),
+            AnalysisKind::BitwiseOr(left, right) => self.bitwise_or(left, right, span),
+            AnalysisKind::BitwiseNot(operand) => self.bitwise_not(operand, span),
+            AnalysisKind::BitwiseXOr(left, right) => self.bitwise_xor(left, right, span),
+            AnalysisKind::ShiftLeft(left, right) => self.shift_left(left, right, span),
+            AnalysisKind::ShiftRight(left, right) => self.shift_right(left, right, span),
+            AnalysisKind::AddressOf(operand) => self.address_of(operand, span),
+            AnalysisKind::Dereference(operand) => self.dereference(operand, span),
+            AnalysisKind::Equal(left, right) => self.equal(left, right, span),
+            AnalysisKind::NotEqual(left, right) => self.not_equal(left, right, span),
+            AnalysisKind::Less(left, right) => self.less(left, right, span),
             AnalysisKind::LessOrEqual(left, right) => {
-                self.less_or_equal(left, right, analysis.span)
+                self.less_or_equal(left, right, span)
             }
-            AnalysisKind::Greater(left, right) => self.greater(left, right, analysis.span),
+            AnalysisKind::Greater(left, right) => self.greater(left, right, span),
             AnalysisKind::GreaterOrEqual(left, right) => {
-                self.greater_or_equal(left, right, analysis.span)
+                self.greater_or_equal(left, right, span)
             }
-            AnalysisKind::Index(index) => self.index(index, analysis.span),
-            AnalysisKind::Usage(identifier) => self.usage(identifier, analysis.span),
-            AnalysisKind::Access(target, member) => self.access(target, member, analysis.span),
-            AnalysisKind::Constructor(structure) => self.constructor(structure, analysis.span),
-            AnalysisKind::Assign(target, value) => self.assign(target, value, analysis.span),
-            AnalysisKind::Store(target, value) => self.store(target, value, analysis.span),
-            AnalysisKind::Binding(binding) => self.binding(binding, analysis.span),
-            AnalysisKind::Block(analyses) => self.block(analyses, analysis.span),
+            AnalysisKind::Index(index) => self.index(index, span),
+            AnalysisKind::Usage(identifier) => self.usage(identifier, span),
+            AnalysisKind::Access(target, member) => self.access(target, member, span),
+            AnalysisKind::Constructor(structure) => self.constructor(typing, structure, span),
+            AnalysisKind::Assign(target, value) => self.assign(target, value, span),
+            AnalysisKind::Store(target, value) => self.store(target, value, span),
+            AnalysisKind::Binding(binding) => self.binding(binding, span),
+            AnalysisKind::Block(analyses) => self.block(analyses, span),
             AnalysisKind::Conditional(condition, then, otherwise) => self.conditional(
                 *condition,
                 *then,
                 otherwise.map(|value| *value),
-                analysis.span,
+                span,
                 false,
             ),
-            AnalysisKind::While(condition, body) => self.r#while(condition, body, analysis.span),
-            AnalysisKind::Module(name, analyses) => self.module(name, analyses, analysis.span),
-            AnalysisKind::Invoke(invoke) => self.invoke(invoke, analysis.span),
-            AnalysisKind::Return(value) => self.r#return(value, analysis.span),
-            AnalysisKind::Break(value) => self.r#break(value, analysis.span),
-            AnalysisKind::Continue(value) => self.r#continue(value, analysis.span),
+            AnalysisKind::While(condition, body) => self.r#while(condition, body, span),
+            AnalysisKind::Module(name, analyses) => self.module(name, analyses, span),
+            AnalysisKind::Invoke(invoke) => self.invoke(invoke, span),
+            AnalysisKind::Return(value) => self.r#return(value, span),
+            AnalysisKind::Break(value) => self.r#break(value, span),
+            AnalysisKind::Continue(value) => self.r#continue(value, span),
         }
     }
 }

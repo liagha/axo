@@ -124,6 +124,7 @@ const PARSE_STAGE: u8 = 2;
 const RESOLVE_STAGE: u8 = 3;
 const ANALYZE_STAGE: u8 = 4;
 const INTERPRET_STAGE: u8 = 5;
+const CACHE_REV: u64 = 1;
 
 impl<'session> Session<'session> {
     fn stage_key(stage: u8, key: Identity) -> Identity {
@@ -568,7 +569,7 @@ impl<'session> Session<'session> {
         let base = self.base();
         let cache = base.join("build").join("records").join(name);
         _ = create_dir_all(&cache);
-        let path = cache.join(format!("{:016x}", hash));
+        let path = cache.join(format!("{:016x}-{:016x}", CACHE_REV, hash));
 
         if let Some(value) = data {
             let buffer = Some(value.clone()).serialize();
@@ -812,7 +813,7 @@ impl<'session> Session<'session> {
         #[cfg(feature = "interpreter")]
         engine: Option<Arc<Lock<Interpreter<'session>>>>,
     ) -> Operation<'session, Arc<Lock<Session<'session>>>> {
-        let states = vec![
+        let mut states = vec![
             Operation::new(Arc::new(Prepare)),
             Operation::new(Arc::new(Flow {
                 keys: keys.clone(),

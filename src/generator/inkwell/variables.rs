@@ -11,7 +11,7 @@ use {
         tracker::Span,
     },
     inkwell::{
-        types::{BasicType, BasicTypeEnum},
+        types::BasicTypeEnum,
         values::{BasicValue, BasicValueEnum, PointerValue},
     },
 };
@@ -87,33 +87,24 @@ impl<'backend> Generator<'backend> {
                 } else {
                     return Ok(None);
                 };
+                let typing = self.value_type(&target.typing);
 
                 if let Some((base, kind)) = self.lvalue(target)? {
                     if kind.is_struct_type() {
                         let shape = kind.into_struct_type();
+                        if let Some(index) = self.field(&typing, &field) {
+                            let slot = self
+                                .builder
+                                .build_struct_gep(shape, base, index as u32, "pointer")
+                                .map_err(|error| {
+                                    GenerateError::new(
+                                        ErrorKind::BuilderError(error.into()),
+                                        analysis.span,
+                                    )
+                                })?;
 
-                        let found = self.find_entity(|entity| {
-                            matches!(entity, Entity::Structure { shape: defined, .. } if defined.as_basic_type_enum() == shape.as_basic_type_enum())
-                        });
-
-                        if let Some(Entity::Structure {
-                            members: fields, ..
-                        }) = found
-                        {
-                            if let Some(index) = fields.iter().position(|item| item == &field) {
-                                let slot = self
-                                    .builder
-                                    .build_struct_gep(shape, base, index as u32, "pointer")
-                                    .map_err(|error| {
-                                        GenerateError::new(
-                                            ErrorKind::BuilderError(error.into()),
-                                            analysis.span,
-                                        )
-                                    })?;
-
-                                let resolved = shape.get_field_type_at_index(index as u32).unwrap();
-                                return Ok(Some((slot, resolved)));
-                            }
+                            let resolved = shape.get_field_type_at_index(index as u32).unwrap();
+                            return Ok(Some((slot, resolved)));
                         }
                     } else if kind.is_pointer_type() {
                         if let Some(resolved) = self.pointee(target) {
@@ -133,36 +124,26 @@ impl<'backend> Generator<'backend> {
                                 }
 
                                 let loaded = load.into_pointer_value();
-                                let found = self.find_entity(|entity| {
-                                    matches!(entity, Entity::Structure { shape: defined, .. } if defined.as_basic_type_enum() == shape.as_basic_type_enum())
-                                });
 
-                                if let Some(Entity::Structure {
-                                    members: fields, ..
-                                }) = found
-                                {
-                                    if let Some(index) =
-                                        fields.iter().position(|item| item == &field)
-                                    {
-                                        let slot = self
-                                            .builder
-                                            .build_struct_gep(
-                                                shape,
-                                                loaded,
-                                                index as u32,
-                                                "pointer",
+                                if let Some(index) = self.field(&typing, &field) {
+                                    let slot = self
+                                        .builder
+                                        .build_struct_gep(
+                                            shape,
+                                            loaded,
+                                            index as u32,
+                                            "pointer",
+                                        )
+                                        .map_err(|error| {
+                                            GenerateError::new(
+                                                ErrorKind::BuilderError(error.into()),
+                                                analysis.span,
                                             )
-                                            .map_err(|error| {
-                                                GenerateError::new(
-                                                    ErrorKind::BuilderError(error.into()),
-                                                    analysis.span,
-                                                )
-                                            })?;
+                                        })?;
 
-                                        let resolved =
-                                            shape.get_field_type_at_index(index as u32).unwrap();
-                                        return Ok(Some((slot, resolved)));
-                                    }
+                                    let resolved =
+                                        shape.get_field_type_at_index(index as u32).unwrap();
+                                    return Ok(Some((slot, resolved)));
                                 }
                             }
                         }

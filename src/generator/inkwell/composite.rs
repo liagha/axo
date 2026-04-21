@@ -6,7 +6,7 @@ use {
             inkwell::{Entity, GenerateError, Generator},
             BuilderError, DataStructureError, ErrorKind,
         },
-        resolver::TypeKind,
+        resolver::{Type, TypeKind},
         tracker::Span,
     },
     inkwell::{
@@ -237,40 +237,33 @@ impl<'backend> Generator<'backend> {
 
     pub fn constructor(
         &mut self,
+        typing: Type<'backend>,
         constructor: Aggregate<Str<'backend>, Analysis<'backend>>,
         span: Span,
     ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
         let identifier = constructor.target.clone();
         let target = identifier.as_str().unwrap_or("").to_string();
+        let layout = self.shape(&typing);
 
         let entity = self.get_entity(&identifier).cloned();
 
         match entity {
-            Some(Entity::Structure { shape, members }) => {
+            Some(Entity::Structure { shape, .. }) => {
                 let mut current = shape.get_undef();
                 let mut position = 0usize;
 
                 for member in constructor.members {
                     let (index, name, assign) = match &member.kind {
                         AnalysisKind::Assign(field, assign) => {
-                            let found =
-                                members
-                                    .iter()
-                                    .position(|item| item == field)
-                                    .ok_or_else(|| {
-                                        GenerateError::new(
-                                            ErrorKind::DataStructure(
-                                                DataStructureError::UnknownField {
-                                                    target: target.clone(),
-                                                    member: field
-                                                        .as_str()
-                                                        .unwrap_or("")
-                                                        .to_string(),
-                                                },
-                                            ),
-                                            span,
-                                        )
-                                    })?;
+                            let found = self.field(&typing, field).ok_or_else(|| {
+                                GenerateError::new(
+                                    ErrorKind::DataStructure(DataStructureError::UnknownField {
+                                        target: target.clone(),
+                                        member: field.as_str().unwrap_or("").to_string(),
+                                    }),
+                                    span,
+                                )
+                            })?;
 
                             position = found + 1;
 
@@ -281,7 +274,7 @@ impl<'backend> Generator<'backend> {
                             )
                         }
                         _ => {
-                            if position >= members.len() {
+                            if position >= layout.len() {
                                 return Err(GenerateError::new(
                                     ErrorKind::DataStructure(
                                         DataStructureError::TooManyInitializers { target },
@@ -297,7 +290,7 @@ impl<'backend> Generator<'backend> {
                         }
                     };
 
-                    let kind = shape.get_field_type_at_index(index as u32).unwrap();
+                    let kind = self.member_type(&typing, &Str::from(name.clone()), span)?.unwrap();
                     let value = self.analysis(assign)?;
 
                     let cast = self.convert(value, kind).ok_or_else(|| {
@@ -429,7 +422,9 @@ impl<'backend> Generator<'backend> {
             return match &member.kind {
                 AnalysisKind::Usage(name) => self.usage(name.clone(), span),
                 AnalysisKind::Invoke(invoke) => self.invoke(invoke.clone(), span),
-                AnalysisKind::Constructor(constructor) => self.constructor(constructor.clone(), span),
+                AnalysisKind::Constructor(constructor) => {
+                    self.constructor(member.typing.clone(), constructor.clone(), span)
+                }
                 _ => Err(GenerateError::new(
                     ErrorKind::DataStructure(DataStructureError::InvalidModuleAccess),
                     span,
@@ -447,39 +442,16 @@ impl<'backend> Generator<'backend> {
             }
         };
 
+        let typing = self.value_type(&target.typing);
+
         if let AnalysisKind::Usage(identifier) = &target.kind {
             if let Some(Entity::Variable { pointer, typing }) = self.get_entity(identifier) {
                 let kind = self.to_basic_type(typing, span)?;
 
                 if kind.is_struct_type() {
                     let shape = kind.into_struct_type();
-                    let entity = self.find_entity(|item| match item {
-                        Entity::Structure {
-                            shape: structure, ..
-                        } => structure.as_basic_type_enum() == kind,
-                        Entity::Union {
-                            shape: structure, ..
-                        } => structure.as_basic_type_enum() == kind,
-                        _ => false,
-                    });
-
-                    let mut position = None;
-                    let mut resolution = None;
-
-                    if let Some(Entity::Structure {
-                        members: fields, ..
-                    }) = entity
-                    {
-                        position = fields.iter().position(|item| item == &field);
-                    } else if let Some(Entity::Union {
-                        members: fields, ..
-                    }) = entity
-                    {
-                        resolution = fields
-                            .iter()
-                            .find(|(name, _)| name == &field)
-                            .map(|(_, typing)| *typing);
-                    }
+                    let position = self.field(&typing, &field);
+                    let resolution = self.member_type(&typing, &field, span)?;
 
                     if let Some(index) = position {
                         let slot = self
@@ -522,34 +494,8 @@ impl<'backend> Generator<'backend> {
         let value = self.analysis(*target)?;
 
         if let BasicValueEnum::StructValue(data) = value {
-            let kind = data.get_type().as_basic_type_enum();
-            let entity = self.find_entity(|item| match item {
-                Entity::Structure {
-                    shape: structure, ..
-                } => structure.as_basic_type_enum() == kind,
-                Entity::Union {
-                    shape: structure, ..
-                } => structure.as_basic_type_enum() == kind,
-                _ => false,
-            });
-
-            let mut position = None;
-            let mut resolution = None;
-
-            if let Some(Entity::Structure {
-                members: fields, ..
-            }) = entity
-            {
-                position = fields.iter().position(|item| item == &field);
-            } else if let Some(Entity::Union {
-                members: fields, ..
-            }) = entity
-            {
-                resolution = fields
-                    .iter()
-                    .find(|(name, _)| name == &field)
-                    .map(|(_, typing)| *typing);
-            }
+            let position = self.field(&typing, &field);
+            let resolution = self.member_type(&typing, &field, span)?;
 
             if let Some(index) = position {
                 return self

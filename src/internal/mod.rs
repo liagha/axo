@@ -3,10 +3,12 @@ mod session;
 pub use {
     session::{
         Artifact,
-        RecordKind,
+        Mode,
         Prepare,
-        Session,
+        RecordKind,
         Record,
+        Session,
+        Step,
     }
 };
 

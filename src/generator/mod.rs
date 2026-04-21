@@ -62,11 +62,6 @@ Action<
             let location = record.location;
             let schema = Session::schema(&base, location);
 
-            if !record.dirty && schema.to_path().map(|p| p.exists()).unwrap_or(false) {
-                record.store(4, Artifact::Output(schema));
-                continue;
-            }
-
             let stem = Str::from(location.stem().unwrap().to_string());
 
             if let Some(Artifact::Analyses(analysis_ref)) = record.fetch(3) {
@@ -212,10 +207,6 @@ Action<
                 _ = create_dir_all(&parent);
 
                 record.store(5, Artifact::Object(object));
-
-                if !record.dirty && object.to_path().map(|p| p.exists()).unwrap_or(false) {
-                    continue;
-                }
 
                 let mut command = std::process::Command::new("clang");
                 if let Some(t) = &target_str {

@@ -103,6 +103,7 @@ impl<'backend> Generator<'backend> {
             .insert(target, self.context.create_module(name));
 
         let caller = self.builder.get_insert_block();
+        let entities = self.entities.clone();
 
         for analysis in analyses {
             if self.terminated() {
@@ -120,6 +121,8 @@ impl<'backend> Generator<'backend> {
         if let Some(block) = caller {
             self.builder.position_at_end(block);
         }
+
+        self.entities = entities;
 
         Ok(self.context.i64_type().const_zero().into())
     }
@@ -140,13 +143,14 @@ impl<'backend> Generator<'backend> {
             if let AnalysisKind::Binding(binding) = &member.kind {
                 let layout = {
                     let layout = self.to_basic_type(&binding.annotation, member.span)?;
+                    let typing = self.value_type(&binding.annotation);
 
                     if matches!(function.interface, Interface::C) {
-                        if let TypeKind::String = &binding.annotation.kind {
+                        if let TypeKind::String = &typing.kind {
                             self.context
                                 .ptr_type(inkwell::AddressSpace::default())
                                 .into()
-                        } else if let TypeKind::Character = &binding.annotation.kind {
+                        } else if let TypeKind::Character = &typing.kind {
                             self.context.i8_type().into()
                         } else {
                             layout
@@ -227,6 +231,8 @@ impl<'backend> Generator<'backend> {
             self.builder.position_at_end(last_block);
         }
 
+        let entities = self.entities.clone();
+
         for (parameter, member) in value.get_param_iter().zip(function.members.iter()) {
             if let AnalysisKind::Binding(binding) = &member.kind {
                 if let AnalysisKind::Usage(target) = binding.target.kind {
@@ -284,6 +290,8 @@ impl<'backend> Generator<'backend> {
                 }
             }
         }
+
+        self.entities = entities;
 
         Ok(self.context.i64_type().const_zero().into())
     }
@@ -481,22 +489,8 @@ impl<'backend> Generator<'backend> {
         call: Invoke<Box<Analysis<'backend>>, Analysis<'backend>>,
         span: Span,
     ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
-        let name = match &call.target.kind {
-            AnalysisKind::Usage(name) => *name,
-            AnalysisKind::Access(_, member) => match &member.kind {
-                AnalysisKind::Usage(name) => *name,
-                _ => Str::default(),
-            },
-            _ => Str::default(),
-        };
-
-        let entity = self.get_entity(&name).and_then(|item| {
-            if let Entity::Function(function) = item {
-                Some(self.linked(name, *function))
-            } else {
-                None
-            }
-        });
+        let name = self.function_target(&call.target.typing).unwrap_or_default();
+        let entity = self.callable(&call.target.typing).map(|function| self.linked(name, function));
 
         if let Some(function) = entity {
             let mut arguments = vec![];
