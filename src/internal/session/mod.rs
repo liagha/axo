@@ -8,13 +8,15 @@ use {
         combinator::{Action, Operation, Operator},
         data::{
             memory::{transmute, Arc, PhantomData},
-            Identity, Str,
+            Identity, Module, Str,
         },
+        identifier,
         internal::{
             hash::{DefaultHasher, Hash, Hasher},
             platform::{catch_unwind, create_dir_all, read, write, AssertUnwindSafe, Lock},
             time::{Duration, Instant, UNIX_EPOCH},
         },
+        literal, module,
         parser::Parser,
         resolver::Resolver,
         scanner::Scanner,
@@ -32,37 +34,64 @@ use crate::{
 use crate::generator::{EmitAction, GenerateAction, RunAction};
 
 pub struct Prepare;
-pub struct Flow<'source> {
+pub struct Bootstrap;
+pub struct Restore<'source> {
     pub keys: Vec<Identity>,
-    pub mode: Mode,
-    pub steps: Vec<Step>,
+    pub slot: u8,
+    pub name: &'static str,
+    pub phantom: PhantomData<&'source ()>,
+}
+pub struct Cache<'source> {
+    pub keys: Vec<Identity>,
+    pub slot: u8,
+    pub name: &'static str,
+    pub phantom: PhantomData<&'source ()>,
+}
+pub struct Report<'source> {
+    pub keys: Vec<Identity>,
+    pub slot: u8,
+    pub head: &'static str,
+    pub color: broccli::Color,
+    pub phantom: PhantomData<&'source ()>,
+}
+pub struct Scan<'source> {
+    pub keys: Vec<Identity>,
+    pub phantom: PhantomData<&'source ()>,
+}
+pub struct Parse<'source> {
+    pub keys: Vec<Identity>,
+    pub phantom: PhantomData<&'source ()>,
+}
+pub struct Resolve<'source> {
+    pub phantom: PhantomData<&'source ()>,
+}
+pub struct Analyze<'source> {
+    pub phantom: PhantomData<&'source ()>,
+}
+#[cfg(feature = "interpreter")]
+pub struct Interpret<'source> {
     #[cfg(feature = "interpreter")]
     pub engine: Option<Arc<Lock<Interpreter<'source>>>>,
     pub phantom: PhantomData<&'source ()>,
 }
 
-#[derive(Clone, Copy, PartialEq, Eq)]
-pub enum Mode {
-    Once,
-    Reactive,
-}
-
-#[derive(Clone, Copy, PartialEq, Eq)]
-pub enum Step {
-    RestoreTokens,
-    RestoreElements,
-    RestoreAnalyses,
-    Scan,
-    Parse,
-    Resolve,
-    Analyze,
-    Interpret,
-    CacheTokens,
-    CacheElements,
-    CacheAnalyses,
-    ReportTokens,
-    ReportElements,
-    ReportAnalyses,
+impl<'source>
+Action<
+    'static,
+    Operator<Arc<Lock<Session<'source>>>>,
+    Operation<'source, Arc<Lock<Session<'source>>>>,
+> for Bootstrap
+{
+    fn action(
+        &self,
+        operator: &mut Operator<Arc<Lock<Session<'source>>>>,
+        operation: &mut Operation<'source, Arc<Lock<Session<'source>>>>,
+    ) {
+        let mut guard = operator.store.write().unwrap();
+        let session = &mut *guard;
+        session.bootstrap();
+        operation.set_resolve(Vec::new());
+    }
 }
 
 impl<'source>
@@ -92,7 +121,7 @@ Action<
     'static,
     Operator<Arc<Lock<Session<'source>>>>,
     Operation<'source, Arc<Lock<Session<'source>>>>,
-> for Flow<'source>
+> for Restore<'source>
 {
     fn action(
         &self,
@@ -100,31 +129,249 @@ Action<
         operation: &mut Operation<'source, Arc<Lock<Session<'source>>>>,
     ) {
         let mut session = operator.store.write().unwrap();
-        #[cfg(feature = "interpreter")]
-        let mut core = self.engine.as_ref().map(|engine| engine.write().unwrap());
+        match self.slot {
+            1 => session.restore_tokens(&self.keys),
+            2 => session.restore_elements(&self.keys),
+            3 => session.restore_analyses(&self.keys),
+            _ => {}
+        }
+        let _ = self.name;
+        operation.set_resolve(Vec::new());
+    }
+}
 
-        session.drive(
-            &self.keys,
-            self.mode,
-            &self.steps,
-            #[cfg(feature = "interpreter")]
-            core.as_deref_mut(),
-        );
+impl<'source>
+Action<
+    'static,
+    Operator<Arc<Lock<Session<'source>>>>,
+    Operation<'source, Arc<Lock<Session<'source>>>>,
+> for Cache<'source>
+{
+    fn action(
+        &self,
+        operator: &mut Operator<Arc<Lock<Session<'source>>>>,
+        operation: &mut Operation<'source, Arc<Lock<Session<'source>>>>,
+    ) {
+        let mut session = operator.store.write().unwrap();
+        match self.slot {
+            1 => session.store_tokens(&self.keys),
+            2 => session.store_elements(&self.keys),
+            3 => session.store_analyses(&self.keys),
+            _ => {}
+        }
+        let _ = self.name;
+        operation.set_resolve(Vec::new());
+    }
+}
 
+impl<'source>
+Action<
+    'static,
+    Operator<Arc<Lock<Session<'source>>>>,
+    Operation<'source, Arc<Lock<Session<'source>>>>,
+> for Report<'source>
+{
+    fn action(
+        &self,
+        operator: &mut Operator<Arc<Lock<Session<'source>>>>,
+        operation: &mut Operation<'source, Arc<Lock<Session<'source>>>>,
+    ) {
+        let session = operator.store.read().unwrap();
+        match self.slot {
+            1 => session.report_tokens(&self.keys),
+            2 => session.report_elements(&self.keys),
+            3 => session.report_analyses(&self.keys),
+            _ => {}
+        }
+        let _ = self.head;
+        let _ = self.color;
+        operation.set_resolve(Vec::new());
+    }
+}
+
+impl<'source>
+Action<
+    'static,
+    Operator<Arc<Lock<Session<'source>>>>,
+    Operation<'source, Arc<Lock<Session<'source>>>>,
+> for Scan<'source>
+{
+    fn action(
+        &self,
+        operator: &mut Operator<Arc<Lock<Session<'source>>>>,
+        operation: &mut Operation<'source, Arc<Lock<Session<'source>>>>,
+    ) {
+        let mut session = operator.store.write().unwrap();
+        let mut changed = false;
+        for key in session.source_keys(&self.keys) {
+            let signature = session.scan_signature(key);
+            if session.stage_value(SCAN_STAGE, key) == signature
+                && session.records.get(&key).unwrap().fetch(1).is_some()
+            {
+                continue;
+            }
+            let before = session.records.get(&key).map(|record| record.artifact_version(1)).unwrap_or(0);
+            Scanner::execute(&mut session, &[key]);
+            let after = session.records.get(&key).map(|record| record.artifact_version(1)).unwrap_or(0);
+            session.set_stage(SCAN_STAGE, key, signature);
+            changed |= before != after;
+        }
         if session.errors.is_empty() {
-            operation.set_resolve(Vec::new());
+            operation.set_resolve(if changed { vec![1] } else { Vec::new() });
         } else {
             operation.set_reject();
         }
     }
 }
 
-const SCAN_STAGE: u8 = 1;
-const PARSE_STAGE: u8 = 2;
-const RESOLVE_STAGE: u8 = 3;
-const ANALYZE_STAGE: u8 = 4;
+impl<'source>
+Action<
+    'static,
+    Operator<Arc<Lock<Session<'source>>>>,
+    Operation<'source, Arc<Lock<Session<'source>>>>,
+> for Parse<'source>
+{
+    fn action(
+        &self,
+        operator: &mut Operator<Arc<Lock<Session<'source>>>>,
+        operation: &mut Operation<'source, Arc<Lock<Session<'source>>>>,
+    ) {
+        let mut session = operator.store.write().unwrap();
+        let mut changed = false;
+        for key in session.source_keys(&self.keys) {
+            let signature = session.parse_signature(key);
+            if session.stage_value(PARSE_STAGE, key) == signature
+                && session.records.get(&key).unwrap().fetch(2).is_some()
+            {
+                continue;
+            }
+            let before = session.records.get(&key).map(|record| record.artifact_version(2)).unwrap_or(0);
+            Parser::execute(&mut session, &[key]);
+            let after = session.records.get(&key).map(|record| record.artifact_version(2)).unwrap_or(0);
+            session.set_stage(PARSE_STAGE, key, signature);
+            changed |= before != after;
+        }
+        if session.errors.is_empty() {
+            operation.set_resolve(if changed { vec![1] } else { Vec::new() });
+        } else {
+            operation.set_reject();
+        }
+    }
+}
+
+impl<'source>
+Action<
+    'static,
+    Operator<Arc<Lock<Session<'source>>>>,
+    Operation<'source, Arc<Lock<Session<'source>>>>,
+> for Resolve<'source>
+{
+    fn action(
+        &self,
+        operator: &mut Operator<Arc<Lock<Session<'source>>>>,
+        operation: &mut Operation<'source, Arc<Lock<Session<'source>>>>,
+    ) {
+        let mut session = operator.store.write().unwrap();
+        let targets = session.all_source_keys();
+        let signature = session.resolve_signature(&targets);
+        if session.stage_value(RESOLVE_STAGE, 0) == signature {
+            operation.set_resolve(Vec::new());
+            return;
+        }
+        let before = session.resolver.registry.len();
+        Resolver::execute(&mut session, &targets);
+        let after = session.resolver.registry.len();
+        session.set_stage(RESOLVE_STAGE, 0, signature);
+        if session.errors.is_empty() {
+            operation.set_resolve(if before != after { vec![1] } else { Vec::new() });
+        } else {
+            operation.set_reject();
+        }
+    }
+}
+
+impl<'source>
+Action<
+    'static,
+    Operator<Arc<Lock<Session<'source>>>>,
+    Operation<'source, Arc<Lock<Session<'source>>>>,
+> for Analyze<'source>
+{
+    fn action(
+        &self,
+        operator: &mut Operator<Arc<Lock<Session<'source>>>>,
+        operation: &mut Operation<'source, Arc<Lock<Session<'source>>>>,
+    ) {
+        let mut session = operator.store.write().unwrap();
+        let targets = session.all_source_keys();
+        let signature = session.analyze_signature(&targets);
+        if session.stage_value(ANALYZE_STAGE, 0) == signature
+            && targets.iter().all(|key| session.records.get(key).unwrap().fetch(3).is_some())
+        {
+            operation.set_resolve(Vec::new());
+            return;
+        }
+        let before = targets
+            .iter()
+            .map(|key| session.records.get(key).map(|record| record.artifact_version(3)).unwrap_or(0))
+            .sum::<usize>();
+        Analyzer::execute(&mut session, &targets);
+        let after = targets
+            .iter()
+            .map(|key| session.records.get(key).map(|record| record.artifact_version(3)).unwrap_or(0))
+            .sum::<usize>();
+        session.set_stage(ANALYZE_STAGE, 0, signature);
+        if session.errors.is_empty() {
+            operation.set_resolve(if before != after { vec![1] } else { Vec::new() });
+        } else {
+            operation.set_reject();
+        }
+    }
+}
+
 #[cfg(feature = "interpreter")]
-const INTERPRET_STAGE: u8 = 5;
+impl<'source>
+Action<
+    'static,
+    Operator<Arc<Lock<Session<'source>>>>,
+    Operation<'source, Arc<Lock<Session<'source>>>>,
+> for Interpret<'source>
+{
+    fn action(
+        &self,
+        operator: &mut Operator<Arc<Lock<Session<'source>>>>,
+        operation: &mut Operation<'source, Arc<Lock<Session<'source>>>>,
+    ) {
+        let mut session = operator.store.write().unwrap();
+        let signature = session.interpret_signature();
+        if session.stage_value(INTERPRET_STAGE, 0) == signature {
+            operation.set_resolve(Vec::new());
+            return;
+        }
+        let mut changed = false;
+        if let Some(engine) = &self.engine {
+            let mut core = engine.write().unwrap();
+            core.reset();
+            let targets = session.all_source_keys();
+            Interpreter::process(&mut session, &mut core, &targets);
+            session.set_stage(INTERPRET_STAGE, 0, signature);
+            changed = true;
+        }
+        if session.errors.is_empty() {
+            operation.set_resolve(if changed { vec![1] } else { Vec::new() });
+        } else {
+            operation.set_reject();
+        }
+    }
+}
+
+const DIRECTIVE_STAGE: u8 = 1;
+const SCAN_STAGE: u8 = 2;
+const PARSE_STAGE: u8 = 3;
+const RESOLVE_STAGE: u8 = 4;
+const ANALYZE_STAGE: u8 = 5;
+#[cfg(feature = "interpreter")]
+const INTERPRET_STAGE: u8 = 6;
 const CACHE_REV: u64 = 1;
 
 impl<'session> Session<'session> {
@@ -201,41 +448,36 @@ impl<'session> Session<'session> {
         hasher.finish() as usize
     }
 
-    fn step_signature(&self, step: Step, keys: &[Identity]) -> usize {
-        match step {
-            Step::Scan => {
-                let mut hasher = DefaultHasher::new();
-                for key in self.source_keys(keys) {
-                    key.hash(&mut hasher);
-                    self.scan_signature(key).hash(&mut hasher);
-                }
-                hasher.finish() as usize
-            }
-            Step::Parse => {
-                let mut hasher = DefaultHasher::new();
-                for key in self.source_keys(keys) {
-                    key.hash(&mut hasher);
-                    self.parse_signature(key).hash(&mut hasher);
-                }
-                hasher.finish() as usize
-            }
-            Step::Resolve => self.combine_signature(&self.all_source_keys(), 2),
-            Step::Analyze => {
-                let mut hasher = DefaultHasher::new();
-                self.combine_signature(&self.all_source_keys(), 2).hash(&mut hasher);
-                self.stage_value(RESOLVE_STAGE, 0).hash(&mut hasher);
-                hasher.finish() as usize
-            }
-            Step::Interpret => self.combine_signature(&self.all_source_keys(), 3),
-            _ => 0,
-        }
+    fn resolve_signature(&self, keys: &[Identity]) -> usize {
+        self.combine_signature(keys, 2)
     }
 
-    fn step_keys(&self, step: Step, keys: &[Identity]) -> Vec<Identity> {
-        match step {
-            Step::Resolve | Step::Analyze | Step::Interpret => self.all_source_keys(),
-            _ => self.source_keys(keys),
+    fn analyze_signature(&self, keys: &[Identity]) -> usize {
+        let mut hasher = DefaultHasher::new();
+        self.combine_signature(keys, 2).hash(&mut hasher);
+        self.stage_value(RESOLVE_STAGE, 0).hash(&mut hasher);
+        hasher.finish() as usize
+    }
+
+    #[cfg(feature = "interpreter")]
+    fn interpret_signature(&self) -> usize {
+        self.combine_signature(&self.all_source_keys(), 3)
+    }
+
+    fn bootstrap(&mut self) {
+        if self.stage_value(DIRECTIVE_STAGE, 0) != 0 {
+            return;
         }
+
+        let directive = module!(Module::new(literal!(identifier!("directive"))))
+            .with_members(self.directives.clone());
+
+        for symbol in self.directives.clone() {
+            self.resolver.registry.insert(symbol.identity, symbol);
+        }
+
+        self.resolver.insert(directive);
+        self.set_stage(DIRECTIVE_STAGE, 0, 1);
     }
 
     fn restore_tokens(&mut self, keys: &[Identity]) {
@@ -396,157 +638,6 @@ impl<'session> Session<'session> {
 
             if let Some(Artifact::Analyses(analyses)) = record.fetch(3) {
                 self.report_section("Analysis", Color::Blue, analyses.format(stencil.clone()).to_string());
-            }
-        }
-    }
-
-    fn apply(
-        &mut self,
-        step: Step,
-        keys: &[Identity],
-        #[cfg(feature = "interpreter")]
-        mut core: Option<&mut Interpreter<'session>>,
-    ) -> bool {
-        match step {
-            Step::RestoreTokens => {
-                self.restore_tokens(keys);
-                false
-            }
-            Step::RestoreElements => {
-                self.restore_elements(keys);
-                false
-            }
-            Step::RestoreAnalyses => {
-                self.restore_analyses(keys);
-                false
-            }
-            Step::Scan => {
-                let mut changed = false;
-                for key in self.step_keys(step, keys) {
-                    let signature = self.scan_signature(key);
-                    if self.stage_value(SCAN_STAGE, key) == signature
-                        && self.records.get(&key).unwrap().fetch(1).is_some()
-                    {
-                        continue;
-                    }
-                    let before = self.records.get(&key).map(|record| record.artifact_version(1)).unwrap_or(0);
-                    Scanner::execute(self, &[key]);
-                    let after = self.records.get(&key).map(|record| record.artifact_version(1)).unwrap_or(0);
-                    self.set_stage(SCAN_STAGE, key, signature);
-                    changed |= before != after;
-                }
-                changed
-            }
-            Step::Parse => {
-                let mut changed = false;
-                for key in self.step_keys(step, keys) {
-                    let signature = self.parse_signature(key);
-                    if self.stage_value(PARSE_STAGE, key) == signature
-                        && self.records.get(&key).unwrap().fetch(2).is_some()
-                    {
-                        continue;
-                    }
-                    let before = self.records.get(&key).map(|record| record.artifact_version(2)).unwrap_or(0);
-                    Parser::execute(self, &[key]);
-                    let after = self.records.get(&key).map(|record| record.artifact_version(2)).unwrap_or(0);
-                    self.set_stage(PARSE_STAGE, key, signature);
-                    changed |= before != after;
-                }
-                changed
-            }
-            Step::Resolve => {
-                let stage = RESOLVE_STAGE;
-                let signature = self.step_signature(step, keys);
-                if self.stage_value(stage, 0) == signature {
-                    return false;
-                }
-                let before = self.resolver.registry.len();
-                let targets = self.step_keys(step, keys);
-                Resolver::execute(self, &targets);
-                let after = self.resolver.registry.len();
-                self.set_stage(stage, 0, signature);
-                before != after
-            }
-            Step::Analyze => {
-                let targets = self.step_keys(step, keys);
-                let signature = self.step_signature(step, keys);
-                if self.stage_value(ANALYZE_STAGE, 0) == signature
-                    && targets.iter().all(|key| self.records.get(key).unwrap().fetch(3).is_some())
-                {
-                    return false;
-                }
-                let before = targets
-                    .iter()
-                    .map(|key| self.records.get(key).map(|record| record.artifact_version(3)).unwrap_or(0))
-                    .sum::<usize>();
-                Analyzer::execute(self, &targets);
-                let after = targets
-                    .iter()
-                    .map(|key| self.records.get(key).map(|record| record.artifact_version(3)).unwrap_or(0))
-                    .sum::<usize>();
-                self.set_stage(ANALYZE_STAGE, 0, signature);
-                before != after
-            }
-            Step::Interpret => {
-                #[cfg(feature = "interpreter")]
-                {
-                    let signature = self.step_signature(step, keys);
-                    if self.stage_value(INTERPRET_STAGE, 0) == signature {
-                        return false;
-                    }
-                    if let Some(core) = core.as_mut() {
-                        core.reset();
-                        let targets = self.step_keys(step, keys);
-                        Interpreter::process(self, core, &targets);
-                        self.set_stage(INTERPRET_STAGE, 0, signature);
-                        return true;
-                    }
-                }
-                false
-            }
-            Step::CacheTokens | Step::CacheElements | Step::CacheAnalyses => {
-                match step {
-                    Step::CacheTokens => self.store_tokens(keys),
-                    Step::CacheElements => self.store_elements(keys),
-                    Step::CacheAnalyses => self.store_analyses(keys),
-                    _ => {}
-                }
-                false
-            }
-            Step::ReportTokens | Step::ReportElements | Step::ReportAnalyses => {
-                match step {
-                    Step::ReportTokens => self.report_tokens(keys),
-                    Step::ReportElements => self.report_elements(keys),
-                    Step::ReportAnalyses => self.report_analyses(keys),
-                    _ => {}
-                }
-                false
-            }
-        }
-    }
-
-    pub fn drive(
-        &mut self,
-        keys: &[Identity],
-        mode: Mode,
-        steps: &[Step],
-        #[cfg(feature = "interpreter")]
-        mut core: Option<&mut Interpreter<'session>>,
-    ) {
-        loop {
-            let mut changed = false;
-
-            for step in steps {
-                changed |= self.apply(
-                    *step,
-                    keys,
-                    #[cfg(feature = "interpreter")]
-                    core.as_deref_mut(),
-                );
-            }
-
-            if mode != Mode::Reactive || !changed {
-                break;
             }
         }
     }
@@ -814,40 +905,184 @@ impl<'session> Session<'session> {
         #[cfg(feature = "interpreter")]
         engine: Option<Arc<Lock<Interpreter<'session>>>>,
     ) -> Operation<'session, Arc<Lock<Session<'session>>>> {
+        #[cfg(feature = "generator")]
         let mut states = vec![
+            Operation::new(Arc::new(Bootstrap)),
             Operation::new(Arc::new(Prepare)),
-            Operation::new(Arc::new(Flow {
-                keys: keys.clone(),
-                mode: Mode::Once,
-                steps: vec![Step::RestoreTokens, Step::RestoreElements, Step::RestoreAnalyses],
+            Operation::plan(vec![
+                Operation::new(Arc::new(Restore {
+                    keys: keys.clone(),
+                    slot: 1,
+                    name: "tokens",
+                    phantom: PhantomData,
+                })),
+                Operation::new(Arc::new(Restore {
+                    keys: keys.clone(),
+                    slot: 2,
+                    name: "elements",
+                    phantom: PhantomData,
+                })),
+                Operation::new(Arc::new(Restore {
+                    keys: keys.clone(),
+                    slot: 3,
+                    name: "analyses",
+                    phantom: PhantomData,
+                })),
+            ]),
+            Operation::cycle(Operation::plan(vec![
+                Operation::new(Arc::new(Scan {
+                    keys: keys.clone(),
+                    phantom: PhantomData,
+                })),
+                Operation::new(Arc::new(Parse {
+                    keys: keys.clone(),
+                    phantom: PhantomData,
+                })),
+                Operation::new(Arc::new(Resolve {
+                    phantom: PhantomData,
+                })),
+                Operation::new(Arc::new(Analyze {
+                    phantom: PhantomData,
+                })),
                 #[cfg(feature = "interpreter")]
-                engine: engine.clone(),
-                phantom: PhantomData,
-            })),
-            Operation::new(Arc::new(Flow {
-                keys: keys.clone(),
-                mode: Mode::Reactive,
-                steps: vec![Step::Scan, Step::Parse, Step::Resolve, Step::Analyze, Step::Interpret],
+                Operation::new(Arc::new(Interpret {
+                    engine: engine.clone(),
+                    phantom: PhantomData,
+                })),
+            ])),
+            Operation::plan(vec![
+                Operation::new(Arc::new(Cache {
+                    keys: keys.clone(),
+                    slot: 1,
+                    name: "tokens",
+                    phantom: PhantomData,
+                })),
+                Operation::new(Arc::new(Cache {
+                    keys: keys.clone(),
+                    slot: 2,
+                    name: "elements",
+                    phantom: PhantomData,
+                })),
+                Operation::new(Arc::new(Cache {
+                    keys: keys.clone(),
+                    slot: 3,
+                    name: "analyses",
+                    phantom: PhantomData,
+                })),
+            ]),
+            Operation::plan(vec![
+                Operation::new(Arc::new(Report {
+                    keys: keys.clone(),
+                    slot: 1,
+                    head: "Tokens",
+                    color: broccli::Color::Cyan,
+                    phantom: PhantomData,
+                })),
+                Operation::new(Arc::new(Report {
+                    keys: keys.clone(),
+                    slot: 2,
+                    head: "Elements",
+                    color: broccli::Color::Cyan,
+                    phantom: PhantomData,
+                })),
+                Operation::new(Arc::new(Report {
+                    keys: keys.clone(),
+                    slot: 3,
+                    head: "Analysis",
+                    color: broccli::Color::Blue,
+                    phantom: PhantomData,
+                })),
+            ]),
+        ];
+
+        #[cfg(not(feature = "generator"))]
+        let states = vec![
+            Operation::new(Arc::new(Bootstrap)),
+            Operation::new(Arc::new(Prepare)),
+            Operation::plan(vec![
+                Operation::new(Arc::new(Restore {
+                    keys: keys.clone(),
+                    slot: 1,
+                    name: "tokens",
+                    phantom: PhantomData,
+                })),
+                Operation::new(Arc::new(Restore {
+                    keys: keys.clone(),
+                    slot: 2,
+                    name: "elements",
+                    phantom: PhantomData,
+                })),
+                Operation::new(Arc::new(Restore {
+                    keys: keys.clone(),
+                    slot: 3,
+                    name: "analyses",
+                    phantom: PhantomData,
+                })),
+            ]),
+            Operation::cycle(Operation::plan(vec![
+                Operation::new(Arc::new(Scan {
+                    keys: keys.clone(),
+                    phantom: PhantomData,
+                })),
+                Operation::new(Arc::new(Parse {
+                    keys: keys.clone(),
+                    phantom: PhantomData,
+                })),
+                Operation::new(Arc::new(Resolve {
+                    phantom: PhantomData,
+                })),
+                Operation::new(Arc::new(Analyze {
+                    phantom: PhantomData,
+                })),
                 #[cfg(feature = "interpreter")]
-                engine: engine.clone(),
-                phantom: PhantomData,
-            })),
-            Operation::new(Arc::new(Flow {
-                keys: keys.clone(),
-                mode: Mode::Once,
-                steps: vec![Step::CacheTokens, Step::CacheElements, Step::CacheAnalyses],
-                #[cfg(feature = "interpreter")]
-                engine: engine.clone(),
-                phantom: PhantomData,
-            })),
-            Operation::new(Arc::new(Flow {
-                keys,
-                mode: Mode::Once,
-                steps: vec![Step::ReportTokens, Step::ReportElements, Step::ReportAnalyses],
-                #[cfg(feature = "interpreter")]
-                engine,
-                phantom: PhantomData,
-            })),
+                Operation::new(Arc::new(Interpret {
+                    engine: engine.clone(),
+                    phantom: PhantomData,
+                })),
+            ])),
+            Operation::plan(vec![
+                Operation::new(Arc::new(Cache {
+                    keys: keys.clone(),
+                    slot: 1,
+                    name: "tokens",
+                    phantom: PhantomData,
+                })),
+                Operation::new(Arc::new(Cache {
+                    keys: keys.clone(),
+                    slot: 2,
+                    name: "elements",
+                    phantom: PhantomData,
+                })),
+                Operation::new(Arc::new(Cache {
+                    keys: keys.clone(),
+                    slot: 3,
+                    name: "analyses",
+                    phantom: PhantomData,
+                })),
+            ]),
+            Operation::plan(vec![
+                Operation::new(Arc::new(Report {
+                    keys: keys.clone(),
+                    slot: 1,
+                    head: "Tokens",
+                    color: broccli::Color::Cyan,
+                    phantom: PhantomData,
+                })),
+                Operation::new(Arc::new(Report {
+                    keys: keys.clone(),
+                    slot: 2,
+                    head: "Elements",
+                    color: broccli::Color::Cyan,
+                    phantom: PhantomData,
+                })),
+                Operation::new(Arc::new(Report {
+                    keys: keys.clone(),
+                    slot: 3,
+                    head: "Analysis",
+                    color: broccli::Color::Blue,
+                    phantom: PhantomData,
+                })),
+            ]),
         ];
 
         #[cfg(feature = "generator")]

@@ -100,3 +100,8 @@ pub struct Repetition<State> {
     pub halt: fn(&State) -> bool,
     pub keep: fn(&State) -> bool,
 }
+
+pub struct Cycle<State> {
+    pub state: Box<State>,
+    pub keep: fn(&State) -> bool,
+}

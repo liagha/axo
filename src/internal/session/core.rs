@@ -1,6 +1,6 @@
 use {
     crate::{
-        analyzer::Analysis,
+        analyzer::{Analysis, Analyzer},
         data::*,
         format::{Display, Show, Stencil},
         identifier,
@@ -10,11 +10,11 @@ use {
             time::{Duration, Instant},
             SessionError,
         },
-        literal, module,
-        parser::{Element, ElementKind, Symbol, SymbolKind},
+        literal,
+        parser::{Element, ElementKind, Parser, Symbol, SymbolKind},
         reporter::Error,
         resolver::Resolver,
-        scanner::{Token, TokenKind},
+        scanner::{Scanner, Token, TokenKind},
         tracker::{Location, Span},
     },
     broccli::{xprintln, Color, TextStyle},
@@ -172,6 +172,7 @@ pub struct Session<'session> {
     pub laps: Vec<Duration>,
     pub records: Map<Identity, Record<'session>>,
     pub resolver: Resolver<'session>,
+    pub directives: Vec<Symbol<'session>>,
     pub errors: Vec<SessionError<'session>>,
     pub target: Option<Location<'session>>,
     pub cache: Map<Location<'session>, u64>,
@@ -188,7 +189,7 @@ impl<'session> Session<'session> {
         let timer = Instant::now();
         let mut laps = Vec::new();
 
-        let mut resolver = Resolver::new();
+        let resolver = Resolver::new();
         let mut records = Map::new();
         let cache = Map::new();
 
@@ -209,15 +210,6 @@ impl<'session> Session<'session> {
             }
         }
 
-        for symbol in directives.clone() {
-            resolver.registry.insert(symbol.identity, symbol);
-        }
-
-        let directive = module!(Module::new(literal!(identifier!("directive"))))
-            .with_members(directives);
-
-        resolver.insert(directive);
-
         laps.push(timer.elapsed());
 
         Self {
@@ -225,6 +217,7 @@ impl<'session> Session<'session> {
             laps,
             records,
             resolver,
+            directives,
             errors: failures,
             target: None,
             cache,
@@ -285,41 +278,91 @@ impl<'session> Session<'session> {
     #[cfg(feature = "interpreter")]
     pub fn execute(session: &mut Self, core: &mut Interpreter<'session>, keys: &[Identity]) {
         session.errors.clear();
+        session.bootstrap();
         if !session.prepare() {
             session.report_all();
             return;
         }
 
-        session.drive(
-            keys,
-            super::Mode::Once,
-            &[super::Step::RestoreTokens, super::Step::RestoreElements, super::Step::RestoreAnalyses],
-            Some(core),
-        );
-        session.drive(
-            keys,
-            super::Mode::Reactive,
-            &[
-                super::Step::Scan,
-                super::Step::Parse,
-                super::Step::Resolve,
-                super::Step::Analyze,
-                super::Step::Interpret,
-            ],
-            Some(core),
-        );
-        session.drive(
-            keys,
-            super::Mode::Once,
-            &[super::Step::CacheTokens, super::Step::CacheElements, super::Step::CacheAnalyses],
-            Some(core),
-        );
-        session.drive(
-            keys,
-            super::Mode::Once,
-            &[super::Step::ReportTokens, super::Step::ReportElements, super::Step::ReportAnalyses],
-            Some(core),
-        );
+        session.restore_tokens(keys);
+        session.restore_elements(keys);
+        session.restore_analyses(keys);
+
+        loop {
+            let mut changed = false;
+
+            for key in session.source_keys(keys) {
+                let signature = session.scan_signature(key);
+                if session.stage_value(super::SCAN_STAGE, key) != signature
+                    || session.records.get(&key).unwrap().fetch(1).is_none()
+                {
+                    let before = session.records.get(&key).map(|record| record.artifact_version(1)).unwrap_or(0);
+                    Scanner::execute(session, &[key]);
+                    let after = session.records.get(&key).map(|record| record.artifact_version(1)).unwrap_or(0);
+                    session.set_stage(super::SCAN_STAGE, key, signature);
+                    changed |= before != after;
+                }
+            }
+
+            for key in session.source_keys(keys) {
+                let signature = session.parse_signature(key);
+                if session.stage_value(super::PARSE_STAGE, key) != signature
+                    || session.records.get(&key).unwrap().fetch(2).is_none()
+                {
+                    let before = session.records.get(&key).map(|record| record.artifact_version(2)).unwrap_or(0);
+                    Parser::execute(session, &[key]);
+                    let after = session.records.get(&key).map(|record| record.artifact_version(2)).unwrap_or(0);
+                    session.set_stage(super::PARSE_STAGE, key, signature);
+                    changed |= before != after;
+                }
+            }
+
+            let targets = session.all_source_keys();
+            let resolve = session.resolve_signature(&targets);
+            if session.stage_value(super::RESOLVE_STAGE, 0) != resolve {
+                let before = session.resolver.registry.len();
+                Resolver::execute(session, &targets);
+                let after = session.resolver.registry.len();
+                session.set_stage(super::RESOLVE_STAGE, 0, resolve);
+                changed |= before != after;
+            }
+
+            let analyze = session.analyze_signature(&targets);
+            if session.stage_value(super::ANALYZE_STAGE, 0) != analyze
+                || targets.iter().any(|key| session.records.get(key).unwrap().fetch(3).is_none())
+            {
+                let before = targets
+                    .iter()
+                    .map(|key| session.records.get(key).map(|record| record.artifact_version(3)).unwrap_or(0))
+                    .sum::<usize>();
+                Analyzer::execute(session, &targets);
+                let after = targets
+                    .iter()
+                    .map(|key| session.records.get(key).map(|record| record.artifact_version(3)).unwrap_or(0))
+                    .sum::<usize>();
+                session.set_stage(super::ANALYZE_STAGE, 0, analyze);
+                changed |= before != after;
+            }
+
+            let interpret = session.interpret_signature();
+            if session.stage_value(super::INTERPRET_STAGE, 0) != interpret {
+                core.reset();
+                Interpreter::process(session, core, &targets);
+                session.set_stage(super::INTERPRET_STAGE, 0, interpret);
+                changed = true;
+            }
+
+            if !changed || !session.errors.is_empty() {
+                break;
+            }
+        }
+
+        session.store_tokens(keys);
+        session.store_elements(keys);
+        session.store_analyses(keys);
+        session.report_tokens(keys);
+        session.report_elements(keys);
+        session.report_analyses(keys);
         session.report_all();
     }
 

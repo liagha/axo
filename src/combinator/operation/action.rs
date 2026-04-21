@@ -1,8 +1,8 @@
 use {
     crate::{
         combinator::{
-            Action, Alternative, Command, Condition, Multiple, Operation, Operator, Repetition,
-            Sequence, Status, Transform, Trigger,
+            Action, Alternative, Command, Condition, Cycle, Multiple, Operation, Operator,
+            Repetition, Sequence, Status, Transform, Trigger,
         },
         data::{memory::take, Identity, Scale},
         internal::{
@@ -282,6 +282,44 @@ impl<'source, Store: Clone + Send + Sync + 'source> Action<'static, Operator<Sto
             operation.stack.truncate(base_stack);
             operation.set_reject();
         }
+    }
+}
+
+impl<'source, Store: Clone + Send + Sync + 'source> Action<'static, Operator<Store>, Operation<'source, Store>>
+for Cycle<Operation<'source, Store>>
+{
+    #[inline]
+    fn action(&self, operator: &mut Operator<Store>, operation: &mut Operation<'source, Store>) {
+        let mut local = Operator::new(operator.store.clone());
+        let mut current_stack = take(&mut operation.stack);
+        let mut current_payload = take(&mut operation.payload);
+
+        loop {
+            local.cache.clear();
+
+            let mut child = Operation::create(
+                self.state.identity,
+                self.state.action.clone(),
+                Status::Pending,
+                operation.depth + 1,
+                current_stack,
+                current_payload,
+                self.state.depends.clone(),
+            );
+
+            local.build(&mut child);
+
+            current_stack = take(&mut child.stack);
+            current_payload = take(&mut child.payload);
+            operation.status = child.status.clone();
+
+            if !child.is_resolved() || !(self.keep)(&child) {
+                break;
+            }
+        }
+
+        operation.stack = current_stack;
+        operation.payload = current_payload;
     }
 }
 

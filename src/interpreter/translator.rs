@@ -1,12 +1,10 @@
 use crate::{
     analyzer::{Analysis, AnalysisKind},
     data::{
-        Function,
-        Invoke,
-        Str,
         memory::take,
+        Function, Invoke, Str,
     },
-    interpreter::{Call, Instruction, Interpreter, Opcode, Slot, Value, error::ErrorKind},
+    interpreter::{error::ErrorKind, Call, Instruction, Interpreter, Opcode, Slot, Value},
     resolver::{Type, TypeKind},
     tracker::Span,
 };
@@ -99,9 +97,15 @@ impl<'a> Interpreter<'a> {
         self.current_module = module;
         self.declare(analyses.clone());
         self.generate(analyses);
+
+        if let Some(span) = self.code.last().map(|instruction| instruction.span.clone()) {
+            self.emit(Opcode::Halt, span);
+        }
+
         self.current_module = previous;
         self.finish_calls();
 
+        self.pointer = start;
         start
     }
 
@@ -202,8 +206,11 @@ impl<'a> Interpreter<'a> {
             self.walk(*body);
         }
 
-        self.function_frames
-            .insert(address, (memory, self.memory_top - memory, function.members.len()));
+        self.function_frames.insert(
+            address,
+            (memory, self.memory_top - memory, function.members.len()),
+        );
+
         self.emit(Opcode::Return, span.clone());
         self.slots = slots;
         self.memory_top = memory;
@@ -215,9 +222,10 @@ impl<'a> Interpreter<'a> {
             TypeKind::Pointer { target } => self.member(target, field),
             TypeKind::Has(target) => member_name(target).is_some_and(|name| &name == field),
             TypeKind::And(left, right) => self.member(left, field) || self.member(right, field),
-            TypeKind::Structure(aggregate) | TypeKind::Union(aggregate) => aggregate.members.iter().any(|member| {
-                member_name(member).is_some_and(|name| name == *field)
-            }),
+            TypeKind::Structure(aggregate) | TypeKind::Union(aggregate) => aggregate
+                .members
+                .iter()
+                .any(|member| member_name(member).is_some_and(|name| name == *field)),
             _ => false,
         }
     }

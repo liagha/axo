@@ -1,8 +1,8 @@
 use {
     crate::{
         combinator::{
-            next_identity, Action, Alternative, Command, Condition, Multiple, Operator, Plan,
-            Repetition, Sequence, Transform, Trigger,
+            next_identity, Action, Alternative, Command, Condition, Cycle, Multiple, Operator,
+            Plan, Repetition, Sequence, Transform, Trigger,
         },
         data::{memory::Arc, memory::PhantomData, Identity, Scale},
         internal::time::{Duration, SystemTime},
@@ -164,6 +164,14 @@ impl<'source, Store: Clone + Send + Sync + 'source> Operation<'source, Store> {
             maximum,
             halt: |state| state.is_rejected() || state.is_pending(),
             keep: |state| state.is_resolved(),
+        }))
+    }
+
+    #[inline]
+    pub fn cycle(state: Self) -> Self {
+        Self::new(Arc::new(Cycle {
+            state: Box::new(state),
+            keep: |state| matches!(&state.status, Status::Resolved(data) if !data.is_empty()),
         }))
     }
 

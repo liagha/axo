@@ -1,0 +1,8 @@
+func main(): Integer {
+    print.print_integer(32+37)
+    print.print_integer(3*23)
+    print.print_integer(100-31)
+    print.print_integer(138/2)
+
+    0
+}
