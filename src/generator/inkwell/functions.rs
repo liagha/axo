@@ -515,6 +515,21 @@ impl<'backend> Generator<'backend> {
                                 .map_err(|error| {
                                     GenerateError::new(ErrorKind::BuilderError(error.into()), span)
                                 })?;
+                        } else if value.get_type() != expected
+                            && value.is_int_value()
+                            && expected.is_int_type()
+                        {
+                            value = self
+                                .builder
+                                .build_int_cast(
+                                    value.into_int_value(),
+                                    expected.into_int_type(),
+                                    "cast",
+                                )
+                                .map_err(|error| {
+                                    GenerateError::new(ErrorKind::BuilderError(error.into()), span)
+                                })?
+                                .into();
                         }
                     }
                 }

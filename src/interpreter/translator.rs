@@ -183,6 +183,7 @@ impl<'a> Interpreter<'a> {
                     self.memory_top += 1;
                     self.bind_slot(*target, Slot { address, typing: member.typing.clone() });
                     self.emit(Opcode::Store(address), span.clone());
+                    self.emit(Opcode::Pop, span.clone());
                 }
                 AnalysisKind::Binding(binding) => {
                     if let AnalysisKind::Usage(target) = &binding.target.kind {
@@ -190,6 +191,7 @@ impl<'a> Interpreter<'a> {
                         self.memory_top += 1;
                         self.bind_slot(*target, Slot { address, typing: value_type(&member.typing) });
                         self.emit(Opcode::Store(address), span.clone());
+                        self.emit(Opcode::Pop, span.clone());
                     }
                 }
                 _ => {}
@@ -200,7 +202,8 @@ impl<'a> Interpreter<'a> {
             self.walk(*body);
         }
 
-        self.function_frames.insert(address, (memory, self.memory_top - memory));
+        self.function_frames
+            .insert(address, (memory, self.memory_top - memory, function.members.len()));
         self.emit(Opcode::Return, span.clone());
         self.slots = slots;
         self.memory_top = memory;

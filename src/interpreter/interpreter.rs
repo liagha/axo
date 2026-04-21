@@ -107,6 +107,7 @@ pub enum Call {
 pub struct Frame {
     pub pointer: Address,
     pub start: Address,
+    pub stack: Address,
     pub locals: Vec<Value>,
 }
 
@@ -119,7 +120,7 @@ pub struct Interpreter<'a> {
     pub slots: Map<Str<'a>, Slot<'a>>,
     pub calls: Map<Identity, Vec<(Type<'a>, Call)>>,
     pub values: Map<Str<'a>, Value>,
-    pub function_frames: Map<Address, (Address, Scale)>,
+    pub function_frames: Map<Address, (Address, Scale, Scale)>,
     pub modules: Map<Str<'a>, Vec<Analysis<'a>>>,
     pub current_module: Str<'a>,
     pub pending: Vec<(Address, Identity, Type<'a>)>,
@@ -225,6 +226,7 @@ impl<'a> Interpreter<'a> {
             self.frames.push(Frame {
                 pointer: self.code.len(),
                 start: 0,
+                stack: 0,
                 locals: Vec::new(),
             });
         }
@@ -301,7 +303,7 @@ impl<'a> Interpreter<'a> {
             (Value::Float(left), Value::Float(right)) => Value::Float(left + right),
             (Value::Float(left), Value::Integer(right)) => Value::Float(left + right as f64),
             (Value::Integer(left), Value::Float(right)) => Value::Float(left as f64 + right),
-            _ => return Err(self.error(ErrorKind::TypeMismatch, span)),
+            _ => return Err(self.error(ErrorKind::InvalidBinary, span)),
         };
 
         self.stack.push(result);
@@ -318,7 +320,7 @@ impl<'a> Interpreter<'a> {
             (Value::Float(left), Value::Float(right)) => Value::Float(left - right),
             (Value::Float(left), Value::Integer(right)) => Value::Float(left - right as f64),
             (Value::Integer(left), Value::Float(right)) => Value::Float(left as f64 - right),
-            _ => return Err(self.error(ErrorKind::TypeMismatch, span)),
+            _ => return Err(self.error(ErrorKind::InvalidBinary, span)),
         };
 
         self.stack.push(result);
@@ -335,7 +337,7 @@ impl<'a> Interpreter<'a> {
             (Value::Float(left), Value::Float(right)) => Value::Float(left * right),
             (Value::Float(left), Value::Integer(right)) => Value::Float(left * right as f64),
             (Value::Integer(left), Value::Float(right)) => Value::Float(left as f64 * right),
-            _ => return Err(self.error(ErrorKind::TypeMismatch, span)),
+            _ => return Err(self.error(ErrorKind::InvalidBinary, span)),
         };
 
         self.stack.push(result);
@@ -357,7 +359,7 @@ impl<'a> Interpreter<'a> {
             (Value::Float(left), Value::Float(right)) => Value::Float(left / right),
             (Value::Float(left), Value::Integer(right)) => Value::Float(left / right as f64),
             (Value::Integer(left), Value::Float(right)) => Value::Float(left as f64 / right),
-            _ => return Err(self.error(ErrorKind::TypeMismatch, span)),
+            _ => return Err(self.error(ErrorKind::InvalidBinary, span)),
         };
 
         self.stack.push(result);
@@ -379,7 +381,7 @@ impl<'a> Interpreter<'a> {
             (Value::Float(left), Value::Float(right)) => Value::Float(left % right),
             (Value::Float(left), Value::Integer(right)) => Value::Float(left % right as f64),
             (Value::Integer(left), Value::Float(right)) => Value::Float(left as f64 % right),
-            _ => return Err(self.error(ErrorKind::TypeMismatch, span)),
+            _ => return Err(self.error(ErrorKind::InvalidBinary, span)),
         };
 
         self.stack.push(result);
@@ -393,7 +395,7 @@ impl<'a> Interpreter<'a> {
         let result = match value {
             Value::Integer(value) => Value::Integer(-value),
             Value::Float(value) => Value::Float(-value),
-            _ => return Err(self.error(ErrorKind::TypeMismatch, span)),
+            _ => return Err(self.error(ErrorKind::InvalidUnary, span)),
         };
 
         self.stack.push(result);
@@ -444,7 +446,7 @@ impl<'a> Interpreter<'a> {
             (Value::Float(left), Value::Float(right)) => Value::Boolean(left < right),
             (Value::Float(left), Value::Integer(right)) => Value::Boolean(left < right as f64),
             (Value::Integer(left), Value::Float(right)) => Value::Boolean((left as f64) < right),
-            _ => return Err(self.error(ErrorKind::TypeMismatch, span)),
+            _ => return Err(self.error(ErrorKind::InvalidCompare, span)),
         };
 
         self.stack.push(result);
@@ -461,7 +463,7 @@ impl<'a> Interpreter<'a> {
             (Value::Float(left), Value::Float(right)) => Value::Boolean(left > right),
             (Value::Float(left), Value::Integer(right)) => Value::Boolean(left > right as f64),
             (Value::Integer(left), Value::Float(right)) => Value::Boolean((left as f64) > right),
-            _ => return Err(self.error(ErrorKind::TypeMismatch, span)),
+            _ => return Err(self.error(ErrorKind::InvalidCompare, span)),
         };
 
         self.stack.push(result);
@@ -478,7 +480,7 @@ impl<'a> Interpreter<'a> {
             (Value::Float(left), Value::Float(right)) => Value::Boolean(left <= right),
             (Value::Float(left), Value::Integer(right)) => Value::Boolean(left <= right as f64),
             (Value::Integer(left), Value::Float(right)) => Value::Boolean((left as f64) <= right),
-            _ => return Err(self.error(ErrorKind::TypeMismatch, span)),
+            _ => return Err(self.error(ErrorKind::InvalidCompare, span)),
         };
 
         self.stack.push(result);
@@ -495,7 +497,7 @@ impl<'a> Interpreter<'a> {
             (Value::Float(left), Value::Float(right)) => Value::Boolean(left >= right),
             (Value::Float(left), Value::Integer(right)) => Value::Boolean(left >= right as f64),
             (Value::Integer(left), Value::Float(right)) => Value::Boolean((left as f64) >= right),
-            _ => return Err(self.error(ErrorKind::TypeMismatch, span)),
+            _ => return Err(self.error(ErrorKind::InvalidCompare, span)),
         };
 
         self.stack.push(result);
@@ -509,7 +511,7 @@ impl<'a> Interpreter<'a> {
 
         let result = match (left, right) {
             (Value::Boolean(left), Value::Boolean(right)) => Value::Boolean(left && right),
-            _ => return Err(self.error(ErrorKind::TypeMismatch, span)),
+            _ => return Err(self.error(ErrorKind::InvalidBinary, span)),
         };
 
         self.stack.push(result);
@@ -523,7 +525,7 @@ impl<'a> Interpreter<'a> {
 
         let result = match (left, right) {
             (Value::Boolean(left), Value::Boolean(right)) => Value::Boolean(left || right),
-            _ => return Err(self.error(ErrorKind::TypeMismatch, span)),
+            _ => return Err(self.error(ErrorKind::InvalidBinary, span)),
         };
 
         self.stack.push(result);
@@ -536,7 +538,7 @@ impl<'a> Interpreter<'a> {
 
         let result = match value {
             Value::Boolean(value) => Value::Boolean(!value),
-            _ => return Err(self.error(ErrorKind::TypeMismatch, span)),
+            _ => return Err(self.error(ErrorKind::InvalidUnary, span)),
         };
 
         self.stack.push(result);
@@ -550,7 +552,7 @@ impl<'a> Interpreter<'a> {
 
         let result = match (left, right) {
             (Value::Boolean(left), Value::Boolean(right)) => Value::Boolean(left ^ right),
-            _ => return Err(self.error(ErrorKind::TypeMismatch, span)),
+            _ => return Err(self.error(ErrorKind::InvalidBinary, span)),
         };
 
         self.stack.push(result);
@@ -564,7 +566,7 @@ impl<'a> Interpreter<'a> {
 
         let result = match (left, right) {
             (Value::Integer(left), Value::Integer(right)) => Value::Integer(left & right),
-            _ => return Err(self.error(ErrorKind::TypeMismatch, span)),
+            _ => return Err(self.error(ErrorKind::InvalidBinary, span)),
         };
 
         self.stack.push(result);
@@ -578,7 +580,7 @@ impl<'a> Interpreter<'a> {
 
         let result = match (left, right) {
             (Value::Integer(left), Value::Integer(right)) => Value::Integer(left | right),
-            _ => return Err(self.error(ErrorKind::TypeMismatch, span)),
+            _ => return Err(self.error(ErrorKind::InvalidBinary, span)),
         };
 
         self.stack.push(result);
@@ -591,7 +593,7 @@ impl<'a> Interpreter<'a> {
 
         let result = match value {
             Value::Integer(value) => Value::Integer(!value),
-            _ => return Err(self.error(ErrorKind::TypeMismatch, span)),
+            _ => return Err(self.error(ErrorKind::InvalidBinary, span)),
         };
 
         self.stack.push(result);
@@ -605,7 +607,7 @@ impl<'a> Interpreter<'a> {
 
         let result = match (left, right) {
             (Value::Integer(left), Value::Integer(right)) => Value::Integer(left ^ right),
-            _ => return Err(self.error(ErrorKind::TypeMismatch, span)),
+            _ => return Err(self.error(ErrorKind::InvalidCondition, span)),
         };
 
         self.stack.push(result);
@@ -619,7 +621,7 @@ impl<'a> Interpreter<'a> {
 
         let result = match (left, right) {
             (Value::Integer(left), Value::Integer(right)) => Value::Integer(left << right),
-            _ => return Err(self.error(ErrorKind::TypeMismatch, span)),
+            _ => return Err(self.error(ErrorKind::InvalidCondition, span)),
         };
 
         self.stack.push(result);
@@ -633,7 +635,7 @@ impl<'a> Interpreter<'a> {
 
         let result = match (left, right) {
             (Value::Integer(left), Value::Integer(right)) => Value::Integer(left >> right),
-            _ => return Err(self.error(ErrorKind::TypeMismatch, span)),
+            _ => return Err(self.error(ErrorKind::InvalidStore, span)),
         };
 
         self.stack.push(result);
@@ -656,7 +658,7 @@ impl<'a> Interpreter<'a> {
         match condition {
             Value::Boolean(true) => self.jump(target)?,
             Value::Boolean(false) => {}
-            _ => return Err(self.error(ErrorKind::TypeMismatch, span)),
+            _ => return Err(self.error(ErrorKind::InvalidCondition, span)),
         }
 
         Ok(())
@@ -669,7 +671,7 @@ impl<'a> Interpreter<'a> {
         match condition {
             Value::Boolean(false) => self.jump(target)?,
             Value::Boolean(true) => {}
-            _ => return Err(self.error(ErrorKind::TypeMismatch, span)),
+            _ => return Err(self.error(ErrorKind::InvalidCondition, span)),
         }
 
         Ok(())
@@ -691,7 +693,8 @@ impl<'a> Interpreter<'a> {
             return Err(self.error(ErrorKind::MemoryAccessViolation, span));
         }
         let value = self.stack.pop().ok_or_else(|| self.error(ErrorKind::StackUnderflow, span))?;
-        self.memory[address] = value;
+        self.memory[address] = value.clone();
+        self.stack.push(value);
         Ok(())
     }
 
@@ -701,14 +704,41 @@ impl<'a> Interpreter<'a> {
             return Err(self.error(ErrorKind::MemoryAccessViolation, span));
         }
         let value = self.stack.pop().ok_or_else(|| self.error(ErrorKind::StackUnderflow, span))?;
-        if let Value::Structure(_, fields) = &mut self.memory[address] {
-            if field >= fields.len() {
-                return Err(self.error(ErrorKind::OutOfBounds, span));
-            }
 
-            fields[field] = value;
-        } else {
-            return Err(self.error(ErrorKind::TypeMismatch, span));
+        match &mut self.memory[address] {
+            Value::Structure(_, fields) => {
+                if field >= fields.len() {
+                    return Err(self.error(ErrorKind::OutOfBounds, span));
+                }
+                fields[field] = value.clone();
+            }
+            Value::Sequence(items) => {
+                if field >= items.len() {
+                    return Err(self.error(ErrorKind::OutOfBounds, span));
+                }
+                items[field] = value.clone();
+            }
+            _ => return Err(self.error(ErrorKind::InvalidStore, span)),
+        }
+
+        self.stack.push(value);
+        Ok(())
+    }
+
+    fn extract_field(&mut self, field: Index) -> Result<(), InterpretError<'a>> {
+        let span = self.current();
+        let target = self.stack.pop().ok_or_else(|| self.error(ErrorKind::StackUnderflow, span))?;
+
+        match target {
+            Value::Structure(_, fields) => {
+                let value = fields.get(field).ok_or_else(|| self.error(ErrorKind::OutOfBounds, span))?.clone();
+                self.stack.push(value);
+            }
+            Value::Sequence(items) => {
+                let value = items.get(field).ok_or_else(|| self.error(ErrorKind::OutOfBounds, span))?.clone();
+                self.stack.push(value);
+            }
+            _ => return Err(self.error(ErrorKind::InvalidAccess, span)),
         }
         Ok(())
     }
@@ -744,8 +774,9 @@ impl<'a> Interpreter<'a> {
         if target >= self.code.len() {
             return Err(self.error(ErrorKind::OutOfBounds, span));
         }
-        let (start, size) = self.function_frames.get(&target).copied().unwrap_or((0, 0));
+        let (start, size, count) = self.function_frames.get(&target).copied().unwrap_or((0, 0, 0));
         let end = start + size;
+        let stack = self.stack.len().saturating_sub(count);
 
         if end > self.memory.len() {
             self.memory.resize(end, Value::Empty);
@@ -759,6 +790,7 @@ impl<'a> Interpreter<'a> {
         self.frames.push(Frame {
             pointer: self.pointer,
             start,
+            stack,
             locals,
         });
         self.pointer = target;
@@ -775,8 +807,11 @@ impl<'a> Interpreter<'a> {
         }
 
         let frame = self.frames.pop().ok_or_else(|| self.error(ErrorKind::InvalidFrame, span))?;
+        let value = self.stack.pop().unwrap_or(Value::Empty);
         let end = frame.start + frame.locals.len();
         self.memory[frame.start..end].clone_from_slice(&frame.locals);
+        self.stack.truncate(frame.stack);
+        self.stack.push(value);
         self.pointer = frame.pointer;
         Ok(())
     }
@@ -803,20 +838,6 @@ impl<'a> Interpreter<'a> {
         Ok(())
     }
 
-    fn extract_field(&mut self, field: Index) -> Result<(), InterpretError<'a>> {
-        let span = self.current();
-        let target = self.stack.pop().ok_or_else(|| self.error(ErrorKind::StackUnderflow, span))?;
-
-        match target {
-            Value::Structure(_, fields) => {
-                let value = fields.get(field).ok_or_else(|| self.error(ErrorKind::OutOfBounds, span))?.clone();
-                self.stack.push(value);
-            }
-            _ => return Err(self.error(ErrorKind::TypeMismatch, span)),
-        }
-        Ok(())
-    }
-
     fn index(&mut self) -> Result<(), InterpretError<'a>> {
         let span = self.current();
         let position = self.stack.pop().ok_or_else(|| self.error(ErrorKind::StackUnderflow, span))?;
@@ -830,7 +851,7 @@ impl<'a> Interpreter<'a> {
                 }
                 self.stack.push(sequence[index].clone());
             }
-            _ => return Err(self.error(ErrorKind::TypeMismatch, span)),
+            _ => return Err(self.error(ErrorKind::InvalidIndex, span)),
         }
         Ok(())
     }

@@ -1,27 +1,25 @@
 struct Token {
     let kind: String,
     let value: Float,
-    let next_position: UInt64
+    let next: UInt64
 }
 
 struct Lexer {
     let source: String,
-    let position: UInt64
+    let index: UInt64
 }
 
-struct ParseResult {
+struct Result {
     let value: Float,
-    let next_position: UInt64
+    let next: UInt64
 }
 
-func compute_abs(let n: Float): Float {
-    if(n < 0.0, {
-        return(0.0 - n)
-    })
+func abs(let n: Float): Float {
+    if(n < 0.0, { return(0.0 - n) })
     return(n)
 }
 
-func compute_power(let base: Float, let exp: Float): Float {
+func power(let base: Float, let exp: Float): Float {
     let result = 1.0
     let count = exp
     while(count > 0.0, {
@@ -31,7 +29,7 @@ func compute_power(let base: Float, let exp: Float): Float {
     return(result)
 }
 
-func compute_modulo(let a: Float, let b: Float): Float {
+func modulo(let a: Float, let b: Float): Float {
     let result = a
     if(b == 0.0, { return(0.0) })
     while(result >= b, {
@@ -40,7 +38,7 @@ func compute_modulo(let a: Float, let b: Float): Float {
     return(result)
 }
 
-func compute_factorial(let n: Float): Float {
+func factorial(let n: Float): Float {
     let result = 1.0
     let count = n
     while(count > 1.0, {
@@ -50,7 +48,7 @@ func compute_factorial(let n: Float): Float {
     return(result)
 }
 
-func compute_sqrt(let n: Float): Float {
+func sqrt(let n: Float): Float {
     if(n <= 0.0, { return(0.0) })
     let guess = n / 2.0
     let count = 0.0
@@ -61,329 +59,331 @@ func compute_sqrt(let n: Float): Float {
     return(guess)
 }
 
-// Taylor series approximation for sin(x)
-// sin(x) = x - x^3/3! + x^5/5! - x^7/7! ...
-func compute_sin(let n: Float): Float {
-    // Normalize n to -PI to PI to keep Taylor series accurate
-    let pi_val = 3.14159265
-    let two_pi = pi_val * 2.0
+func sin(let n: Float): Float {
+    let pi = 3.14159265
+    let limit = pi * 2.0
     let x = n
-    while(x > pi_val, { x = x - two_pi })
-    while(x < (0.0 - pi_val), { x = x + two_pi })
+    while(x > pi, { x = x - limit })
+    while(x < (0.0 - pi), { x = x + limit })
 
     let result = 0.0
     let count = 0.0
     let sign = 1.0
 
     while(count < 10.0, {
-        let term_pow = (count * 2.0) + 1.0
-        let num = compute_power(x, term_pow)
-        let den = compute_factorial(term_pow)
-        result = result + (sign * (num / den))
+        let step = (count * 2.0) + 1.0
+        let top = power(x, step)
+        let bottom = factorial(step)
+        result = result + (sign * (top / bottom))
         sign = 0.0 - sign
         count = count + 1.0
     })
     return(result)
 }
 
-// Taylor series approximation for cos(x)
-// cos(x) = 1 - x^2/2! + x^4/4! - x^6/6! ...
-func compute_cos(let n: Float): Float {
-    let pi_val = 3.14159265
-    let two_pi = pi_val * 2.0
+func cos(let n: Float): Float {
+    let pi = 3.14159265
+    let limit = pi * 2.0
     let x = n
-    while(x > pi_val, { x = x - two_pi })
-    while(x < (0.0 - pi_val), { x = x + two_pi })
+    while(x > pi, { x = x - limit })
+    while(x < (0.0 - pi), { x = x + limit })
 
     let result = 0.0
     let count = 0.0
     let sign = 1.0
 
     while(count < 10.0, {
-        let term_pow = count * 2.0
-        let num = compute_power(x, term_pow)
-        let den = compute_factorial(term_pow)
-        result = result + (sign * (num / den))
+        let step = count * 2.0
+        let top = power(x, step)
+        let bottom = factorial(step)
+        result = result + (sign * (top / bottom))
         sign = 0.0 - sign
         count = count + 1.0
     })
     return(result)
 }
 
-func next_token(let lexer: Lexer): Token {
-    while(lexer.position < string.string_length(lexer.source), {
-        let current_char: UInt8 = string.character_at(lexer.source, lexer.position)
+func get_token(let lexer: Lexer): Token {
+    while(lexer.index < string.string_length(lexer.source), {
+        let char: UInt8 = string.character_at(lexer.source, lexer.index)
 
-        if(string.is_whitespace(current_char), {
-            lexer.position = lexer.position + cast.integer_uint64(1)
+        if(string.is_whitespace(char), {
+            lexer.index = lexer.index + cast.integer_uint64(1)
             continue()
         })
 
-        if(current_char == cast.character_uint8('+'), {
-            lexer.position = lexer.position + cast.integer_uint64(1)
-            return(Token { kind = "PLUS", value = 0.0, next_position = lexer.position })
+        if(char == cast.character_uint8('+'), {
+            lexer.index = lexer.index + cast.integer_uint64(1)
+            return(Token { kind = "PLUS", value = 0.0, next = lexer.index })
         })
 
-        if(current_char == cast.character_uint8('-'), {
-            lexer.position = lexer.position + cast.integer_uint64(1)
-            return(Token { kind = "MINUS", value = 0.0, next_position = lexer.position })
+        if(char == cast.character_uint8('-'), {
+            lexer.index = lexer.index + cast.integer_uint64(1)
+            return(Token { kind = "MINUS", value = 0.0, next = lexer.index })
         })
 
-        if(current_char == cast.character_uint8('*'), {
-            lexer.position = lexer.position + cast.integer_uint64(1)
-            return(Token { kind = "MULTIPLY", value = 0.0, next_position = lexer.position })
+        if(char == cast.character_uint8('*'), {
+            lexer.index = lexer.index + cast.integer_uint64(1)
+            return(Token { kind = "MULTIPLY", value = 0.0, next = lexer.index })
         })
 
-        if(current_char == cast.character_uint8('/'), {
-            lexer.position = lexer.position + cast.integer_uint64(1)
-            return(Token { kind = "DIVIDE", value = 0.0, next_position = lexer.position })
+        if(char == cast.character_uint8('/'), {
+            lexer.index = lexer.index + cast.integer_uint64(1)
+            return(Token { kind = "DIVIDE", value = 0.0, next = lexer.index })
         })
 
-        if(current_char == cast.character_uint8('%'), {
-            lexer.position = lexer.position + cast.integer_uint64(1)
-            return(Token { kind = "MODULO", value = 0.0, next_position = lexer.position })
+        if(char == cast.character_uint8('%'), {
+            lexer.index = lexer.index + cast.integer_uint64(1)
+            return(Token { kind = "MODULO", value = 0.0, next = lexer.index })
         })
 
-        if(current_char == cast.character_uint8('^'), {
-            lexer.position = lexer.position + cast.integer_uint64(1)
-            return(Token { kind = "POWER", value = 0.0, next_position = lexer.position })
+        if(char == cast.character_uint8('^'), {
+            lexer.index = lexer.index + cast.integer_uint64(1)
+            return(Token { kind = "POWER", value = 0.0, next = lexer.index })
         })
 
-        if(current_char == cast.character_uint8('!'), {
-            lexer.position = lexer.position + cast.integer_uint64(1)
-            return(Token { kind = "FACTORIAL", value = 0.0, next_position = lexer.position })
+        if(char == cast.character_uint8('!'), {
+            lexer.index = lexer.index + cast.integer_uint64(1)
+            return(Token { kind = "FACTORIAL", value = 0.0, next = lexer.index })
         })
 
-        if(current_char == cast.character_uint8('('), {
-            lexer.position = lexer.position + cast.integer_uint64(1)
-            return(Token { kind = "LPAREN", value = 0.0, next_position = lexer.position })
+        if(char == cast.character_uint8('('), {
+            lexer.index = lexer.index + cast.integer_uint64(1)
+            return(Token { kind = "LPAREN", value = 0.0, next = lexer.index })
         })
 
-        if(current_char == cast.character_uint8(')'), {
-            lexer.position = lexer.position + cast.integer_uint64(1)
-            return(Token { kind = "RPAREN", value = 0.0, next_position = lexer.position })
+        if(char == cast.character_uint8(')'), {
+            lexer.index = lexer.index + cast.integer_uint64(1)
+            return(Token { kind = "RPAREN", value = 0.0, next = lexer.index })
         })
 
-        // Parse Identifiers (functions and constants)
-        if(string.is_alpha(current_char), {
-            let start = lexer.position
-            while(lexer.position < string.string_length(lexer.source) && string.is_alpha(string.character_at(lexer.source, lexer.position)), {
-                lexer.position = lexer.position + cast.integer_uint64(1)
+        if(string.is_alpha(char), {
+            let start = lexer.index
+            while(lexer.index < string.string_length(lexer.source) && string.is_alpha(string.character_at(lexer.source, lexer.index)), {
+                lexer.index = lexer.index + cast.integer_uint64(1)
             })
 
-            let ident = string.string_substring(lexer.source, start, lexer.position)
+            let word = string.string_substring(lexer.source, start, lexer.index)
 
-            if(ident == "pi" || ident == "PI", { return(Token { kind = "PI", value = 3.14159265, next_position = lexer.position }) })
-            if(ident == "e" || ident == "E", { return(Token { kind = "EULER", value = 2.71828182, next_position = lexer.position }) })
-            if(ident == "sqrt", { return(Token { kind = "SQRT", value = 0.0, next_position = lexer.position }) })
-            if(ident == "sin", { return(Token { kind = "SIN", value = 0.0, next_position = lexer.position }) })
-            if(ident == "cos", { return(Token { kind = "COS", value = 0.0, next_position = lexer.position }) })
-            if(ident == "abs", { return(Token { kind = "ABS", value = 0.0, next_position = lexer.position }) })
+            if(word == "pi" || word == "PI", { return(Token { kind = "PI", value = 3.14159265, next = lexer.index }) })
+            if(word == "e" || word == "E", { return(Token { kind = "EULER", value = 2.71828182, next = lexer.index }) })
+            if(word == "sqrt", { return(Token { kind = "SQRT", value = 0.0, next = lexer.index }) })
+            if(word == "sin", { return(Token { kind = "SIN", value = 0.0, next = lexer.index }) })
+            if(word == "cos", { return(Token { kind = "COS", value = 0.0, next = lexer.index }) })
+            if(word == "abs", { return(Token { kind = "ABS", value = 0.0, next = lexer.index }) })
 
-            print.print_string("Lexed: UNKNOWN IDENTIFIER\n")
-            return(Token { kind = "ILLEGAL", value = 0.0, next_position = lexer.position })
+            print.print_string("Unknown")
+            return(Token { kind = "ILLEGAL", value = 0.0, next = lexer.index })
         })
 
-        if(string.is_digit(current_char), {
-            let start = lexer.position
-            while(lexer.position < string.string_length(lexer.source) && (string.is_digit(string.character_at(lexer.source, lexer.position)) || string.character_at(lexer.source, lexer.position) == cast.character_uint8('.')), {
-                lexer.position = lexer.position + cast.integer_uint64(1)
+        if(string.is_digit(char), {
+            let start = lexer.index
+            while(lexer.index < string.string_length(lexer.source) && (string.is_digit(string.character_at(lexer.source, lexer.index)) || string.character_at(lexer.source, lexer.index) == cast.character_uint8('.')), {
+                lexer.index = lexer.index + cast.integer_uint64(1)
             })
-            let num_str = string.string_substring(lexer.source, start, lexer.position)
-            let parsed_val = string.parse_float(num_str)
-            return(Token { kind = "NUMBER", value = parsed_val, next_position = lexer.position })
+            let number = string.string_substring(lexer.source, start, lexer.index)
+            let value = string.parse_float(number)
+            return(Token { kind = "NUMBER", value = value, next = lexer.index })
         })
 
-        lexer.position = lexer.position + cast.integer_uint64(1)
-        return(Token { kind = "ILLEGAL", value = 0.0, next_position = lexer.position })
+        lexer.index = lexer.index + cast.integer_uint64(1)
+        return(Token { kind = "ILLEGAL", value = 0.0, next = lexer.index })
     })
 
-    return(Token { kind = "EOF", value = 0.0, next_position = lexer.position })
+    return(Token { kind = "EOF", value = 0.0, next = lexer.index })
 }
 
-func parse_function_call(let lexer: Lexer, let func_kind: String): ParseResult {
-    let lparen_tok = next_token(lexer)
-    lexer.position = lparen_tok.next_position
-    let inner_res = parse_expression(lexer)
-    lexer.position = inner_res.next_position
-    let rparen_tok = next_token(lexer)
-    lexer.position = rparen_tok.next_position
+func parse_call(let lexer: Lexer, let kind: String): Result {
+    let lparen = get_token(lexer)
+    lexer.index = lparen.next
+    let inner = parse_expr(lexer)
+    lexer.index = inner.next
+    let rparen = get_token(lexer)
+    lexer.index = rparen.next
 
-    if(func_kind == "SQRT", { return(ParseResult { value = compute_sqrt(inner_res.value), next_position = lexer.position }) })
-    if(func_kind == "SIN", { return(ParseResult { value = compute_sin(inner_res.value), next_position = lexer.position }) })
-    if(func_kind == "COS", { return(ParseResult { value = compute_cos(inner_res.value), next_position = lexer.position }) })
-    if(func_kind == "ABS", { return(ParseResult { value = compute_abs(inner_res.value), next_position = lexer.position }) })
+    if(kind == "SQRT", { return(Result { value = sqrt(inner.value), next = lexer.index }) })
+    if(kind == "SIN", { return(Result { value = sin(inner.value), next = lexer.index }) })
+    if(kind == "COS", { return(Result { value = cos(inner.value), next = lexer.index }) })
+    if(kind == "ABS", { return(Result { value = abs(inner.value), next = lexer.index }) })
 
-    return(ParseResult { value = 0.0, next_position = lexer.position })
+    return(Result { value = 0.0, next = lexer.index })
 }
 
-func parse_factor(let lexer: Lexer): ParseResult {
-    let tok = next_token(lexer)
-    lexer.position = tok.next_position
+func parse_factor(let lexer: Lexer): Result {
+    let token = get_token(lexer)
+    lexer.index = token.next
 
-    if(tok.kind == "NUMBER", { return(ParseResult { value = tok.value, next_position = lexer.position }) })
-    if(tok.kind == "PI", { return(ParseResult { value = tok.value, next_position = lexer.position }) })
-    if(tok.kind == "EULER", { return(ParseResult { value = tok.value, next_position = lexer.position }) })
+    if(token.kind == "NUMBER", { return(Result { value = token.value, next = lexer.index }) })
+    if(token.kind == "PI", { return(Result { value = token.value, next = lexer.index }) })
+    if(token.kind == "EULER", { return(Result { value = token.value, next = lexer.index }) })
 
-    if(tok.kind == "SQRT" || tok.kind == "SIN" || tok.kind == "COS" || tok.kind == "ABS", {
-        return(parse_function_call(lexer, tok.kind))
+    if(token.kind == "SQRT" || token.kind == "SIN" || token.kind == "COS" || token.kind == "ABS", {
+        return(parse_call(lexer, token.kind))
     })
 
-    if(tok.kind == "LPAREN", {
-        let inner_res = parse_expression(lexer)
-        lexer.position = inner_res.next_position
-        let next_tok = next_token(lexer)
-        lexer.position = next_tok.next_position
-        return(ParseResult { value = inner_res.value, next_position = lexer.position })
+    if(token.kind == "LPAREN", {
+        let inner = parse_expr(lexer)
+        lexer.index = inner.next
+        let next = get_token(lexer)
+        lexer.index = next.next
+        return(Result { value = inner.value, next = lexer.index })
     })
 
-    print.print_string("Syntax error: Expected factor\n")
-    return(ParseResult { value = 0.0, next_position = lexer.position })
+    return(Result { value = 0.0, next = lexer.index })
 }
 
-func parse_unary(let lexer: Lexer): ParseResult {
-    let peek_lexer = Lexer { source = lexer.source, position = lexer.position }
-    let tok = next_token(peek_lexer)
+func parse_unary(let lexer: Lexer): Result {
+    let peek = Lexer { source = lexer.source, index = lexer.index }
+    let token = get_token(peek)
 
-    if(tok.kind == "MINUS", {
-        lexer.position = tok.next_position
-        let right_res = parse_unary(lexer)
-        lexer.position = right_res.next_position
-        return(ParseResult { value = 0.0 - right_res.value, next_position = lexer.position })
+    if(token.kind == "MINUS", {
+        lexer.index = token.next
+        let right = parse_unary(lexer)
+        lexer.index = right.next
+        return(Result { value = 0.0 - right.value, next = lexer.index })
     }, {
-        if(tok.kind == "PLUS", {
-            lexer.position = tok.next_position
-            let right_res = parse_unary(lexer)
-            lexer.position = right_res.next_position
-            return(ParseResult { value = right_res.value, next_position = lexer.position })
+        if(token.kind == "PLUS", {
+            lexer.index = token.next
+            let right = parse_unary(lexer)
+            lexer.index = right.next
+            return(Result { value = right.value, next = lexer.index })
         }, {
             return(parse_factor(lexer))
         })
     })
 }
 
-func parse_postfix(let lexer: Lexer): ParseResult {
-    let left_res = parse_unary(lexer)
-    lexer.position = left_res.next_position
-    let current_value = left_res.value
-
+func parse_postfix(let lexer: Lexer): Result {
+    let left = parse_unary(lexer)
+    lexer.index = left.next
+    let value = left.value
     let loop = cast.integer_uint8(1)
+
     while(loop == cast.integer_uint8(1), {
-        let peek_lexer = Lexer { source = lexer.source, position = lexer.position }
-        let tok = next_token(peek_lexer)
-        if(tok.kind == "FACTORIAL", {
-            lexer.position = tok.next_position
-            current_value = compute_factorial(current_value)
+        let peek = Lexer { source = lexer.source, index = lexer.index }
+        let token = get_token(peek)
+        if(token.kind == "FACTORIAL", {
+            lexer.index = token.next
+            value = factorial(value)
         }, {
             loop = cast.integer_uint8(0)
-            current_value
+            value
         })
     })
 
-    return(ParseResult { value = current_value, next_position = lexer.position })
+    return(Result { value = value, next = lexer.index })
 }
 
-func parse_power(let lexer: Lexer): ParseResult {
-    let left_res = parse_postfix(lexer)
-    lexer.position = left_res.next_position
-    let current_value = left_res.value
+func parse_power(let lexer: Lexer): Result {
+    let left = parse_postfix(lexer)
+    lexer.index = left.next
+    let value = left.value
     let loop = cast.integer_uint8(1)
 
     while(loop == cast.integer_uint8(1), {
-        let peek_lexer = Lexer { source = lexer.source, position = lexer.position }
-        let tok = next_token(peek_lexer)
-        if(tok.kind == "POWER", {
-            lexer.position = tok.next_position
-            let right_res = parse_postfix(lexer)
-            lexer.position = right_res.next_position
-            current_value = compute_power(current_value, right_res.value)
+        let peek = Lexer { source = lexer.source, index = lexer.index }
+        let token = get_token(peek)
+        if(token.kind == "POWER", {
+            lexer.index = token.next
+            let right = parse_postfix(lexer)
+            lexer.index = right.next
+            value = power(value, right.value)
         }, {
             loop = cast.integer_uint8(0)
-            current_value
+            value
         })
     })
 
-    return(ParseResult { value = current_value, next_position = lexer.position })
+    return(Result { value = value, next = lexer.index })
 }
 
-func parse_term(let lexer: Lexer): ParseResult {
-    let left_res = parse_power(lexer)
-    lexer.position = left_res.next_position
-    let current_value = left_res.value
+func parse_term(let lexer: Lexer): Result {
+    let left = parse_power(lexer)
+    lexer.index = left.next
+    let value = left.value
     let loop = cast.integer_uint8(1)
 
     while(loop == cast.integer_uint8(1), {
-        let peek_lexer = Lexer { source = lexer.source, position = lexer.position }
-        let tok = next_token(peek_lexer)
-        if(tok.kind == "MULTIPLY", {
-            lexer.position = tok.next_position
-            let right_res = parse_power(lexer)
-            lexer.position = right_res.next_position
-            current_value = current_value * right_res.value
+        let peek = Lexer { source = lexer.source, index = lexer.index }
+        let token = get_token(peek)
+        if(token.kind == "MULTIPLY", {
+            lexer.index = token.next
+            let right = parse_power(lexer)
+            lexer.index = right.next
+            value = value * right.value
         }, {
-            if(tok.kind == "DIVIDE", {
-                lexer.position = tok.next_position
-                let right_res = parse_power(lexer)
-                lexer.position = right_res.next_position
-                current_value = current_value / right_res.value
+            if(token.kind == "DIVIDE", {
+                lexer.index = token.next
+                let right = parse_power(lexer)
+                lexer.index = right.next
+                value = value / right.value
             }, {
-                if(tok.kind == "MODULO", {
-                    lexer.position = tok.next_position
-                    let right_res = parse_power(lexer)
-                    lexer.position = right_res.next_position
-                    current_value = compute_modulo(current_value, right_res.value)
+                if(token.kind == "MODULO", {
+                    lexer.index = token.next
+                    let right = parse_power(lexer)
+                    lexer.index = right.next
+                    value = modulo(value, right.value)
                 }, {
                     loop = cast.integer_uint8(0)
-                    current_value // Fixes the mismatch
+                    value
                 })
             })
         })
     })
 
-    return(ParseResult { value = current_value, next_position = lexer.position })
+    return(Result { value = value, next = lexer.index })
 }
 
-func parse_expression(let lexer: Lexer): ParseResult {
-    let left_res = parse_term(lexer)
-    lexer.position = left_res.next_position
-    let current_value = left_res.value
+func parse_expr(let lexer: Lexer): Result {
+    let left = parse_term(lexer)
+    lexer.index = left.next
+    let value = left.value
     let loop = cast.integer_uint8(1)
 
     while(loop == cast.integer_uint8(1), {
-        let peek_lexer = Lexer { source = lexer.source, position = lexer.position }
-        let tok = next_token(peek_lexer)
-        if(tok.kind == "PLUS", {
-            lexer.position = tok.next_position
-            let right_res = parse_term(lexer)
-            lexer.position = right_res.next_position
-            current_value = current_value + right_res.value
+        let peek = Lexer { source = lexer.source, index = lexer.index }
+        let token = get_token(peek)
+        if(token.kind == "PLUS", {
+            lexer.index = token.next
+            let right = parse_term(lexer)
+            lexer.index = right.next
+            value = value + right.value
         }, {
-            if(tok.kind == "MINUS", {
-                lexer.position = tok.next_position
-                let right_res = parse_term(lexer)
-                lexer.position = right_res.next_position
-                current_value = current_value - right_res.value
+            if(token.kind == "MINUS", {
+                lexer.index = token.next
+                let right = parse_term(lexer)
+                lexer.index = right.next
+                value = value - right.value
             }, {
                 loop = cast.integer_uint8(0)
-                current_value // Fixes the mismatch
+                value
             })
         })
     })
 
-    return(ParseResult { value = current_value, next_position = lexer.position })
+    return(Result { value = value, next = lexer.index })
 }
 
 func main(): Integer {
-    print.print_string("Engine initialized. Available funcs: sin(x), cos(x), abs(x), sqrt(x)\n")
-    print.print_string("Constants: pi, e\n")
+    print.print_string("Axo")
+    let active = cast.integer_uint8(1)
 
-    let input_text: String = input.get_input("Enter your calculation: ")
-    let lexer = Lexer { source = input_text, position = cast.integer_uint64(0) }
-    let result = parse_expression(lexer)
+    while(active == cast.integer_uint8(1), {
+        let input: String = input.get_input("> ")
 
-    print.print_string("Final Result: ")
-    print.print_float(result.value)
-    print.print_newline()
+        if(input == "exit" || input == "quit", {
+            active = cast.integer_uint8(0)
+        }, {
+            if(string.string_length(input) > cast.integer_uint64(0), {
+                let lexer = Lexer { source = input, index = cast.integer_uint64(0) }
+                let result = parse_expr(lexer)
+
+                print.print_float(result.value)
+                print.print_newline()
+            })
+            active
+        })
+    })
 
     0
 }

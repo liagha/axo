@@ -123,6 +123,7 @@ const SCAN_STAGE: u8 = 1;
 const PARSE_STAGE: u8 = 2;
 const RESOLVE_STAGE: u8 = 3;
 const ANALYZE_STAGE: u8 = 4;
+#[cfg(feature = "interpreter")]
 const INTERPRET_STAGE: u8 = 5;
 const CACHE_REV: u64 = 1;
 

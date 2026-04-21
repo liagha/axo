@@ -1,4 +1,6 @@
 #include <stdint.h>
+#include <stdio.h>
+#include <stdlib.h>
 
 uint8_t* string_pointer(const char* string) {
     return (uint8_t*)string;
@@ -32,3 +34,14 @@ int64_t character_integer(int32_t value) {
     return (int64_t)value;
 }
 
+const char* float_string(double value) {
+    char* buffer = malloc(64);
+    if (buffer) {
+        snprintf(buffer, 64, "%f", value);
+    }
+    return buffer;
+}
+
+const char* pointer_string(uint8_t* pointer) {
+    return (const char*)pointer;
+}

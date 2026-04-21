@@ -8,6 +8,50 @@ use {
 };
 
 impl<'backend> Generator<'backend> {
+    fn string_equal(
+        &mut self,
+        left: Box<Analysis<'backend>>,
+        right: Box<Analysis<'backend>>,
+        invert: bool,
+        span: Span,
+    ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
+        let alpha = self.analysis(*left)?;
+        let beta = self.analysis(*right)?;
+
+        let pointer = self.context.ptr_type(inkwell::AddressSpace::default());
+        let integer = self.context.i32_type();
+        let module = self.current_module();
+        let function = module.get_function("strcmp").unwrap_or_else(|| {
+            module.add_function(
+                "strcmp",
+                integer.fn_type(&[pointer.into(), pointer.into()], false),
+                None,
+            )
+        });
+
+        let value = self
+            .builder
+            .build_call(function, &[alpha.into(), beta.into()], "strcmp")
+            .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?
+            .try_as_basic_value()
+            .basic()
+            .ok_or_else(|| GenerateError::new(ErrorKind::Normalize, span))?
+            .into_int_value();
+
+        let kind = if invert {
+            IntPredicate::NE
+        } else {
+            IntPredicate::EQ
+        };
+
+        let truth = self
+            .builder
+            .build_int_compare(kind, value, integer.const_zero(), "equal")
+            .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
+
+        Ok(truth.into())
+    }
+
     pub fn tag(
         &self,
         value: BasicValueEnum<'backend>,
@@ -32,6 +76,12 @@ impl<'backend> Generator<'backend> {
         right: Box<Analysis<'backend>>,
         span: Span,
     ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
+        if matches!(self.value_type(&left.typing).kind, crate::resolver::TypeKind::String)
+            && matches!(self.value_type(&right.typing).kind, crate::resolver::TypeKind::String)
+        {
+            return self.string_equal(left, right, false, span);
+        }
+
         let alpha = self.analysis(*left)?;
         let beta = self.analysis(*right)?;
 
@@ -72,6 +122,12 @@ impl<'backend> Generator<'backend> {
         right: Box<Analysis<'backend>>,
         span: Span,
     ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
+        if matches!(self.value_type(&left.typing).kind, crate::resolver::TypeKind::String)
+            && matches!(self.value_type(&right.typing).kind, crate::resolver::TypeKind::String)
+        {
+            return self.string_equal(left, right, true, span);
+        }
+
         let alpha = self.analysis(*left)?;
         let beta = self.analysis(*right)?;
 

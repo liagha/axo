@@ -1,7 +1,5 @@
 use axo::{
     internal::{Session, SessionError},
-    parser::{ElementKind, SymbolKind},
-    scanner::TokenKind,
     tracker::{TrackError, ErrorKind},
 };
 
@@ -9,17 +7,6 @@ fn main() {
     let flag = Session::arguments();
     let mut initializer = axo::initializer::Initializer::new(flag.clone());
     let targets = initializer.initialize();
-
-    let bare = initializer.output.iter().any(|symbol| {
-        if let SymbolKind::Binding(binding) = &symbol.kind {
-            if let ElementKind::Literal(token) = &binding.target.kind {
-                if let TokenKind::Identifier(name) = &token.kind {
-                    return **name == "Bare";
-                }
-            }
-        }
-        false
-    });
 
     let failures: Vec<SessionError> = initializer
         .errors
@@ -29,9 +16,9 @@ fn main() {
 
     if targets.is_empty() {
         #[cfg(feature = "interpreter")]
-        axo::dialog::start(bare, initializer.output, flag);
+        axo::dialog::start(initializer.output, flag);
     } else {
-        let mut session = Session::create(bare, initializer.output, failures, flag);
+        let mut session = Session::create(initializer.output, failures, flag);
 
         targets.iter().for_each(|(target, span)| {
             if !Session::traverse(target, &mut session.records) {

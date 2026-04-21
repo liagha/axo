@@ -1,9 +1,10 @@
 use crate::{
-    internal::platform::{ARCH, OS},
     combinator::{Form, Formation, Former},
     data::{Binding, BindingKind, Offset, Scale, Str},
-    initializer::InitializeError,
+    initializer::{ErrorKind, InitializeError},
+    internal::platform::{ARCH, OS},
     parser::{Element, ElementKind, ParseError, Symbol, SymbolKind},
+    reporter::Error,
     scanner::{PunctuationKind, Scanner, Token, TokenKind},
     tracker::{Location, Peekable, Position, Span},
 };
@@ -86,10 +87,20 @@ impl<'a> Initializer<'a> {
     pub fn filter<'source>(
         length: Scale,
     ) -> Formation<'a, 'source, Self, Token<'a>, Element<'a>, ParseError<'a>> {
+        let ignore = |token: &Token| {
+            matches!(
+                token.kind,
+                TokenKind::Punctuation(PunctuationKind::Newline)
+                    | TokenKind::Punctuation(PunctuationKind::Tab)
+                    | TokenKind::Punctuation(PunctuationKind::Space)
+                    | TokenKind::Comment(_)
+            )
+        };
+
         Formation::repetition(
             Formation::alternative([
-                Formation::predicate(is_ignored).with_ignore(),
-                Formation::predicate(|token: &Token| !is_ignored(token)),
+                Formation::predicate(ignore).with_ignore(),
+                Formation::predicate(move |token: &Token| !ignore(token)),
             ]),
             0,
             Some(length),
@@ -105,8 +116,14 @@ impl<'a> Initializer<'a> {
             Self::target(),
             Self::discard(),
             Self::bare(),
-            Self::implicit_input(),
-            Formation::anything().with_ignore(),
+            Self::implicit(),
+            Formation::anything().with_panic(|former: &mut Former<'a, 'source, Self, Token<'a>, Symbol<'a>, InitializeError<'a>>, formation| {
+                let form = former.forms.get_mut(formation.form).unwrap();
+                let input = form.collect_inputs()[0].clone();
+                let span = input.span;
+
+                Error::new(ErrorKind::Argument(input), span)
+            }),
         ])
     }
 
@@ -118,27 +135,18 @@ impl<'a> Initializer<'a> {
     pub fn initialize(&mut self) -> Vec<(Location<'a>, Span)> {
         let mut scanner = Scanner::new(Position::new(0), self.content);
         scanner.scan();
-
         self.input = scanner.output;
 
         let length = self.length();
         let formation = Self::filter(length);
 
-        let inputs = {
-            let mut former = Former::new(self);
-            former.form(formation).collect_inputs()
-        };
-
-        self.input = inputs;
+        let input = Former::new(self).form(formation).collect_inputs();
+        self.input = input;
         self.reset();
 
         let mut directives = Vec::new();
         let formation = Self::formation();
-
-        let forms = {
-            let mut former = Former::new(self);
-            former.form(formation).flatten()
-        };
+        let forms = Former::new(self).form(formation).flatten();
 
         for form in forms {
             match form {
@@ -157,19 +165,30 @@ impl<'a> Initializer<'a> {
         let mut targets = Vec::new();
 
         for symbol in &directives {
-            if let Some(name) = target_name(symbol) {
-                if name == Str::from("Target") {
-                    has_target = true;
-                } else if name == Str::from("Input") || name.starts_with("Input(") {
-                    if let Some(value) = value_name(symbol) {
-                        targets.push((value, symbol.span));
+            if let SymbolKind::Binding(binding) = &symbol.kind {
+                if let ElementKind::Literal(target_token) = &binding.target.kind {
+                    if let TokenKind::Identifier(name) = &target_token.kind {
+                        if **name == *"Target" {
+                            has_target = true;
+                        } else if **name == *"Input" || name.starts_with("Input(") {
+                            if let Some(value) = &binding.value {
+                                if let ElementKind::Literal(value_token) = &value.kind {
+                                    match &value_token.kind {
+                                        TokenKind::String(val) | TokenKind::Identifier(val) => {
+                                            targets.push((**val, symbol.span));
+                                        }
+                                        _ => {}
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             }
         }
 
         if !has_target {
-            let target_str = match (ARCH, OS) {
+            let string = match (ARCH, OS) {
                 ("x86_64", "windows") => "x86_64-pc-windows-msvc",
                 ("aarch64", "windows") => "aarch64-pc-windows-msvc",
                 ("x86_64", "macos") => "x86_64-apple-darwin",
@@ -185,57 +204,16 @@ impl<'a> Initializer<'a> {
                 span,
             );
             let value = Element::new(
-                ElementKind::literal(Token::new(TokenKind::identifier(Str::from(target_str)), span)),
+                ElementKind::literal(Token::new(TokenKind::identifier(Str::from(string)), span)),
                 span,
             );
-            let symbol = Symbol::new(
+            directives.push(Symbol::new(
                 SymbolKind::binding(Binding::new(target, Some(value), None, BindingKind::Static)),
                 span,
-            );
-            directives.push(symbol);
+            ));
         }
 
         self.output = directives;
         targets
-    }
-}
-
-fn is_ignored(token: &Token) -> bool {
-    matches!(
-        token.kind,
-        TokenKind::Punctuation(PunctuationKind::Newline)
-            | TokenKind::Punctuation(PunctuationKind::Tab)
-            | TokenKind::Punctuation(PunctuationKind::Space)
-            | TokenKind::Comment(_)
-    )
-}
-
-fn target_name<'a>(symbol: &Symbol<'a>) -> Option<Str<'a>> {
-    match &symbol.kind {
-        SymbolKind::Binding(binding) => match &binding.target.kind {
-            ElementKind::Literal(token) => match &token.kind {
-                TokenKind::Identifier(name) => Some(**name),
-                _ => None,
-            },
-            _ => None,
-        },
-        _ => None,
-    }
-}
-
-fn value_name<'a>(symbol: &Symbol<'a>) -> Option<Str<'a>> {
-    match &symbol.kind {
-        SymbolKind::Binding(binding) => {
-            let value = binding.value.as_ref()?;
-            match &value.kind {
-                ElementKind::Literal(token) => match &token.kind {
-                    TokenKind::String(value) => Some(**value),
-                    TokenKind::Identifier(value) => Some(**value),
-                    _ => None,
-                },
-                _ => None,
-            }
-        }
-        _ => None,
     }
 }

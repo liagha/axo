@@ -182,8 +182,8 @@ impl Dialog {
     }
 }
 
-pub fn start(bare: bool, directives: Vec<Symbol>, flag: Str) {
-    let mut session = Session::create(bare, directives, Vec::new(), flag);
+pub fn start(directives: Vec<Symbol>, flag: Str) {
+    let mut session = Session::create(directives, Vec::new(), flag);
     let mut core = Interpreter::new(1024);
 
     let mut keys: Vec<_> = session

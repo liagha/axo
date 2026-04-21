@@ -3,8 +3,8 @@ mod error;
 mod initializer;
 mod traits;
 
-pub use {initializer::Initializer, error::*};
+pub use {error::*, initializer::Initializer};
 
-use {crate::reporter::Error};
+use crate::reporter::Error;
 
 pub type InitializeError<'error> = Error<'error, ErrorKind<'error>>;

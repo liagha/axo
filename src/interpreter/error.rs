@@ -4,13 +4,17 @@ use crate::format::{Display, Formatter, Result};
 pub enum ErrorKind {
     StackUnderflow,
     MemoryAccessViolation,
-    TypeMismatch,
+    InvalidBinary,
+    InvalidUnary,
+    InvalidCompare,
     DivisionByZero,
     OutOfBounds,
     InvalidFrame,
     InvalidCall,
     InvalidAccess,
     InvalidStore,
+    InvalidCondition,
+    InvalidIndex,
     InvalidControl,
     MissingSymbol,
 }
@@ -24,8 +28,14 @@ impl Display for ErrorKind {
             ErrorKind::MemoryAccessViolation => {
                 write!(f, "memory access violation: invalid memory address.")
             }
-            ErrorKind::TypeMismatch => {
-                write!(f, "type mismatch: invalid operation for the given types.")
+            ErrorKind::InvalidBinary => {
+                write!(f, "invalid binary: operands do not match the operation.")
+            }
+            ErrorKind::InvalidUnary => {
+                write!(f, "invalid unary: operand does not match the operation.")
+            }
+            ErrorKind::InvalidCompare => {
+                write!(f, "invalid compare: operands cannot be compared.")
             }
             ErrorKind::DivisionByZero => {
                 write!(f, "division by zero: attempted to divide by zero.")
@@ -44,6 +54,12 @@ impl Display for ErrorKind {
             }
             ErrorKind::InvalidStore => {
                 write!(f, "invalid store: target cannot receive a value.")
+            }
+            ErrorKind::InvalidCondition => {
+                write!(f, "invalid condition: value must be Boolean.")
+            }
+            ErrorKind::InvalidIndex => {
+                write!(f, "invalid index: target cannot be indexed.")
             }
             ErrorKind::InvalidControl => {
                 write!(f, "invalid control flow: statement is not valid in the current scope.")

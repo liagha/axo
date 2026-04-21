@@ -4,7 +4,6 @@ use {
         data::*,
         format::{Display, Show, Stencil},
         identifier,
-        initializer::Initializer,
         internal::{
             hash::{DefaultHasher, Hash, Hasher, Map},
             platform::{args, read_dir, OS, ARCH, PathBuf},
@@ -39,6 +38,8 @@ pub const BASE: &[(&str, &str)] = &[
     ("./base/string.c", include_str!("../../../base/string.c")),
     ("./base/input.axo", include_str!("../../../base/input.axo")),
     ("./base/input.c", include_str!("../../../base/input.c")),
+    ("./base/vector.axo", include_str!("../../../base/vector.axo")),
+    ("./base/vector.c", include_str!("../../../base/vector.c")),
 ];
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -170,7 +171,6 @@ pub struct Session<'session> {
     pub timer: Instant,
     pub laps: Vec<Duration>,
     pub records: Map<Identity, Record<'session>>,
-    pub initializer: Initializer<'session>,
     pub resolver: Resolver<'session>,
     pub errors: Vec<SessionError<'session>>,
     pub target: Option<Location<'session>>,
@@ -181,7 +181,6 @@ pub struct Session<'session> {
 
 impl<'session> Session<'session> {
     pub fn create(
-        bare: bool,
         directives: Vec<Symbol<'session>>,
         failures: Vec<SessionError<'session>>,
         flag: Str<'session>,
@@ -197,18 +196,16 @@ impl<'session> Session<'session> {
         record.set_content(flag);
         records.insert(0, record);
 
-        if !bare {
-            for &(path, content) in BASE {
-                if let Some(kind) = RecordKind::from_path(path) {
-                    let string = path.to_string();
-                    let location = Location::from(string.clone());
-                    let mut hasher = DefaultHasher::new();
-                    Hash::hash(&string, &mut hasher);
-                    let identity = (hasher.finish() as Identity) & 0x3FFFFFFF;
-                    let mut base = Record::new(kind, location);
-                    base.set_content(Str::from(content));
-                    records.insert(identity, base);
-                }
+        for &(path, content) in BASE {
+            if let Some(kind) = RecordKind::from_path(path) {
+                let string = path.to_string();
+                let location = Location::from(string.clone());
+                let mut hasher = DefaultHasher::new();
+                Hash::hash(&string, &mut hasher);
+                let identity = (hasher.finish() as Identity) & 0x3FFFFFFF;
+                let mut base = Record::new(kind, location);
+                base.set_content(Str::from(content));
+                records.insert(identity, base);
             }
         }
 
@@ -227,7 +224,6 @@ impl<'session> Session<'session> {
             timer,
             laps,
             records,
-            initializer: Initializer::new(Self::arguments()),
             resolver,
             errors: failures,
             target: None,

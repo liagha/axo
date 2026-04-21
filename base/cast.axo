@@ -4,12 +4,9 @@ func pointer_integer(C, let pointer: *UInt8): Integer
 func integer_uint64(C, let value: Integer): UInt64
 func integer_uint8(C, let value: Integer): UInt8
 
-func string_pointer(C, let string: String): *UInt8
-func integer_pointer(C, let value: Integer): *UInt8
-func pointer_integer(C, let pointer: *UInt8): Integer
-func integer_uint64(C, let value: Integer): UInt64
-func integer_uint8(C, let value: Integer): UInt8
-
 func uint8_character(C, let value: UInt8): Character
 func character_uint8(C, let value: Character): UInt8
 func character_integer(C, let value: Character): Integer
+
+func float_string(C, let value: Float): String
+func pointer_string(C, let pointer: *UInt8): String

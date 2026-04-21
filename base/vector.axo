@@ -1,0 +1,13 @@
+func vector_create(C): *UInt8
+
+func vector_count(C, let vector: *UInt8): UInt64
+
+func vector_push(C, let vector: *UInt8, let item: *UInt8): Boolean
+
+func vector_set(C, let vector: *UInt8, let index: UInt64, let item: *UInt8): Boolean
+
+func vector_get(C, let vector: *UInt8, let index: UInt64): *UInt8
+
+func vector_delete(C, let vector: *UInt8, let index: UInt64): Boolean
+
+func vector_free(C, let vector: *UInt8)
