@@ -2,6 +2,6 @@ func string_length(C, let string: String): UInt64
 func character_at(C, let string: String, let index: UInt64): UInt8
 func is_whitespace(C, let character: UInt8): Boolean
 func is_digit(C, let character: UInt8): Boolean
+func is_alpha(C, let character: UInt8): Boolean
 func string_substring(C, let string: String, let start: UInt64, let end: UInt64): String
 func parse_float(C, let string: String): Float
-

@@ -20,6 +20,10 @@ bool is_digit(uint8_t character) {
     return isdigit(character) != 0;
 }
 
+bool is_alpha(uint8_t character) {
+    return isalpha(character) != 0;
+}
+
 const char* string_substring(const char* string, uint64_t start, uint64_t end) {
     uint64_t length = end - start;
     char* result = malloc(length + 1);
@@ -31,4 +35,3 @@ const char* string_substring(const char* string, uint64_t start, uint64_t end) {
 double parse_float(const char* string) {
     return strtod(string, NULL);
 }
-

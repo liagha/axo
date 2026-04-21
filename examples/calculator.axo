@@ -14,6 +14,13 @@ struct ParseResult {
     let next_position: UInt64
 }
 
+func compute_abs(let n: Float): Float {
+    if(n < 0.0, {
+        return(0.0 - n)
+    })
+    return(n)
+}
+
 func compute_power(let base: Float, let exp: Float): Float {
     let result = 1.0
     let count = exp
@@ -26,9 +33,7 @@ func compute_power(let base: Float, let exp: Float): Float {
 
 func compute_modulo(let a: Float, let b: Float): Float {
     let result = a
-    if(b == 0.0, {
-        return(0.0)
-    })
+    if(b == 0.0, { return(0.0) })
     while(result >= b, {
         result = result - b
     })
@@ -46,17 +51,63 @@ func compute_factorial(let n: Float): Float {
 }
 
 func compute_sqrt(let n: Float): Float {
+    if(n <= 0.0, { return(0.0) })
     let guess = n / 2.0
     let count = 0.0
-    if(n <= 0.0, {
-        return(0.0)
-    })
-
     while(count < 20.0, {
         guess = (guess + (n / guess)) / 2.0
         count = count + 1.0
     })
     return(guess)
+}
+
+// Taylor series approximation for sin(x)
+// sin(x) = x - x^3/3! + x^5/5! - x^7/7! ...
+func compute_sin(let n: Float): Float {
+    // Normalize n to -PI to PI to keep Taylor series accurate
+    let pi_val = 3.14159265
+    let two_pi = pi_val * 2.0
+    let x = n
+    while(x > pi_val, { x = x - two_pi })
+    while(x < (0.0 - pi_val), { x = x + two_pi })
+
+    let result = 0.0
+    let count = 0.0
+    let sign = 1.0
+
+    while(count < 10.0, {
+        let term_pow = (count * 2.0) + 1.0
+        let num = compute_power(x, term_pow)
+        let den = compute_factorial(term_pow)
+        result = result + (sign * (num / den))
+        sign = 0.0 - sign
+        count = count + 1.0
+    })
+    return(result)
+}
+
+// Taylor series approximation for cos(x)
+// cos(x) = 1 - x^2/2! + x^4/4! - x^6/6! ...
+func compute_cos(let n: Float): Float {
+    let pi_val = 3.14159265
+    let two_pi = pi_val * 2.0
+    let x = n
+    while(x > pi_val, { x = x - two_pi })
+    while(x < (0.0 - pi_val), { x = x + two_pi })
+
+    let result = 0.0
+    let count = 0.0
+    let sign = 1.0
+
+    while(count < 10.0, {
+        let term_pow = count * 2.0
+        let num = compute_power(x, term_pow)
+        let den = compute_factorial(term_pow)
+        result = result + (sign * (num / den))
+        sign = 0.0 - sign
+        count = count + 1.0
+    })
+    return(result)
 }
 
 func next_token(let lexer: Lexer): Token {
@@ -70,128 +121,124 @@ func next_token(let lexer: Lexer): Token {
 
         if(current_char == cast.character_uint8('+'), {
             lexer.position = lexer.position + cast.integer_uint64(1)
-            print.print_string("Lexed: PLUS\n")
             return(Token { kind = "PLUS", value = 0.0, next_position = lexer.position })
         })
 
         if(current_char == cast.character_uint8('-'), {
             lexer.position = lexer.position + cast.integer_uint64(1)
-            print.print_string("Lexed: MINUS\n")
             return(Token { kind = "MINUS", value = 0.0, next_position = lexer.position })
         })
 
         if(current_char == cast.character_uint8('*'), {
             lexer.position = lexer.position + cast.integer_uint64(1)
-            print.print_string("Lexed: MULTIPLY\n")
             return(Token { kind = "MULTIPLY", value = 0.0, next_position = lexer.position })
         })
 
         if(current_char == cast.character_uint8('/'), {
             lexer.position = lexer.position + cast.integer_uint64(1)
-            print.print_string("Lexed: DIVIDE\n")
             return(Token { kind = "DIVIDE", value = 0.0, next_position = lexer.position })
         })
 
         if(current_char == cast.character_uint8('%'), {
             lexer.position = lexer.position + cast.integer_uint64(1)
-            print.print_string("Lexed: MODULO\n")
             return(Token { kind = "MODULO", value = 0.0, next_position = lexer.position })
         })
 
         if(current_char == cast.character_uint8('^'), {
             lexer.position = lexer.position + cast.integer_uint64(1)
-            print.print_string("Lexed: POWER\n")
             return(Token { kind = "POWER", value = 0.0, next_position = lexer.position })
         })
 
         if(current_char == cast.character_uint8('!'), {
             lexer.position = lexer.position + cast.integer_uint64(1)
-            print.print_string("Lexed: FACTORIAL\n")
             return(Token { kind = "FACTORIAL", value = 0.0, next_position = lexer.position })
-        })
-
-        if(current_char == cast.character_uint8('s'), {
-            lexer.position = lexer.position + cast.integer_uint64(1)
-            print.print_string("Lexed: SQRT\n")
-            return(Token { kind = "SQRT", value = 0.0, next_position = lexer.position })
-        })
-
-        if(current_char == cast.character_uint8('p'), {
-            lexer.position = lexer.position + cast.integer_uint64(1)
-            print.print_string("Lexed: PI\n")
-            return(Token { kind = "PI", value = 3.14159, next_position = lexer.position })
         })
 
         if(current_char == cast.character_uint8('('), {
             lexer.position = lexer.position + cast.integer_uint64(1)
-            print.print_string("Lexed: LPAREN\n")
             return(Token { kind = "LPAREN", value = 0.0, next_position = lexer.position })
         })
 
         if(current_char == cast.character_uint8(')'), {
             lexer.position = lexer.position + cast.integer_uint64(1)
-            print.print_string("Lexed: RPAREN\n")
             return(Token { kind = "RPAREN", value = 0.0, next_position = lexer.position })
+        })
+
+        // Parse Identifiers (functions and constants)
+        if(string.is_alpha(current_char), {
+            let start = lexer.position
+            while(lexer.position < string.string_length(lexer.source) && string.is_alpha(string.character_at(lexer.source, lexer.position)), {
+                lexer.position = lexer.position + cast.integer_uint64(1)
+            })
+
+            let ident = string.string_substring(lexer.source, start, lexer.position)
+
+            if(ident == "pi" || ident == "PI", { return(Token { kind = "PI", value = 3.14159265, next_position = lexer.position }) })
+            if(ident == "e" || ident == "E", { return(Token { kind = "EULER", value = 2.71828182, next_position = lexer.position }) })
+            if(ident == "sqrt", { return(Token { kind = "SQRT", value = 0.0, next_position = lexer.position }) })
+            if(ident == "sin", { return(Token { kind = "SIN", value = 0.0, next_position = lexer.position }) })
+            if(ident == "cos", { return(Token { kind = "COS", value = 0.0, next_position = lexer.position }) })
+            if(ident == "abs", { return(Token { kind = "ABS", value = 0.0, next_position = lexer.position }) })
+
+            print.print_string("Lexed: UNKNOWN IDENTIFIER\n")
+            return(Token { kind = "ILLEGAL", value = 0.0, next_position = lexer.position })
         })
 
         if(string.is_digit(current_char), {
             let start = lexer.position
-
             while(lexer.position < string.string_length(lexer.source) && (string.is_digit(string.character_at(lexer.source, lexer.position)) || string.character_at(lexer.source, lexer.position) == cast.character_uint8('.')), {
                 lexer.position = lexer.position + cast.integer_uint64(1)
             })
-
             let num_str = string.string_substring(lexer.source, start, lexer.position)
             let parsed_val = string.parse_float(num_str)
-
-            print.print_string("Lexed: NUMBER (")
-            print.print_float(parsed_val)
-            print.print_string(")\n")
-
             return(Token { kind = "NUMBER", value = parsed_val, next_position = lexer.position })
         })
 
-        print.print_string("Lexed: ILLEGAL\n")
         lexer.position = lexer.position + cast.integer_uint64(1)
         return(Token { kind = "ILLEGAL", value = 0.0, next_position = lexer.position })
     })
 
-    print.print_string("Lexed: EOF\n")
     return(Token { kind = "EOF", value = 0.0, next_position = lexer.position })
+}
+
+func parse_function_call(let lexer: Lexer, let func_kind: String): ParseResult {
+    let lparen_tok = next_token(lexer)
+    lexer.position = lparen_tok.next_position
+    let inner_res = parse_expression(lexer)
+    lexer.position = inner_res.next_position
+    let rparen_tok = next_token(lexer)
+    lexer.position = rparen_tok.next_position
+
+    if(func_kind == "SQRT", { return(ParseResult { value = compute_sqrt(inner_res.value), next_position = lexer.position }) })
+    if(func_kind == "SIN", { return(ParseResult { value = compute_sin(inner_res.value), next_position = lexer.position }) })
+    if(func_kind == "COS", { return(ParseResult { value = compute_cos(inner_res.value), next_position = lexer.position }) })
+    if(func_kind == "ABS", { return(ParseResult { value = compute_abs(inner_res.value), next_position = lexer.position }) })
+
+    return(ParseResult { value = 0.0, next_position = lexer.position })
 }
 
 func parse_factor(let lexer: Lexer): ParseResult {
     let tok = next_token(lexer)
     lexer.position = tok.next_position
 
-    if(tok.kind == "NUMBER", {
-        return(ParseResult { value = tok.value, next_position = lexer.position })
-    }, {
-        if(tok.kind == "PI", {
-            return(ParseResult { value = 3.14159265, next_position = lexer.position })
-        }, {
-            if(tok.kind == "SQRT", {
-                let lparen_tok = next_token(lexer)
-                lexer.position = lparen_tok.next_position
-                let inner_res = parse_expression(lexer)
-                lexer.position = inner_res.next_position
-                let rparen_tok = next_token(lexer)
-                lexer.position = rparen_tok.next_position
-                return(ParseResult { value = compute_sqrt(inner_res.value), next_position = lexer.position })
-            }, {
-                if(tok.kind == "LPAREN", {
-                    let inner_res = parse_expression(lexer)
-                    lexer.position = inner_res.next_position
-                    let next_tok = next_token(lexer)
-                    lexer.position = next_tok.next_position
-                    return(ParseResult { value = inner_res.value, next_position = lexer.position })
-                }, {
-                    print.print_string("parse_factor failed, unexpected token\n")
-                    return(ParseResult { value = 0.0, next_position = lexer.position })
-                })
-            })
-        })
+    if(tok.kind == "NUMBER", { return(ParseResult { value = tok.value, next_position = lexer.position }) })
+    if(tok.kind == "PI", { return(ParseResult { value = tok.value, next_position = lexer.position }) })
+    if(tok.kind == "EULER", { return(ParseResult { value = tok.value, next_position = lexer.position }) })
+
+    if(tok.kind == "SQRT" || tok.kind == "SIN" || tok.kind == "COS" || tok.kind == "ABS", {
+        return(parse_function_call(lexer, tok.kind))
     })
+
+    if(tok.kind == "LPAREN", {
+        let inner_res = parse_expression(lexer)
+        lexer.position = inner_res.next_position
+        let next_tok = next_token(lexer)
+        lexer.position = next_tok.next_position
+        return(ParseResult { value = inner_res.value, next_position = lexer.position })
+    })
+
+    print.print_string("Syntax error: Expected factor\n")
+    return(ParseResult { value = 0.0, next_position = lexer.position })
 }
 
 func parse_unary(let lexer: Lexer): ParseResult {
@@ -220,14 +267,17 @@ func parse_postfix(let lexer: Lexer): ParseResult {
     lexer.position = left_res.next_position
     let current_value = left_res.value
 
-    let peek_lexer = Lexer { source = lexer.source, position = lexer.position }
-    let tok = next_token(peek_lexer)
-
-    if(tok.kind == "FACTORIAL", {
-        lexer.position = tok.next_position
-        current_value = compute_factorial(current_value)
-    }, {
-        0.0
+    let loop = cast.integer_uint8(1)
+    while(loop == cast.integer_uint8(1), {
+        let peek_lexer = Lexer { source = lexer.source, position = lexer.position }
+        let tok = next_token(peek_lexer)
+        if(tok.kind == "FACTORIAL", {
+            lexer.position = tok.next_position
+            current_value = compute_factorial(current_value)
+        }, {
+            loop = cast.integer_uint8(0)
+            current_value
+        })
     })
 
     return(ParseResult { value = current_value, next_position = lexer.position })
@@ -249,7 +299,7 @@ func parse_power(let lexer: Lexer): ParseResult {
             current_value = compute_power(current_value, right_res.value)
         }, {
             loop = cast.integer_uint8(0)
-            0.0
+            current_value
         })
     })
 
@@ -284,7 +334,7 @@ func parse_term(let lexer: Lexer): ParseResult {
                     current_value = compute_modulo(current_value, right_res.value)
                 }, {
                     loop = cast.integer_uint8(0)
-                    0.0
+                    current_value // Fixes the mismatch
                 })
             })
         })
@@ -315,7 +365,7 @@ func parse_expression(let lexer: Lexer): ParseResult {
                 current_value = current_value - right_res.value
             }, {
                 loop = cast.integer_uint8(0)
-                0.0
+                current_value // Fixes the mismatch
             })
         })
     })
@@ -324,6 +374,9 @@ func parse_expression(let lexer: Lexer): ParseResult {
 }
 
 func main(): Integer {
+    print.print_string("Engine initialized. Available funcs: sin(x), cos(x), abs(x), sqrt(x)\n")
+    print.print_string("Constants: pi, e\n")
+
     let input_text: String = input.get_input("Enter your calculation: ")
     let lexer = Lexer { source = input_text, position = cast.integer_uint64(0) }
     let result = parse_expression(lexer)

@@ -1,1 +1,0 @@
-return(Token { kind = "NUMBER", value = parsed_val, next_position = lexer.position })
