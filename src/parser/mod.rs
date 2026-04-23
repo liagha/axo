@@ -134,7 +134,7 @@ mod tests {
 
     #[test]
     fn binding_body_missing() {
-        let parser = parse("var");
+        let parser = parse("let");
         assert!(matches!(kind(&parser), ErrorKind::ExpectedBody));
     }
 
@@ -218,7 +218,7 @@ mod tests {
         for n in [8usize, 16, 32, 64] {
             let mut text = String::new();
             for _ in 0..n {
-                text.push_str("( [ { var ");
+                text.push_str("( [ { let ");
             }
             let parser = parse(Box::leak(text.into_boxed_str()));
             assert!(!parser.errors.is_empty());
