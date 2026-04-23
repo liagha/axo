@@ -13,7 +13,7 @@ use {
         identifier,
         internal::{
             hash::{DefaultHasher, Hash, Hasher},
-            platform::{create_dir_all, write, Lock},
+            platform::{Lock},
             time::{Duration, Instant, UNIX_EPOCH},
         },
         literal, module,
@@ -533,6 +533,10 @@ impl<'session> Session<'session> {
 
         #[cfg(feature = "interpreter")]
         {
+            use crate::{
+                internal::platform::{create_dir_all, write},
+            };
+
             let mut sources = Vec::new();
             let discard = self.get_directive(Str::from("Discard")).is_some();
 
