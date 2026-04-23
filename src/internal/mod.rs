@@ -52,6 +52,7 @@ pub mod platform {
         fs::{canonicalize, create_dir_all, read, read_dir, read_to_string, write, metadata, File},
         io::{
             stderr, stdin, stdout, BufRead, Error, ErrorKind, Result, Stdin, StdinLock, Stdout,
+            IsTerminal,
             StdoutLock, Read, Write,
         },
         path::{Path, PathBuf},

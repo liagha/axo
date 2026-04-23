@@ -16,7 +16,7 @@ fn main() {
 
     if targets.is_empty() {
         #[cfg(feature = "interpreter")]
-        axo::dialog::start(initializer.output, flag);
+        axo::dialog::Dialog::start(initializer.output, flag);
     } else {
         let mut session = Session::create(initializer.output, failures, flag);
 
