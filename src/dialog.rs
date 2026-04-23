@@ -1,31 +1,24 @@
 use crate::{
-    data::{Str, from_utf8},
+    analyzer::Analyzer,
+    data::{from_utf8, Identity, Str},
     internal::{
         platform::{
-            set_current_dir, read_dir, stdin, stdout, Read, Write, Command,
+            read_dir, set_current_dir, stdin, stdout, Command, Read, Write,
         },
-        RecordKind, Record, Session,
+        session::{
+            ANALYZE_STAGE, INTERPRET_STAGE, PARSE_STAGE, RESOLVE_STAGE, SCAN_STAGE,
+        },
+        Record, RecordKind, Session,
     },
     interpreter,
     interpreter::Interpreter,
-    parser::Symbol,
+    parser::{Parser, Symbol},
+    resolver::Resolver,
+    scanner::Scanner,
     tracker::Location,
 };
 #[cfg(unix)]
 use std::io::IsTerminal;
-
-fn keep(session: &Session, identity: usize) -> bool {
-    let Some(record) = session.records.get(&identity) else {
-        return false;
-    };
-
-    match record.fetch(2) {
-        Some(crate::internal::Artifact::Elements(elements)) => {
-            !elements.is_empty() && elements.iter().all(|element| element.kind.is_symbolize())
-        }
-        _ => false,
-    }
-}
 
 pub struct Dialog {
     pub history: Vec<String>,
@@ -67,11 +60,11 @@ impl Dialog {
         let mut cursor = 0;
         let mut index = self.history.len();
 
-        let render = |characters: &[char], position: usize| {
-            let string: String = characters.iter().collect();
+        let render = |chars: &[char], pos: usize| {
+            let string: String = chars.iter().collect();
             print!("\r\x1b[2K{}{}", prompt, string);
-            if characters.len() > position {
-                print!("\x1b[{}D", characters.len() - position);
+            if chars.len() > pos {
+                print!("\x1b[{}D", chars.len() - pos);
             }
             let _ = stdout().flush();
         };
@@ -182,6 +175,91 @@ impl Dialog {
     }
 }
 
+pub fn refresh<'a>(session: &mut Session<'a>, mut core: Option<&mut Interpreter<'a>>, keys: &[Identity]) {
+    session.errors.clear();
+    session.bootstrap();
+    if !session.prepare() {
+        session.report_all();
+        return;
+    }
+
+    loop {
+        let mut changed = false;
+
+        for key in session.source_keys(keys) {
+            let signature = session.scan_signature(key);
+            if session.stage_value(SCAN_STAGE, key) != signature
+                || session.records.get(&key).unwrap().fetch(1).is_none()
+            {
+                let before = session.records.get(&key).map(|record| record.artifact_version(1)).unwrap_or(0);
+                Scanner::execute(session, &[key]);
+                let after = session.records.get(&key).map(|record| record.artifact_version(1)).unwrap_or(0);
+                session.set_stage(SCAN_STAGE, key, signature);
+                changed |= before != after;
+            }
+        }
+
+        for key in session.source_keys(keys) {
+            let signature = session.parse_signature(key);
+            if session.stage_value(PARSE_STAGE, key) != signature
+                || session.records.get(&key).unwrap().fetch(2).is_none()
+            {
+                let before = session.records.get(&key).map(|record| record.artifact_version(2)).unwrap_or(0);
+                Parser::execute(session, &[key]);
+                let after = session.records.get(&key).map(|record| record.artifact_version(2)).unwrap_or(0);
+                session.set_stage(PARSE_STAGE, key, signature);
+                changed |= before != after;
+            }
+        }
+
+        let targets = session.all_source_keys();
+        let resolve = session.resolve_signature(&targets);
+        if session.stage_value(RESOLVE_STAGE, 0) != resolve {
+            let before = session.resolver.registry.len();
+            Resolver::execute(session, &targets);
+            let after = session.resolver.registry.len();
+            session.set_stage(RESOLVE_STAGE, 0, resolve);
+            changed |= before != after;
+        }
+
+        let analyze = session.analyze_signature(&targets);
+        if session.stage_value(ANALYZE_STAGE, 0) != analyze
+            || targets.iter().any(|key| session.records.get(key).unwrap().fetch(3).is_none())
+        {
+            let before = targets
+                .iter()
+                .map(|key| session.records.get(key).map(|record| record.artifact_version(3)).unwrap_or(0))
+                .sum::<usize>();
+            Analyzer::execute(session, &targets);
+            let after = targets
+                .iter()
+                .map(|key| session.records.get(key).map(|record| record.artifact_version(3)).unwrap_or(0))
+                .sum::<usize>();
+            session.set_stage(ANALYZE_STAGE, 0, analyze);
+            changed |= before != after;
+        }
+
+        let interpret = session.interpret_signature();
+        if let Some(core) = core.as_deref_mut() {
+            if session.stage_value(INTERPRET_STAGE, 0) != interpret {
+                core.reset();
+                Interpreter::process(session, core, &targets);
+                session.set_stage(INTERPRET_STAGE, 0, interpret);
+                changed = true;
+            }
+        }
+
+        if !changed || !session.errors.is_empty() {
+            break;
+        }
+    }
+
+    session.report_tokens(keys);
+    session.report_elements(keys);
+    session.report_analyses(keys);
+    session.report_all();
+}
+
 pub fn start(directives: Vec<Symbol>, flag: Str) {
     let mut session = Session::create(directives, Vec::new(), flag);
     let mut core = Interpreter::new(1024);
@@ -193,7 +271,7 @@ pub fn start(directives: Vec<Symbol>, flag: Str) {
         .collect();
     keys.sort();
 
-    Session::execute(&mut session, &mut core, &keys);
+    refresh(&mut session, Some(&mut core), &keys);
 
     let mut terminal = Dialog::new();
 
@@ -235,25 +313,21 @@ pub fn start(directives: Vec<Symbol>, flag: Str) {
             continue;
         }
 
+        let identity = session.records.len() | 0x40000000;
         let location = Location::from("dialog");
         let mut record = Record::new(RecordKind::Source, location);
         record.set_content(input);
-
-        let identity = session.records.len() | 0x40000000;
         session.records.insert(identity, record);
 
-        Session::execute(&mut session, &mut core, &[identity]);
-        let stay = session.errors.is_empty() && keep(&session, identity);
+        refresh(&mut session, None, &[identity]);
 
         if session.errors.is_empty() {
-            if let Some(result) = core.extract() {
+            if let Ok(Some(result)) = Interpreter::execute_line(&session, &mut core, identity) {
                 if !matches!(result, interpreter::Value::Empty) {
                     println!("{:?}", result);
                 }
             }
-        }
-
-        if !stay {
+        } else {
             session.records.remove(&identity);
         }
     }

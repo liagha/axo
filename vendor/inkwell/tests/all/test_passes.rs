@@ -1,13 +1,15 @@
 use inkwell::context::Context;
+#[allow(deprecated)]
 use inkwell::passes::{PassManager, PassManagerBuilder, PassRegistry};
 
+use inkwell::OptimizationLevel;
 #[llvm_versions(13..)]
 use inkwell::passes::PassBuilderOptions;
 #[llvm_versions(13..)]
 use inkwell::targets::{CodeModel, InitializationConfig, RelocMode, Target, TargetMachine};
-use inkwell::OptimizationLevel;
 
 #[test]
+#[allow(deprecated)]
 fn test_init_all_passes_for_module() {
     let context = Context::create();
     let module = context.create_module("my_module");
@@ -122,6 +124,7 @@ fn test_init_all_passes_for_module() {
 }
 
 #[test]
+#[allow(deprecated)]
 fn test_pass_manager_builder() {
     let pass_manager_builder = PassManagerBuilder::create();
 

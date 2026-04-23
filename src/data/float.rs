@@ -1,4 +1,3 @@
-use orbyte::Orbyte;
 use crate::{
     format::{Debug, Display, Formatter, Result},
     internal::{
@@ -7,7 +6,7 @@ use crate::{
     },
 };
 
-#[derive(Clone, Copy, Debug, Orbyte)]
+#[derive(Clone, Copy, Debug)]
 pub struct Float(pub f64);
 
 impl PartialEq for Float {

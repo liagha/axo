@@ -1,4 +1,3 @@
-use orbyte::Orbyte;
 use {
     crate::{
         data::{slice, Str},
@@ -8,7 +7,7 @@ use {
     OperatorKind::*,
 };
 
-#[derive(Clone, Debug, Eq, Hash, Orbyte, PartialEq)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub enum OperatorKind {
     At,
     Ampersand,

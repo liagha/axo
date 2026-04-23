@@ -4,6 +4,7 @@ mod string;
 
 pub use {
     std::ffi::CString,
+    std::num::NonZero,
     float::Float,
     helper::{element::*, symbol::*},
     string::{from_utf8, FromStr, Str, Utf8Error},

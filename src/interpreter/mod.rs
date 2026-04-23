@@ -133,8 +133,8 @@ impl<'source> Interpreter<'source> {
         }
     }
 
-    pub fn process(
-        session: &mut Session<'source>,
+    fn assemble(
+        session: &Session<'source>,
         core: &mut Interpreter<'source>,
         keys: &[Identity],
     ) {
@@ -156,7 +156,6 @@ impl<'source> Interpreter<'source> {
         sources.sort();
 
         let library = Self::load_library(session);
-        let start = core.code.len();
 
         Self::bind_values(session, core);
 
@@ -184,15 +183,27 @@ impl<'source> Interpreter<'source> {
             }
 
             let stem = Str::from(stem.to_string());
-            core.modules.entry(stem).or_default().extend(analyses);
+            core.modules.insert(stem, ());
+            core.units.push(CompilationUnit {
+                stem,
+                analyses,
+            });
         }
 
         core.compile();
+    }
+
+    pub fn process(
+        session: &mut Session<'source>,
+        core: &mut Interpreter<'source>,
+        keys: &[Identity],
+    ) {
+        let start = core.code.len();
+
+        Self::assemble(session, core, keys);
 
         if session.errors.is_empty() && core.code.len() > start {
-            core.pointer = start;
-            core.frames.clear();
-            core.stack.clear();
+            core.begin(start);
 
             if let Err(error) = core.run() {
                 session.errors.push(SessionError::Interpret(error));
@@ -206,6 +217,76 @@ impl<'source> Interpreter<'source> {
         keys: &[Identity],
     ) {
         Self::process(session, core, keys);
+    }
+
+    pub fn evaluate(
+        session: &Session<'source>,
+        core: &mut Interpreter<'source>,
+        key: Identity,
+    ) -> Result<Option<Value>, InterpretError<'source>> {
+        let Some(record) = session.records.get(&key) else {
+            return Ok(None);
+        };
+
+        let Some(Artifact::Analyses(analyses)) = record.fetch(3) else {
+            return Ok(None);
+        };
+
+        let Some(stem) = record.location.stem() else {
+            return Ok(None);
+        };
+
+        core.reset();
+        let mut keys: Vec<_> = session
+            .records
+            .iter()
+            .filter(|(identity, record)| {
+                **identity != key && record.kind == RecordKind::Source && record.fetch(0).is_some()
+            })
+            .map(|(&identity, _)| identity)
+            .collect();
+        keys.sort();
+        Self::assemble(session, core, &keys);
+
+        if !core.code.is_empty() {
+            core.begin(0);
+            core.run()?;
+        }
+
+        core.eval(Str::from(stem.to_string()), analyses.clone())
+    }
+
+    pub fn execute_line(
+        session: &Session<'source>,
+        core: &mut Interpreter<'source>,
+        key: Identity,
+    ) -> Result<Option<Value>, InterpretError<'source>> {
+        let Some(record) = session.records.get(&key) else {
+            return Ok(None);
+        };
+
+        let Some(Artifact::Analyses(analyses)) = record.fetch(3) else {
+            return Ok(None);
+        };
+
+        let Some(stem) = record.location.stem() else {
+            return Ok(None);
+        };
+
+        let library = Self::load_library(session);
+
+        Self::bind_values(session, core);
+
+        for analysis in analyses {
+            if let AnalysisKind::Function(function) = &analysis.kind {
+                if matches!(function.interface, Interface::C) {
+                    Self::bind_function(core, function, &analysis.typing, &library);
+                }
+            }
+        }
+
+        core.modules.insert(Str::from(stem.to_string()), ());
+        core.eval(Str::from(stem.to_string()), analyses.clone())
     }
 
     fn load_library(session: &Session) -> Option<Library> {

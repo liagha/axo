@@ -1,4 +1,3 @@
-use orbyte::Orbyte;
 use crate::{
     data::*,
     internal::hash::{Hash, Set},
@@ -8,7 +7,6 @@ use crate::{
     tracker::Span,
 };
 
-#[derive(Orbyte)]
 pub struct Symbol<'symbol> {
     pub identity: Identity,
     pub kind: SymbolKind<'symbol>,
@@ -17,7 +15,7 @@ pub struct Symbol<'symbol> {
     pub typing: Type<'symbol>,
 }
 
-#[derive(Clone, Hash, Orbyte, PartialEq)]
+#[derive(Clone, Hash, PartialEq)]
 pub enum SymbolKind<'symbol> {
     Binding(Box<Binding<Element<'symbol>, Element<'symbol>, Option<Element<'symbol>>>>),
     Structure(Box<Aggregate<Element<'symbol>, Symbol<'symbol>>>),

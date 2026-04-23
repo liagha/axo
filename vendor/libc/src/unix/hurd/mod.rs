@@ -431,6 +431,7 @@ s! {
         pub si_value: crate::sigval,
     }
 
+    #[derive(Default)]
     pub struct timespec {
         pub tv_sec: __time_t,
         pub tv_nsec: __syscall_slong_t,
@@ -3330,8 +3331,8 @@ pub const PTHREAD_MUTEX_INITIALIZER: pthread_mutex_t = pthread_mutex_t {
     __shpid: 0,
     __type: PTHREAD_MUTEX_TIMED as c_int,
     __flags: 0,
-    __reserved1: Padding::uninit(),
-    __reserved2: Padding::uninit(),
+    __reserved1: Padding::new(0),
+    __reserved2: Padding::new(0),
 };
 pub const PTHREAD_COND_INITIALIZER: pthread_cond_t = pthread_cond_t {
     __lock: __PTHREAD_SPIN_LOCK_INITIALIZER,

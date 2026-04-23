@@ -19,7 +19,7 @@ impl<'backend> Generator<'backend> {
             16 => self.context.i16_type(),
             32 => self.context.i32_type(),
             64 => self.context.i64_type(),
-            bits => self.context.custom_width_int_type(bits as u32),
+            bits => self.context.custom_width_int_type(std::num::NonZeroU32::new(bits as u32).unwrap()).unwrap(),
         };
 
         let bits = number as u64;

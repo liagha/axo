@@ -1,28 +1,25 @@
+use llvm_sys::LLVMOpcode;
 #[llvm_versions(14..)]
 use llvm_sys::core::LLVMGetGEPSourceElementType;
 use llvm_sys::core::{
-    LLVMGetAlignment, LLVMGetAllocatedType, LLVMGetFCmpPredicate, LLVMGetICmpPredicate, LLVMGetIndices,
-    LLVMGetInstructionOpcode, LLVMGetInstructionParent, LLVMGetMetadata, LLVMGetNextInstruction, LLVMGetNumIndices,
-    LLVMGetNumOperands, LLVMGetOperand, LLVMGetOperandUse, LLVMGetPreviousInstruction, LLVMGetVolatile,
-    LLVMHasMetadata, LLVMInstructionClone, LLVMInstructionEraseFromParent, LLVMInstructionRemoveFromParent,
-    LLVMIsAAllocaInst, LLVMIsABasicBlock, LLVMIsAGetElementPtrInst, LLVMIsALoadInst, LLVMIsAStoreInst,
-    LLVMIsATerminatorInst, LLVMIsConditional, LLVMIsTailCall, LLVMSetAlignment, LLVMSetMetadata, LLVMSetOperand,
-    LLVMSetVolatile, LLVMValueAsBasicBlock,
+    LLVMGetAlignment, LLVMGetAllocatedType, LLVMGetAtomicRMWBinOp, LLVMGetFCmpPredicate, LLVMGetICmpPredicate,
+    LLVMGetIndices, LLVMGetInstructionOpcode, LLVMGetInstructionParent, LLVMGetMetadata, LLVMGetNextInstruction,
+    LLVMGetNumIndices, LLVMGetNumOperands, LLVMGetOperand, LLVMGetOperandUse, LLVMGetOrdering,
+    LLVMGetPreviousInstruction, LLVMGetVolatile, LLVMHasMetadata, LLVMInstructionClone, LLVMInstructionEraseFromParent,
+    LLVMInstructionRemoveFromParent, LLVMIsATerminatorInst, LLVMIsConditional, LLVMIsTailCall, LLVMSetAlignment,
+    LLVMSetMetadata, LLVMSetOperand, LLVMSetOrdering, LLVMSetVolatile, LLVMValueAsBasicBlock, LLVMValueIsBasicBlock,
 };
-use llvm_sys::core::{LLVMGetAtomicRMWBinOp, LLVMIsAAtomicCmpXchgInst, LLVMIsAAtomicRMWInst};
-use llvm_sys::core::{LLVMGetOrdering, LLVMSetOrdering};
 use llvm_sys::prelude::LLVMValueRef;
-use llvm_sys::LLVMOpcode;
 
 use std::{ffi::CStr, fmt, fmt::Display};
 
+use crate::AtomicRMWBinOp;
 use crate::debug_info::DILocation;
 use crate::values::{BasicValue, BasicValueEnum, BasicValueUse, MetadataValue, Value};
-use crate::AtomicRMWBinOp;
+use crate::{AtomicOrdering, FloatPredicate, IntPredicate};
 use crate::{basic_block::BasicBlock, types::AnyTypeEnum};
 use crate::{error::AlignmentError, values::basic_value_use::Operand};
 use crate::{types::BasicTypeEnum, values::traits::AsValueRef};
-use crate::{AtomicOrdering, FloatPredicate, IntPredicate};
 
 use super::AnyValue;
 
@@ -35,6 +32,10 @@ pub enum AtomicError {
     AcquireRelease,
     #[error("The acquire ordering is not valid on store instructions.")]
     AcquireOnStore,
+    #[error("Only acquire, release, acq_rel and sequentially consistent orderings are valid on fence instructions.")]
+    InvalidOrderingOnFence,
+    #[error("The not_atomic and unordered orderings are not valid on atomicrmw instructions.")]
+    InvalidOrderingOnAtomicRMW,
 }
 
 /// Errors for InstructionValue.
@@ -44,14 +45,30 @@ pub enum InstructionValueError {
     CannotNameVoidTypeInst,
     #[error("Value is not a load, store, atomicrmw or cmpxchg instruction.")]
     NotMemoryAccessInst,
-    #[error("Value is not a load or store instruction.")]
-    NotLoadOrStoreInst,
+    #[error("Value is not an atomic ordering capable memory access instruction.")]
+    NotAtomicOrderingInst,
     #[error("Value is not an alloca instruction.")]
     NotAllocaInst,
+    #[error("Value is not an icmp instruction.")]
+    NotIcmpInst,
+    #[error("Value is not an add, sub, mul, shl or trunc instruction.")]
+    NotArithInst,
+    #[error("Value is not a div or shr instruction.")]
+    NotDivOrShrInst,
     #[error("Alignment Error: {0}")]
     AlignmentError(AlignmentError),
     #[error("Not a GEP instruction.")]
     NotGEPInst,
+    #[error("Not a fast-math supporting instruction.")]
+    NotFastMathInst,
+    #[error("Not a call instruction.")]
+    NotCallInst,
+    #[error("Not a zext instruction.")]
+    NotZextInst,
+    #[error("Not an or instruction.")]
+    NotOrInst,
+    #[error("Not a branch instruction.")]
+    NotBrInst,
     #[error("Atomic Error: {0}")]
     AtomicError(AtomicError),
     #[error("Metadata is expected to be a node.")]
@@ -110,6 +127,8 @@ pub enum InstructionOpcode {
     Or,
     #[llvm_variant(LLVMPHI)]
     Phi,
+    #[cfg(feature = "llvm22-1")]
+    PtrToAddr,
     PtrToInt,
     Resume,
     #[llvm_variant(LLVMRet)]
@@ -142,45 +161,22 @@ pub struct InstructionValue<'ctx> {
 }
 
 impl<'ctx> InstructionValue<'ctx> {
-    fn is_a_load_inst(self) -> bool {
-        !unsafe { LLVMIsALoadInst(self.as_value_ref()) }.is_null()
-    }
-
-    fn is_a_store_inst(self) -> bool {
-        !unsafe { LLVMIsAStoreInst(self.as_value_ref()) }.is_null()
-    }
-
-    fn is_a_alloca_inst(self) -> bool {
-        !unsafe { LLVMIsAAllocaInst(self.as_value_ref()) }.is_null()
-    }
-
-    #[allow(dead_code)]
-    fn is_a_getelementptr_inst(self) -> bool {
-        !unsafe { LLVMIsAGetElementPtrInst(self.as_value_ref()) }.is_null()
-    }
-
-    fn is_a_atomicrmw_inst(self) -> bool {
-        !unsafe { LLVMIsAAtomicRMWInst(self.as_value_ref()) }.is_null()
-    }
-
-    fn is_a_cmpxchg_inst(self) -> bool {
-        !unsafe { LLVMIsAAtomicCmpXchgInst(self.as_value_ref()) }.is_null()
-    }
-
     /// Get a value from an [LLVMValueRef].
     ///
     /// # Safety
     ///
     /// The ref must be valid and of type instruction.
     pub unsafe fn new(instruction_value: LLVMValueRef) -> Self {
-        debug_assert!(!instruction_value.is_null());
+        unsafe {
+            debug_assert!(!instruction_value.is_null());
 
-        let value = Value::new(instruction_value);
+            let value = Value::new(instruction_value);
 
-        debug_assert!(value.is_instruction());
+            debug_assert!(value.is_instruction());
 
-        InstructionValue {
-            instruction_value: value,
+            InstructionValue {
+                instruction_value: value,
+            }
         }
     }
 
@@ -202,10 +198,10 @@ impl<'ctx> InstructionValue<'ctx> {
     /// Get a instruction with it's name
     /// Compares against all instructions after self, and self.
     pub fn get_instruction_with_name(&self, name: &str) -> Option<InstructionValue<'ctx>> {
-        if let Some(ins_name) = self.get_name() {
-            if ins_name.to_str() == Ok(name) {
-                return Some(*self);
-            }
+        if let Some(ins_name) = self.get_name()
+            && ins_name.to_str() == Ok(name)
+        {
+            return Some(*self);
         }
         self.get_next_instruction()?.get_instruction_with_name(name)
     }
@@ -275,34 +271,46 @@ impl<'ctx> InstructionValue<'ctx> {
         unsafe { !LLVMIsATerminatorInst(self.as_value_ref()).is_null() }
     }
 
-    // SubTypes: Only apply to terminators
-    /// Returns if a terminator is conditional or not
-    pub fn is_conditional(self) -> bool {
+    // SubTypes: Only apply to branch instructions
+    /// Returns whether the branch instruction is conditional
+    pub fn is_conditional(self) -> Result<bool, InstructionValueError> {
         if self.get_opcode() == InstructionOpcode::Br {
-            unsafe { LLVMIsConditional(self.as_value_ref()) == 1 }
+            Ok(unsafe { LLVMIsConditional(self.as_value_ref()) == 1 })
         } else {
-            false
+            Err(InstructionValueError::NotBrInst)
         }
     }
 
-    pub fn is_tail_call(self) -> bool {
-        // LLVMIsTailCall has UB if the value is not an llvm::CallInst*.
+    // SubTypes: Only apply to call instructions
+    /// Returns whether the call instruction is tail call
+    pub fn is_tail_call(self) -> Result<bool, InstructionValueError> {
         if self.get_opcode() == InstructionOpcode::Call {
-            unsafe { LLVMIsTailCall(self.as_value_ref()) == 1 }
+            Ok(unsafe { LLVMIsTailCall(self.as_value_ref()) == 1 })
         } else {
-            false
+            Err(InstructionValueError::NotCallInst)
         }
     }
 
-    /// Returns the tail call kind on call instructions.
-    ///
-    /// Other instructions return `None`.
+    // SubTypes: Only apply to call instructions
+    /// Returns tail call kind of the call instruction
     #[llvm_versions(18..)]
-    pub fn get_tail_call_kind(self) -> Option<super::LLVMTailCallKind> {
+    pub fn get_tail_call_kind(self) -> Result<super::LLVMTailCallKind, InstructionValueError> {
         if self.get_opcode() == InstructionOpcode::Call {
-            unsafe { llvm_sys::core::LLVMGetTailCallKind(self.as_value_ref()) }.into()
+            Ok(unsafe { llvm_sys::core::LLVMGetTailCallKind(self.as_value_ref()) })
         } else {
-            None
+            Err(InstructionValueError::NotCallInst)
+        }
+    }
+
+    // SubTypes: Only apply to call instructions
+    /// Sets tail call kind of the call instruction
+    #[llvm_versions(18..)]
+    pub fn set_tail_call_kind(self, kind: super::LLVMTailCallKind) -> Result<(), InstructionValueError> {
+        if self.get_opcode() == InstructionOpcode::Call {
+            unsafe { llvm_sys::core::LLVMSetTailCallKind(self.as_value_ref(), kind) };
+            Ok(())
+        } else {
+            Err(InstructionValueError::NotCallInst)
         }
     }
 
@@ -314,64 +322,183 @@ impl<'ctx> InstructionValue<'ctx> {
         unsafe { llvm_sys::core::LLVMCanValueUseFastMathFlags(self.as_value_ref()) == 1 }
     }
 
-    /// Get [fast math flags][0] of supported instructions.
-    ///
-    /// Calling this on unsupported instructions is safe and returns `None`.
-    ///
-    /// [0]: https://llvm.org/docs/LangRef.html#fast-math-flags
+    // SubTypes: Only apply to fast-math supporting instructions
+    /// Return the [`FastMathFlags`] on supported instructions.
     #[llvm_versions(18..)]
-    pub fn get_fast_math_flags(self) -> Option<u32> {
-        self.can_use_fast_math_flags()
-            .then(|| unsafe { llvm_sys::core::LLVMGetFastMathFlags(self.as_value_ref()) } as u32)
-    }
-
-    /// Set [fast math flags][0] on supported instructions.
-    ///
-    /// Calling this on unsupported instructions is safe and results in a no-op.
-    ///
-    /// [0]: https://llvm.org/docs/LangRef.html#fast-math-flags
-    #[llvm_versions(18..)]
-    pub fn set_fast_math_flags(self, flags: u32) {
+    pub fn get_fast_math_flags(self) -> Result<FastMathFlags, InstructionValueError> {
         if self.can_use_fast_math_flags() {
-            unsafe { llvm_sys::core::LLVMSetFastMathFlags(self.as_value_ref(), flags) };
+            let raw = unsafe { llvm_sys::core::LLVMGetFastMathFlags(self.as_value_ref()) };
+            Ok(FastMathFlags::from_bits_retain(raw))
+        } else {
+            Err(InstructionValueError::NotFastMathInst)
         }
     }
 
-    /// Check if a `zext` instruction has the non-negative flag set.
-    ///
-    /// Calling this function on other instructions is safe and returns `None`.
+    // SubTypes: Only apply to fast-math supporting instructions
+    /// Set [`FastMathFlags`] on supported instructions.
     #[llvm_versions(18..)]
-    pub fn get_non_negative_flag(self) -> Option<bool> {
-        (self.get_opcode() == InstructionOpcode::ZExt)
-            .then(|| unsafe { llvm_sys::core::LLVMGetNNeg(self.as_value_ref()) == 1 })
+    pub fn set_fast_math_flags(self, flags: FastMathFlags) -> Result<(), InstructionValueError> {
+        if self.can_use_fast_math_flags() {
+            unsafe { llvm_sys::core::LLVMSetFastMathFlags(self.as_value_ref(), flags.bits()) };
+            Ok(())
+        } else {
+            Err(InstructionValueError::NotFastMathInst)
+        }
     }
 
-    /// Set the non-negative flag on `zext` instructions.
-    ///
-    /// Calling this function on other instructions is safe and results in a no-op.
+    // SubTypes: Only apply to zext instructions
+    /// Returns the non-negative flag on zext instructions.
     #[llvm_versions(18..)]
-    pub fn set_non_negative_flag(self, flag: bool) {
+    pub fn get_non_negative_flag(self) -> Result<bool, InstructionValueError> {
+        if self.get_opcode() == InstructionOpcode::ZExt {
+            Ok(unsafe { llvm_sys::core::LLVMGetNNeg(self.as_value_ref()) == 1 })
+        } else {
+            Err(InstructionValueError::NotZextInst)
+        }
+    }
+
+    // SubTypes: Only apply to zext instructions
+    /// Set the non-negative flag on zext instructions.
+    #[llvm_versions(18..)]
+    pub fn set_non_negative_flag(self, flag: bool) -> Result<(), InstructionValueError> {
         if self.get_opcode() == InstructionOpcode::ZExt {
             unsafe { llvm_sys::core::LLVMSetNNeg(self.as_value_ref(), flag as i32) };
+            Ok(())
+        } else {
+            Err(InstructionValueError::NotZextInst)
         }
     }
 
-    /// Checks if an `or` instruction has the `disjoint` flag set.
-    ///
-    /// Calling this function on other instructions is safe and returns `None`.
+    // SubTypes: Only apply to or instructions
+    /// Returns the disjoint flag on or instructions.
     #[llvm_versions(18..)]
-    pub fn get_disjoint_flag(self) -> Option<bool> {
-        (self.get_opcode() == InstructionOpcode::Or)
-            .then(|| unsafe { llvm_sys::core::LLVMGetIsDisjoint(self.as_value_ref()) == 1 })
+    pub fn get_disjoint_flag(self) -> Result<bool, InstructionValueError> {
+        if self.get_opcode() == InstructionOpcode::Or {
+            Ok(unsafe { llvm_sys::core::LLVMGetIsDisjoint(self.as_value_ref()) == 1 })
+        } else {
+            Err(InstructionValueError::NotOrInst)
+        }
     }
 
-    /// Set the `disjoint` flag on `or` instructions.
-    ///
-    /// Calling this function on other instructions is safe and results in a no-op.
+    // SubTypes: Only apply to or instructions
+    /// Set the disjoint flag on or instructions.
     #[llvm_versions(18..)]
-    pub fn set_disjoint_flag(self, flag: bool) {
+    pub fn set_disjoint_flag(self, flag: bool) -> Result<(), InstructionValueError> {
         if self.get_opcode() == InstructionOpcode::Or {
             unsafe { llvm_sys::core::LLVMSetIsDisjoint(self.as_value_ref(), flag as i32) };
+            Ok(())
+        } else {
+            Err(InstructionValueError::NotOrInst)
+        }
+    }
+
+    // SubTypes: Only apply to specific arithmetic instructions
+    /// Returns whether or not an arithmetic instruction has the no signed wrap flag set.
+    #[llvm_versions(17..)]
+    pub fn get_no_signed_wrap_flag(self) -> Result<bool, InstructionValueError> {
+        match self.get_opcode() {
+            InstructionOpcode::Add
+            | InstructionOpcode::Sub
+            | InstructionOpcode::Mul
+            | InstructionOpcode::Shl
+            | InstructionOpcode::Trunc => Ok(unsafe { llvm_sys::core::LLVMGetNSW(self.as_value_ref()) == 1 }),
+            _ => Err(InstructionValueError::NotArithInst),
+        }
+    }
+
+    // SubTypes: Only apply to specific arithmetic instructions
+    /// Sets whether or not an arithmetic instruction is no signed wrap.
+    #[llvm_versions(17..)]
+    pub fn set_no_signed_wrap_flag(self, flag: bool) -> Result<(), InstructionValueError> {
+        match self.get_opcode() {
+            InstructionOpcode::Add
+            | InstructionOpcode::Sub
+            | InstructionOpcode::Mul
+            | InstructionOpcode::Shl
+            | InstructionOpcode::Trunc => {
+                unsafe { llvm_sys::core::LLVMSetNSW(self.as_value_ref(), flag as i32) };
+                Ok(())
+            },
+            _ => Err(InstructionValueError::NotArithInst),
+        }
+    }
+
+    // SubTypes: Only apply to specific arithmetic instructions
+    /// Returns whether or not an arithmetic instruction has the no unsigned wrap flag set.
+    #[llvm_versions(17..)]
+    pub fn get_no_unsigned_wrap_flag(self) -> Result<bool, InstructionValueError> {
+        match self.get_opcode() {
+            InstructionOpcode::Add
+            | InstructionOpcode::Sub
+            | InstructionOpcode::Mul
+            | InstructionOpcode::Shl
+            | InstructionOpcode::Trunc => Ok(unsafe { llvm_sys::core::LLVMGetNUW(self.as_value_ref()) == 1 }),
+            _ => Err(InstructionValueError::NotArithInst),
+        }
+    }
+
+    // SubTypes: Only apply to specific arithmetic instructions
+    /// Sets whether or not an arithmetic instruction is no unsigned wrap.
+    #[llvm_versions(17..)]
+    pub fn set_no_unsigned_wrap_flag(self, flag: bool) -> Result<(), InstructionValueError> {
+        match self.get_opcode() {
+            InstructionOpcode::Add
+            | InstructionOpcode::Sub
+            | InstructionOpcode::Mul
+            | InstructionOpcode::Shl
+            | InstructionOpcode::Trunc => {
+                unsafe { llvm_sys::core::LLVMSetNUW(self.as_value_ref(), flag as i32) };
+                Ok(())
+            },
+            _ => Err(InstructionValueError::NotArithInst),
+        }
+    }
+
+    // SubTypes: Only apply to division and shift right instructions
+    /// Returns whether or not an instruction has the exact flag set.
+    #[llvm_versions(17..)]
+    pub fn get_exact_flag(self) -> Result<bool, InstructionValueError> {
+        match self.get_opcode() {
+            InstructionOpcode::SDiv | InstructionOpcode::UDiv | InstructionOpcode::AShr | InstructionOpcode::LShr => {
+                Ok(unsafe { llvm_sys::core::LLVMGetExact(self.as_value_ref()) == 1 })
+            },
+            _ => Err(InstructionValueError::NotDivOrShrInst),
+        }
+    }
+
+    // SubTypes: Only apply to division and shift right instructions
+    /// Sets whether or not an instruction is exact.
+    #[llvm_versions(17..)]
+    pub fn set_exact_flag(self, flag: bool) -> Result<(), InstructionValueError> {
+        match self.get_opcode() {
+            InstructionOpcode::SDiv | InstructionOpcode::UDiv | InstructionOpcode::AShr | InstructionOpcode::LShr => {
+                unsafe { llvm_sys::core::LLVMSetExact(self.as_value_ref(), flag as i32) };
+                Ok(())
+            },
+            _ => Err(InstructionValueError::NotDivOrShrInst),
+        }
+    }
+
+    // SubTypes: Only apply to integer comparison instruction
+    /// Returns whether or not an instruction has the same sign flag set.
+    #[llvm_versions(21..)]
+    pub fn get_same_sign_flag(self) -> Result<bool, InstructionValueError> {
+        match self.get_opcode() {
+            InstructionOpcode::ICmp => Ok(unsafe { llvm_sys::core::LLVMGetICmpSameSign(self.as_value_ref()) == 1 }),
+            _ => Err(InstructionValueError::NotIcmpInst),
+        }
+    }
+
+    // SubTypes: Only apply to integer comparison instruction
+    /// Sets whether or not an instruction is same sign.
+    #[llvm_versions(21..)]
+    pub fn set_same_sign_flag(self, flag: bool) -> Result<(), InstructionValueError> {
+        match self.get_opcode() {
+            InstructionOpcode::ICmp => {
+                unsafe { llvm_sys::core::LLVMSetICmpSameSign(self.as_value_ref(), flag as i32) };
+                Ok(())
+            },
+            _ => Err(InstructionValueError::NotIcmpInst),
         }
     }
 
@@ -382,52 +509,85 @@ impl<'ctx> InstructionValue<'ctx> {
     // SubTypes: Only apply to memory access instructions
     /// Returns whether or not a memory access instruction is volatile.
     pub fn get_volatile(self) -> Result<bool, InstructionValueError> {
-        if !self.is_a_load_inst() && !self.is_a_store_inst() && !self.is_a_atomicrmw_inst() && !self.is_a_cmpxchg_inst()
-        {
-            return Err(InstructionValueError::NotMemoryAccessInst);
+        match self.get_opcode() {
+            InstructionOpcode::Load
+            | InstructionOpcode::Store
+            | InstructionOpcode::AtomicRMW
+            | InstructionOpcode::AtomicCmpXchg => Ok(unsafe { LLVMGetVolatile(self.as_value_ref()) } == 1),
+            _ => Err(InstructionValueError::NotMemoryAccessInst),
         }
-        Ok(unsafe { LLVMGetVolatile(self.as_value_ref()) } == 1)
     }
 
     // SubTypes: Only apply to memory access instructions
     /// Sets whether or not a memory access instruction is volatile.
     pub fn set_volatile(self, volatile: bool) -> Result<(), InstructionValueError> {
-        if !self.is_a_load_inst() && !self.is_a_store_inst() && !self.is_a_atomicrmw_inst() && !self.is_a_cmpxchg_inst()
-        {
-            return Err(InstructionValueError::NotMemoryAccessInst);
+        match self.get_opcode() {
+            InstructionOpcode::Load
+            | InstructionOpcode::Store
+            | InstructionOpcode::AtomicRMW
+            | InstructionOpcode::AtomicCmpXchg => {
+                unsafe { LLVMSetVolatile(self.as_value_ref(), volatile as i32) };
+                Ok(())
+            },
+            _ => Err(InstructionValueError::NotMemoryAccessInst),
         }
-        unsafe { LLVMSetVolatile(self.as_value_ref(), volatile as i32) };
-        Ok(())
     }
 
     // SubTypes: Only apply to alloca instruction
     /// Returns the type that is allocated by the alloca instruction.
     pub fn get_allocated_type(self) -> Result<BasicTypeEnum<'ctx>, InstructionValueError> {
-        if !self.is_a_alloca_inst() {
-            return Err(InstructionValueError::NotAllocaInst);
+        match self.get_opcode() {
+            InstructionOpcode::Alloca => Ok(unsafe { BasicTypeEnum::new(LLVMGetAllocatedType(self.as_value_ref())) }),
+            _ => Err(InstructionValueError::NotAllocaInst),
         }
-        Ok(unsafe { BasicTypeEnum::new(LLVMGetAllocatedType(self.as_value_ref())) })
     }
 
     // SubTypes: Only apply to GetElementPtr instruction
     /// Returns the source element type of the given GEP.
     #[llvm_versions(14..)]
     pub fn get_gep_source_element_type(self) -> Result<BasicTypeEnum<'ctx>, InstructionValueError> {
-        if !self.is_a_getelementptr_inst() {
-            return Err(InstructionValueError::NotGEPInst);
+        match self.get_opcode() {
+            InstructionOpcode::GetElementPtr => {
+                Ok(unsafe { BasicTypeEnum::new(LLVMGetGEPSourceElementType(self.as_value_ref())) })
+            },
+            _ => Err(InstructionValueError::NotGEPInst),
         }
-        Ok(unsafe { BasicTypeEnum::new(LLVMGetGEPSourceElementType(self.as_value_ref())) })
+    }
+
+    // SubTypes: Only apply to GetElementPtr instruction
+    /// Returns whether or not the GEP is in bounds.
+    pub fn get_in_bounds_flag(self) -> Result<bool, InstructionValueError> {
+        match self.get_opcode() {
+            InstructionOpcode::GetElementPtr => Ok(unsafe { llvm_sys::core::LLVMIsInBounds(self.as_value_ref()) == 1 }),
+            _ => Err(InstructionValueError::NotGEPInst),
+        }
+    }
+
+    // SubTypes: Only apply to GetElementPtr instruction
+    /// Sets the given GEP to be in bounds or not.
+    pub fn set_in_bounds_flag(self, flag: bool) -> Result<(), InstructionValueError> {
+        match self.get_opcode() {
+            InstructionOpcode::GetElementPtr => {
+                unsafe {
+                    llvm_sys::core::LLVMSetIsInBounds(self.as_value_ref(), flag as i32);
+                }
+                Ok(())
+            },
+            _ => Err(InstructionValueError::NotGEPInst),
+        }
     }
 
     // SubTypes: Only apply to memory access and alloca instructions
     /// Returns alignment on a memory access instruction or alloca.
     pub fn get_alignment(self) -> Result<u32, InstructionValueError> {
-        if !self.is_a_alloca_inst() && !self.is_a_load_inst() && !self.is_a_store_inst() {
-            return Err(InstructionValueError::AlignmentError(
+        match self.get_opcode() {
+            InstructionOpcode::Alloca | InstructionOpcode::Load | InstructionOpcode::Store => {
+                Ok(unsafe { LLVMGetAlignment(self.as_value_ref()) })
+            },
+            _ => Err(InstructionValueError::AlignmentError(
                 AlignmentError::UnalignedInstruction,
-            ));
+            )),
         }
-        Ok(unsafe { LLVMGetAlignment(self.as_value_ref()) })
     }
 
     // SubTypes: Only apply to memory access and alloca instructions
@@ -439,47 +599,107 @@ impl<'ctx> InstructionValue<'ctx> {
                 alignment,
             )));
         }
-        if !self.is_a_alloca_inst() && !self.is_a_load_inst() && !self.is_a_store_inst() {
-            return Err(InstructionValueError::AlignmentError(
+
+        match self.get_opcode() {
+            InstructionOpcode::Alloca | InstructionOpcode::Load | InstructionOpcode::Store => {
+                unsafe { LLVMSetAlignment(self.as_value_ref(), alignment) };
+                Ok(())
+            },
+            _ => Err(InstructionValueError::AlignmentError(
                 AlignmentError::UnalignedInstruction,
-            ));
+            )),
         }
-        unsafe { LLVMSetAlignment(self.as_value_ref(), alignment) };
-        Ok(())
     }
 
     // SubTypes: Only apply to memory access instructions
     /// Returns atomic ordering on a memory access instruction.
     pub fn get_atomic_ordering(self) -> Result<AtomicOrdering, InstructionValueError> {
-        if !self.is_a_load_inst() && !self.is_a_store_inst() {
-            return Err(InstructionValueError::NotLoadOrStoreInst);
+        match self.get_opcode() {
+            InstructionOpcode::Load | InstructionOpcode::Store | InstructionOpcode::AtomicRMW => {
+                Ok(unsafe { LLVMGetOrdering(self.as_value_ref()) }.into())
+            },
+            #[cfg(any(
+                feature = "llvm18-1",
+                feature = "llvm19-1",
+                feature = "llvm20-1",
+                feature = "llvm21-1",
+                feature = "llvm22-1"
+            ))]
+            InstructionOpcode::Fence => Ok(unsafe { LLVMGetOrdering(self.as_value_ref()) }.into()),
+            _ => Err(InstructionValueError::NotAtomicOrderingInst),
         }
-        Ok(unsafe { LLVMGetOrdering(self.as_value_ref()) }.into())
     }
 
     // SubTypes: Only apply to memory access instructions
     /// Sets atomic ordering on a memory access instruction.
     pub fn set_atomic_ordering(self, ordering: AtomicOrdering) -> Result<(), InstructionValueError> {
         // Although fence and atomicrmw both have an ordering, the LLVM C API
-        // does not support them. The cmpxchg instruction has two orderings and
-        // does not work with this API.
-        if !self.is_a_load_inst() && !self.is_a_store_inst() {
-            return Err(InstructionValueError::NotLoadOrStoreInst);
+        // does not support them (for LLVM < 18). The cmpxchg instruction has two orderings and
+        // does not work with this API
+        match (self.get_opcode(), ordering) {
+            (InstructionOpcode::Load, AtomicOrdering::Release) => {
+                Err(InstructionValueError::AtomicError(AtomicError::ReleaseOnLoad))
+            },
+            (InstructionOpcode::Store, AtomicOrdering::Acquire) => {
+                Err(InstructionValueError::AtomicError(AtomicError::AcquireOnStore))
+            },
+            (InstructionOpcode::Load | InstructionOpcode::Store, AtomicOrdering::AcquireRelease) => {
+                Err(InstructionValueError::AtomicError(AtomicError::AcquireRelease))
+            },
+            (InstructionOpcode::Load | InstructionOpcode::Store, _) => {
+                unsafe { LLVMSetOrdering(self.as_value_ref(), ordering.into()) };
+                Ok(())
+            },
+            #[cfg(any(
+                feature = "llvm18-1",
+                feature = "llvm19-1",
+                feature = "llvm20-1",
+                feature = "llvm21-1",
+                feature = "llvm22-1"
+            ))]
+            (
+                InstructionOpcode::Fence,
+                AtomicOrdering::Acquire
+                | AtomicOrdering::Release
+                | AtomicOrdering::AcquireRelease
+                | AtomicOrdering::SequentiallyConsistent,
+            ) => {
+                unsafe { LLVMSetOrdering(self.as_value_ref(), ordering.into()) };
+                Ok(())
+            },
+            #[cfg(any(
+                feature = "llvm18-1",
+                feature = "llvm19-1",
+                feature = "llvm20-1",
+                feature = "llvm21-1",
+                feature = "llvm22-1"
+            ))]
+            (InstructionOpcode::Fence, _) => {
+                Err(InstructionValueError::AtomicError(AtomicError::InvalidOrderingOnFence))
+            },
+            #[cfg(any(
+                feature = "llvm18-1",
+                feature = "llvm19-1",
+                feature = "llvm20-1",
+                feature = "llvm21-1",
+                feature = "llvm22-1"
+            ))]
+            (InstructionOpcode::AtomicRMW, AtomicOrdering::NotAtomic | AtomicOrdering::Unordered) => Err(
+                InstructionValueError::AtomicError(AtomicError::InvalidOrderingOnAtomicRMW),
+            ),
+            #[cfg(any(
+                feature = "llvm18-1",
+                feature = "llvm19-1",
+                feature = "llvm20-1",
+                feature = "llvm21-1",
+                feature = "llvm22-1"
+            ))]
+            (InstructionOpcode::AtomicRMW, _) => {
+                unsafe { LLVMSetOrdering(self.as_value_ref(), ordering.into()) };
+                Ok(())
+            },
+            (_, _) => Err(InstructionValueError::NotAtomicOrderingInst),
         }
-        match ordering {
-            AtomicOrdering::Release if self.is_a_load_inst() => {
-                return Err(InstructionValueError::AtomicError(AtomicError::ReleaseOnLoad))
-            },
-            AtomicOrdering::AcquireRelease => {
-                return Err(InstructionValueError::AtomicError(AtomicError::AcquireRelease))
-            },
-            AtomicOrdering::Acquire if self.is_a_store_inst() => {
-                return Err(InstructionValueError::AtomicError(AtomicError::AcquireOnStore))
-            },
-            _ => {},
-        };
-        unsafe { LLVMSetOrdering(self.as_value_ref(), ordering.into()) };
-        Ok(())
     }
 
     /// Obtains the number of operands an `InstructionValue` has.
@@ -631,7 +851,7 @@ impl<'ctx> InstructionValue<'ctx> {
             return None;
         }
 
-        let is_basic_block = unsafe { !LLVMIsABasicBlock(operand).is_null() };
+        let is_basic_block = unsafe { LLVMValueIsBasicBlock(operand) == 1 };
 
         if is_basic_block {
             let bb = unsafe { BasicBlock::new(LLVMValueAsBasicBlock(operand)) };
@@ -1040,5 +1260,28 @@ impl<'ctx> Iterator for OperandUseIter<'ctx> {
         } else {
             None
         }
+    }
+}
+
+#[llvm_versions(18..)]
+bitflags::bitflags! {
+    /// Fast math flags to enable otherwise unsafe floating-point transformations.
+    #[repr(transparent)]
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    pub struct FastMathFlags: u32 {
+        /// Allows all non-strict floating-point transforms.
+        const AllowReassoc = llvm_sys::LLVMFastMathAllowReassoc;
+        /// Arguments and results are assumed not-NaN.
+        const NoNaNs = llvm_sys::LLVMFastMathNoNaNs;
+        /// Arguments and results are assumed not-infinite.
+        const NoInfs = llvm_sys::LLVMFastMathNoInfs;
+        /// Can ignore the sign of zero.
+        const NoSignedZeros = llvm_sys::LLVMFastMathNoSignedZeros;
+        /// Can use reciprocal multiply instead of division.
+        const AllowReciprocal = llvm_sys::LLVMFastMathAllowReciprocal;
+        /// Can be floating-point contracted (FMA).
+        const AllowContract = llvm_sys::LLVMFastMathAllowContract;
+        /// Allows approximations of math library functions or intrinsics
+        const ApproxFunc = llvm_sys::LLVMFastMathApproxFunc;
     }
 }

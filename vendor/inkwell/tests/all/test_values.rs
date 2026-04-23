@@ -10,7 +10,7 @@ use inkwell::types::{AnyTypeEnum, StringRadix, VectorType};
 use inkwell::values::CallSiteValue;
 #[llvm_versions(18..)]
 use inkwell::values::OperandBundle;
-use inkwell::values::{AnyValue, BasicValue, InstructionOpcode::*, FIRST_CUSTOM_METADATA_KIND_ID};
+use inkwell::values::{AnyValue, BasicValue, FIRST_CUSTOM_METADATA_KIND_ID, InstructionOpcode::*};
 use inkwell::{AddressSpace, DLLStorageClass, GlobalVisibility, ThreadLocalMode};
 
 #[llvm_versions(18..)]
@@ -78,7 +78,8 @@ fn test_call_site() {
     feature = "llvm18-1",
     feature = "llvm19-1",
     feature = "llvm20-1",
-    feature = "llvm21-1"
+    feature = "llvm21-1",
+    feature = "llvm22-1"
 ))]
 fn test_call_site_tail_call_attributes() {
     let context = Context::create();
@@ -97,7 +98,7 @@ fn test_call_site_tail_call_attributes() {
     assert_eq!(call_site.get_tail_call_kind(), LLVMTailCallKindNone);
     assert_eq!(
         call_site.try_as_basic_value().unwrap_instruction().get_tail_call_kind(),
-        Some(LLVMTailCallKindNone)
+        Ok(LLVMTailCallKindNone)
     );
 
     call_site.set_tail_call_kind(LLVMTailCallKindTail);
@@ -169,8 +170,8 @@ fn test_call_site_function_value_indirect_call() {
     // }
     // ```
 
-    let llvm_ir = r#"
-        source_filename = "my_mod";
+    let llvm_ir = b"
+        source_filename = \"my_mod\";
 
         define void @my_fn() {
             entry:
@@ -182,9 +183,9 @@ fn test_call_site_function_value_indirect_call() {
         }
 
         declare void @dummy_fn();
-    "#;
+    \0";
 
-    let memory_buffer = MemoryBuffer::create_from_memory_range_copy(llvm_ir.as_bytes(), "my_mod");
+    let memory_buffer = MemoryBuffer::create_from_memory_range_copy(llvm_ir, "my_mod");
     let context = Context::create();
     let module = context.create_module_from_ir(memory_buffer).unwrap();
 
@@ -223,6 +224,7 @@ fn test_set_get_name() {
         feature = "llvm19-1",
         feature = "llvm20-1",
         feature = "llvm21-1",
+        feature = "llvm22-1",
     ))]
     let bf16_type = context.bf16_type();
     let f32_type = context.f32_type();
@@ -252,6 +254,7 @@ fn test_set_get_name() {
         feature = "llvm19-1",
         feature = "llvm20-1",
         feature = "llvm21-1",
+        feature = "llvm22-1",
     ))]
     let bf16_val = bf16_type.const_float(0.0);
     let f32_val = f32_type.const_float(0.0);
@@ -274,7 +277,8 @@ fn test_set_get_name() {
         feature = "llvm18-1",
         feature = "llvm19-1",
         feature = "llvm20-1",
-        feature = "llvm21-1"
+        feature = "llvm21-1",
+        feature = "llvm22-1"
     ))]
     let scalable_vec_val = f64_type.scalable_vec_type(42).const_zero();
     let ppc_f128_val = ppc_f128_type.const_float(0.0);
@@ -298,6 +302,7 @@ fn test_set_get_name() {
         feature = "llvm19-1",
         feature = "llvm20-1",
         feature = "llvm21-1",
+        feature = "llvm22-1",
     ))]
     assert_eq!(bf16_val.get_name().to_str(), Ok(""));
     assert_eq!(f32_val.get_name().to_str(), Ok(""));
@@ -317,7 +322,8 @@ fn test_set_get_name() {
         feature = "llvm18-1",
         feature = "llvm19-1",
         feature = "llvm20-1",
-        feature = "llvm21-1"
+        feature = "llvm21-1",
+        feature = "llvm22-1"
     ))]
     assert_eq!(scalable_vec_val.get_name().to_str(), Ok(""));
     assert_eq!(ppc_f128_val.get_name().to_str(), Ok(""));
@@ -342,6 +348,7 @@ fn test_set_get_name() {
         feature = "llvm19-1",
         feature = "llvm20-1",
         feature = "llvm21-1",
+        feature = "llvm22-1",
     ))]
     bf16_val.set_name("my_val8");
     f32_val.set_name("my_val9");
@@ -361,7 +368,8 @@ fn test_set_get_name() {
         feature = "llvm18-1",
         feature = "llvm19-1",
         feature = "llvm20-1",
-        feature = "llvm21-1"
+        feature = "llvm21-1",
+        feature = "llvm22-1"
     ))]
     scalable_vec_val.set_name("my_val16");
     ppc_f128_val.set_name("my_val17");
@@ -385,6 +393,7 @@ fn test_set_get_name() {
         feature = "llvm19-1",
         feature = "llvm20-1",
         feature = "llvm21-1",
+        feature = "llvm22-1",
     ))]
     assert_eq!(bf16_val.get_name().to_str(), Ok(""));
     assert_eq!(f32_val.get_name().to_str(), Ok(""));
@@ -404,7 +413,8 @@ fn test_set_get_name() {
         feature = "llvm18-1",
         feature = "llvm19-1",
         feature = "llvm20-1",
-        feature = "llvm21-1"
+        feature = "llvm21-1",
+        feature = "llvm22-1"
     ))]
     assert_eq!(scalable_vec_val.get_name().to_str(), Ok(""));
     assert_eq!(ppc_f128_val.get_name().to_str(), Ok(""));
@@ -426,7 +436,8 @@ fn test_set_get_name() {
         feature = "llvm18-1",
         feature = "llvm19-1",
         feature = "llvm20-1",
-        feature = "llvm21-1"
+        feature = "llvm21-1",
+        feature = "llvm22-1"
     ))]
     let scalable_vec_type = bool_type.scalable_vec_type(1);
 
@@ -451,7 +462,8 @@ fn test_set_get_name() {
             feature = "llvm18-1",
             feature = "llvm19-1",
             feature = "llvm20-1",
-            feature = "llvm21-1"
+            feature = "llvm21-1",
+            feature = "llvm22-1"
         ))]
         scalable_vec_type.into(),
     ];
@@ -478,7 +490,8 @@ fn test_set_get_name() {
         feature = "llvm18-1",
         feature = "llvm19-1",
         feature = "llvm20-1",
-        feature = "llvm21-1"
+        feature = "llvm21-1",
+        feature = "llvm22-1"
     ))]
     let scalable_vec_param = function.get_nth_param(6).unwrap().into_scalable_vector_value();
     let phi_val = builder.build_phi(bool_type, "phi_node").unwrap();
@@ -499,7 +512,8 @@ fn test_set_get_name() {
         feature = "llvm18-1",
         feature = "llvm19-1",
         feature = "llvm20-1",
-        feature = "llvm21-1"
+        feature = "llvm21-1",
+        feature = "llvm22-1"
     ))]
     assert_eq!(scalable_vec_param.get_name().to_str(), Ok(""));
     assert_eq!(phi_val.get_name().to_str(), Ok("phi_node"));
@@ -520,7 +534,8 @@ fn test_set_get_name() {
         feature = "llvm18-1",
         feature = "llvm19-1",
         feature = "llvm20-1",
-        feature = "llvm21-1"
+        feature = "llvm21-1",
+        feature = "llvm22-1"
     ))]
     scalable_vec_param.set_name("my_val7");
     phi_val.set_name("phi");
@@ -541,7 +556,8 @@ fn test_set_get_name() {
         feature = "llvm18-1",
         feature = "llvm19-1",
         feature = "llvm20-1",
-        feature = "llvm21-1"
+        feature = "llvm21-1",
+        feature = "llvm22-1"
     ))]
     assert_eq!(scalable_vec_param.get_name().to_str(), Ok("my_val7"));
     assert_eq!(phi_val.get_name().to_str(), Ok("phi"));
@@ -571,6 +587,7 @@ fn test_undef() {
         feature = "llvm19-1",
         feature = "llvm20-1",
         feature = "llvm21-1",
+        feature = "llvm22-1",
     ))]
     let bf16_type = context.bf16_type();
     let f32_type = context.f32_type();
@@ -602,6 +619,7 @@ fn test_undef() {
         feature = "llvm19-1",
         feature = "llvm20-1",
         feature = "llvm21-1",
+        feature = "llvm22-1",
     ))]
     let bf16_val = bf16_type.const_float(0.0);
     let f32_val = f32_type.const_float(0.0);
@@ -624,7 +642,8 @@ fn test_undef() {
         feature = "llvm18-1",
         feature = "llvm19-1",
         feature = "llvm20-1",
-        feature = "llvm21-1"
+        feature = "llvm21-1",
+        feature = "llvm22-1"
     ))]
     let scalable_vec_val = f64_type.scalable_vec_type(42).const_zero();
     let ppc_f128_val = ppc_f128_type.const_float(0.0);
@@ -648,6 +667,7 @@ fn test_undef() {
         feature = "llvm19-1",
         feature = "llvm20-1",
         feature = "llvm21-1",
+        feature = "llvm22-1",
     ))]
     assert!(!bf16_val.is_undef());
     assert!(!f32_val.is_undef());
@@ -667,7 +687,8 @@ fn test_undef() {
         feature = "llvm18-1",
         feature = "llvm19-1",
         feature = "llvm20-1",
-        feature = "llvm21-1"
+        feature = "llvm21-1",
+        feature = "llvm22-1"
     ))]
     assert!(!scalable_vec_val.is_undef());
     assert!(!ppc_f128_val.is_undef());
@@ -691,6 +712,7 @@ fn test_undef() {
         feature = "llvm19-1",
         feature = "llvm20-1",
         feature = "llvm21-1",
+        feature = "llvm22-1",
     ))]
     let bf16_undef = bf16_type.get_undef();
     let f32_undef = f32_type.get_undef();
@@ -713,7 +735,8 @@ fn test_undef() {
         feature = "llvm18-1",
         feature = "llvm19-1",
         feature = "llvm20-1",
-        feature = "llvm21-1"
+        feature = "llvm21-1",
+        feature = "llvm22-1"
     ))]
     let scalable_vec_undef = bool_type.scalable_vec_type(1).get_undef();
     let ppc_f128_undef = ppc_f128_type.get_undef();
@@ -737,6 +760,7 @@ fn test_undef() {
         feature = "llvm19-1",
         feature = "llvm20-1",
         feature = "llvm21-1",
+        feature = "llvm22-1",
     ))]
     assert!(bf16_undef.is_undef());
     assert!(f32_undef.is_undef());
@@ -756,7 +780,8 @@ fn test_undef() {
         feature = "llvm18-1",
         feature = "llvm19-1",
         feature = "llvm20-1",
-        feature = "llvm21-1"
+        feature = "llvm21-1",
+        feature = "llvm22-1"
     ))]
     assert!(scalable_vec_undef.is_undef());
     assert!(ppc_f128_undef.is_undef());
@@ -956,12 +981,9 @@ fn test_metadata() {
 
     let md_string = context.metadata_string("lots of metadata here");
 
-    assert_eq!(md_string.get_node_size(), 0);
-    assert_eq!(md_string.get_node_values().len(), 0);
-    assert_eq!(
-        md_string.get_string_value().unwrap().to_str(),
-        Ok("lots of metadata here")
-    );
+    assert_eq!(md_string.get_node_size(), None);
+    assert_eq!(md_string.get_node_values(), None);
+    assert_eq!(md_string.get_string_value().unwrap(), b"lots of metadata here");
 
     let bool_type = context.bool_type();
     // let i8_type = context.i8_type();
@@ -970,12 +992,12 @@ fn test_metadata() {
     // let i64_type = context.i64_type();
     // let i128_type = context.i128_type();
     // let f16_type = context.f16_type();
-    // #[cfg(any(feature = "llvm11-0", feature = "llvm12-0", feature = "llvm13-0", feature = "llvm14-0", feature = "llvm15-0", feature = "llvm16-0", feature = "llvm17-0", feature = "llvm18-1", feature = "llvm19-1", feature = "llvm20-1", feature = "llvm21-1"))]
+    // #[cfg(any(feature = "llvm11-0", feature = "llvm12-0", feature = "llvm13-0", feature = "llvm14-0", feature = "llvm15-0", feature = "llvm16-0", feature = "llvm17-0", feature = "llvm18-1", feature = "llvm19-1", feature = "llvm20-1", feature = "llvm21-1", feature = "llvm22-1"))]
     // let bf16_type = context.bf16_type();
     let f32_type = context.f32_type();
     // let f64_type = context.f64_type();
     // let f128_type = context.f128_type();
-    // #[cfg(any(feature = "llvm15-0", feature = "llvm16-0", feature = "llvm17-0", feature = "llvm18-1", feature = "llvm19-1", feature = "llvm20-1", feature = "llvm21-1"))]
+    // #[cfg(any(feature = "llvm15-0", feature = "llvm16-0", feature = "llvm17-0", feature = "llvm18-1", feature = "llvm19-1", feature = "llvm20-1", feature = "llvm21-1", feature = "llvm22-1"))]
     // let ptr_type = context.ptr_type(AddressSpace::default());
     // let array_type = f64_type.array_type(42);
     // let ppc_f128_type = context.ppc_f128_type();
@@ -988,15 +1010,15 @@ fn test_metadata() {
     // let i64_val = i64_type.const_int(0, false);
     // let i128_val = i128_type.const_int(0, false);
     // let f16_val = f16_type.const_float(0.0);
-    // #[cfg(any(feature = "llvm11-0", feature = "llvm12-0", feature = "llvm13-0", feature = "llvm14-0", feature = "llvm15-0", feature = "llvm16-0", feature = "llvm17-0", feature = "llvm18-1", feature = "llvm19-1", feature = "llvm20-1", feature = "llvm21-1"))]
+    // #[cfg(any(feature = "llvm11-0", feature = "llvm12-0", feature = "llvm13-0", feature = "llvm14-0", feature = "llvm15-0", feature = "llvm16-0", feature = "llvm17-0", feature = "llvm18-1", feature = "llvm19-1", feature = "llvm20-1", feature = "llvm21-1", feature = "llvm22-1"))]
     // let bf16_val = bf16_type.const_float(0.0);
     let f32_val = f32_type.const_float(0.0);
     // let f64_val = f64_type.const_float(0.0);
     // let f128_val = f128_type.const_float(0.0);
     // let ppc_f128_val = ppc_f128_type.const_float(0.0);
-    // #[cfg(not(any(feature = "llvm15-0", feature = "llvm16-0", feature = "llvm17-0", feature = "llvm18-1", feature = "llvm19-1", feature = "llvm20-1", feature = "llvm21-1")))]
+    // #[cfg(not(any(feature = "llvm15-0", feature = "llvm16-0", feature = "llvm17-0", feature = "llvm18-1", feature = "llvm19-1", feature = "llvm20-1", feature = "llvm21-1", feature = "llvm22-1")))]
     // let ptr_val = bool_type.ptr_type(AddressSpace::default()).const_null();
-    // #[cfg(any(feature = "llvm15-0", feature = "llvm16-0", feature = "llvm17-0", feature = "llvm18-1", feature = "llvm19-1", feature = "llvm20-1", feature = "llvm21-1"))]
+    // #[cfg(any(feature = "llvm15-0", feature = "llvm16-0", feature = "llvm17-0", feature = "llvm18-1", feature = "llvm19-1", feature = "llvm20-1", feature = "llvm21-1", feature = "llvm22-1"))]
     // let ptr_val = ptr_type.const_null();
     // let array_val = f64_type.const_array(&[f64_val]);
     // let struct_val = context.const_struct(&[i8_val.into(), f128_val.into()], false);
@@ -1006,7 +1028,7 @@ fn test_metadata() {
     let md_node_child = context.metadata_node(&[bool_val.into(), f32_val.into()]);
     let md_node = context.metadata_node(&[bool_val.into(), f32_val.into(), md_string.into(), md_node_child.into()]);
 
-    let node_values = md_node.get_node_values();
+    let node_values = md_node.get_node_values().unwrap();
 
     assert_eq!(md_node.get_string_value(), None);
     assert_eq!(node_values.len(), 4);
@@ -1027,7 +1049,7 @@ fn test_metadata() {
 
     assert_eq!(global_md.len(), 1);
 
-    let md = global_md[0].get_node_values();
+    let md = global_md[0].get_node_values().unwrap();
 
     assert_eq!(md.len(), 4);
     assert_eq!(md[0].into_int_value(), bool_val);
@@ -1053,7 +1075,7 @@ fn test_metadata() {
     // assert!(i64_val.has_metadata());
     // assert!(!i128_val.has_metadata());
     // assert!(!f16_val.has_metadata());
-    // #[cfg(any(feature = "llvm11-0", feature = "llvm12-0", feature = "llvm13-0", feature = "llvm14-0", feature = "llvm15-0", feature = "llvm16-0", feature = "llvm17-0", feature = "llvm18-1", feature = "llvm19-1", feature = "llvm20-1", feature = "llvm21-1"))]
+    // #[cfg(any(feature = "llvm11-0", feature = "llvm12-0", feature = "llvm13-0", feature = "llvm14-0", feature = "llvm15-0", feature = "llvm16-0", feature = "llvm17-0", feature = "llvm18-1", feature = "llvm19-1", feature = "llvm20-1", feature = "llvm21-1", feature = "llvm22-1"))]
     // assert!(!bf16_val.has_metadata());
     // assert!(!f32_val.has_metadata());
     // assert!(!f64_val.has_metadata());
@@ -1083,7 +1105,7 @@ fn test_metadata() {
     assert!(ret_instr.has_metadata());
     assert!(ret_instr.get_metadata(1).is_none());
 
-    let md_node_values = ret_instr.get_metadata(2).unwrap().get_node_values();
+    let md_node_values = ret_instr.get_metadata(2).unwrap().get_node_values().unwrap();
 
     assert_eq!(md_node_values.len(), 1);
     assert_eq!(
@@ -1106,7 +1128,8 @@ fn test_floats() {
         feature = "llvm18-1",
         feature = "llvm19-1",
         feature = "llvm20-1",
-        feature = "llvm21-1"
+        feature = "llvm21-1",
+        feature = "llvm22-1"
     )))]
     {
         use inkwell::FloatPredicate;
@@ -1148,7 +1171,8 @@ fn test_floats() {
             feature = "llvm18-1",
             feature = "llvm19-1",
             feature = "llvm20-1",
-            feature = "llvm21-1"
+            feature = "llvm21-1",
+            feature = "llvm22-1"
         )))]
         {
             let neg_two = f64_two.const_neg();
@@ -1647,7 +1671,8 @@ fn test_consts() {
         feature = "llvm18-1",
         feature = "llvm19-1",
         feature = "llvm20-1",
-        feature = "llvm21-1"
+        feature = "llvm21-1",
+        feature = "llvm22-1"
     ))]
     let bf16_type = context.bf16_type();
     let f32_type = context.f32_type();
@@ -1672,7 +1697,8 @@ fn test_consts() {
         feature = "llvm18-1",
         feature = "llvm19-1",
         feature = "llvm20-1",
-        feature = "llvm21-1"
+        feature = "llvm21-1",
+        feature = "llvm22-1"
     ))]
     let bf16_val = bf16_type.const_float(1.2);
     let f32_val = f32_type.const_float(3.4);
@@ -1690,7 +1716,8 @@ fn test_consts() {
         feature = "llvm18-1",
         feature = "llvm19-1",
         feature = "llvm20-1",
-        feature = "llvm21-1"
+        feature = "llvm21-1",
+        feature = "llvm22-1"
     ))]
     let scalable_vec_val = f64_type.scalable_vec_type(42).const_zero();
     let array_val = i8_type.const_array(&[i8_val]);
@@ -1714,7 +1741,8 @@ fn test_consts() {
         feature = "llvm18-1",
         feature = "llvm19-1",
         feature = "llvm20-1",
-        feature = "llvm21-1"
+        feature = "llvm21-1",
+        feature = "llvm22-1"
     ))]
     assert!(bf16_val.is_const());
     assert!(f32_val.is_const());
@@ -1732,7 +1760,8 @@ fn test_consts() {
         feature = "llvm18-1",
         feature = "llvm19-1",
         feature = "llvm20-1",
-        feature = "llvm21-1"
+        feature = "llvm21-1",
+        feature = "llvm22-1"
     ))]
     assert!(scalable_vec_val.is_const());
     assert!(array_val.is_const());
@@ -1769,7 +1798,8 @@ fn test_consts() {
         feature = "llvm18-1",
         feature = "llvm19-1",
         feature = "llvm20-1",
-        feature = "llvm21-1"
+        feature = "llvm21-1",
+        feature = "llvm22-1"
     ))]
     assert_eq!(bf16_val.get_constant(), Some((1.203125, false)));
     assert_eq!(f32_val.get_constant(), Some((3.4000000953674316, false)));
@@ -1900,7 +1930,8 @@ fn test_non_fn_ptr_called() {
         feature = "llvm18-1",
         feature = "llvm19-1",
         feature = "llvm20-1",
-        feature = "llvm21-1"
+        feature = "llvm21-1",
+        feature = "llvm22-1"
     ))]
     builder
         .build_indirect_call(i8_ptr_type.fn_type(&[], false), i8_ptr_param, &[], "call")
@@ -2045,6 +2076,7 @@ fn test_basic_value_types() {
         feature = "llvm19-1",
         feature = "llvm20-1",
         feature = "llvm21-1",
+        feature = "llvm22-1",
     ))]
     let bf16_type = context.bf16_type();
     let f32_type = context.f32_type();
@@ -2074,6 +2106,7 @@ fn test_basic_value_types() {
         feature = "llvm19-1",
         feature = "llvm20-1",
         feature = "llvm21-1",
+        feature = "llvm22-1",
     ))]
     let bf16_val = bf16_type.const_float(0.0);
     let f32_val = f32_type.const_float(0.0);
@@ -2096,7 +2129,8 @@ fn test_basic_value_types() {
         feature = "llvm18-1",
         feature = "llvm19-1",
         feature = "llvm20-1",
-        feature = "llvm21-1"
+        feature = "llvm21-1",
+        feature = "llvm22-1"
     ))]
     let scalable_vec_val = f64_type.scalable_vec_type(42).const_zero();
     let ppc_f128_val = ppc_f128_type.const_float(0.0);
@@ -2119,7 +2153,8 @@ fn test_basic_value_types() {
         feature = "llvm18-1",
         feature = "llvm19-1",
         feature = "llvm20-1",
-        feature = "llvm21-1"
+        feature = "llvm21-1",
+        feature = "llvm22-1"
     ))]
     assert!(bf16_val.as_basic_value_enum().is_float_value());
     assert!(f32_val.as_basic_value_enum().is_float_value());
@@ -2139,7 +2174,8 @@ fn test_basic_value_types() {
         feature = "llvm18-1",
         feature = "llvm19-1",
         feature = "llvm20-1",
-        feature = "llvm21-1"
+        feature = "llvm21-1",
+        feature = "llvm22-1"
     ))]
     assert!(scalable_vec_val.as_basic_value_enum().is_scalable_vector_value());
     assert!(ppc_f128_val.as_basic_value_enum().is_float_value());
@@ -2162,7 +2198,8 @@ fn test_basic_value_types() {
         feature = "llvm18-1",
         feature = "llvm19-1",
         feature = "llvm20-1",
-        feature = "llvm21-1"
+        feature = "llvm21-1",
+        feature = "llvm22-1"
     ))]
     assert!(bf16_val.as_any_value_enum().is_float_value());
     assert!(f32_val.as_any_value_enum().is_float_value());
@@ -2182,7 +2219,8 @@ fn test_basic_value_types() {
         feature = "llvm18-1",
         feature = "llvm19-1",
         feature = "llvm20-1",
-        feature = "llvm21-1"
+        feature = "llvm21-1",
+        feature = "llvm22-1"
     ))]
     assert!(scalable_vec_val.as_any_value_enum().is_scalable_vector_value());
     assert!(ppc_f128_val.as_any_value_enum().is_float_value());

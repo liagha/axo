@@ -1,7 +1,6 @@
-use orbyte::Orbyte;
 use crate::{data::*, resolver::Type, tracker::Span};
 
-#[derive(Clone, Debug, Orbyte)]
+#[derive(Clone, Debug)]
 pub struct Analysis<'analysis> {
     pub kind: AnalysisKind<'analysis>,
     pub span: Span,
@@ -18,7 +17,7 @@ impl<'analysis> Analysis<'analysis> {
     }
 }
 
-#[derive(Clone, Debug, Orbyte)]
+#[derive(Clone, Debug)]
 pub enum AnalysisKind<'analysis> {
     Integer {
         value: Integer,

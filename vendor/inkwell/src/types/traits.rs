@@ -2,6 +2,7 @@ use llvm_sys::prelude::LLVMTypeRef;
 
 use std::fmt::Debug;
 
+use crate::AddressSpace;
 use crate::support::LLVMString;
 use crate::types::enums::{AnyTypeEnum, BasicMetadataTypeEnum, BasicTypeEnum};
 use crate::types::{
@@ -12,7 +13,6 @@ use crate::values::{
     FloatMathValue, FloatValue, IntMathValue, IntValue, PointerMathValue, PointerValue, ScalableVectorValue,
     VectorValue,
 };
-use crate::AddressSpace;
 
 /// Accessor to the inner LLVM type reference
 pub unsafe trait AsTypeRef {
@@ -159,6 +159,7 @@ pub unsafe trait BasicType<'ctx>: AnyType<'ctx> {
             feature = "llvm19-1",
             feature = "llvm20-1",
             feature = "llvm21-1",
+            feature = "llvm22-1",
         ),
         deprecated(
             note = "Starting from version 15.0, LLVM doesn't differentiate between pointer types. Use Context::ptr_type instead."

@@ -2,13 +2,13 @@
 use llvm_sys::core::LLVMGetArrayLength;
 use llvm_sys::prelude::LLVMTypeRef;
 
+use crate::AddressSpace;
 use crate::context::ContextRef;
 use crate::support::LLVMString;
 use crate::types::enums::BasicMetadataTypeEnum;
 use crate::types::traits::AsTypeRef;
 use crate::types::{BasicTypeEnum, FunctionType, PointerType, Type};
 use crate::values::{ArrayValue, IntValue};
-use crate::AddressSpace;
 
 use std::fmt::{self, Display};
 
@@ -24,10 +24,12 @@ impl<'ctx> ArrayType<'ctx> {
     /// # Safety
     /// Undefined behavior, if referenced type isn't array type
     pub unsafe fn new(array_type: LLVMTypeRef) -> Self {
-        assert!(!array_type.is_null());
+        unsafe {
+            assert!(!array_type.is_null());
 
-        ArrayType {
-            array_type: Type::new(array_type),
+            ArrayType {
+                array_type: Type::new(array_type),
+            }
         }
     }
 
@@ -73,6 +75,7 @@ impl<'ctx> ArrayType<'ctx> {
             feature = "llvm19-1",
             feature = "llvm20-1",
             feature = "llvm21-1",
+            feature = "llvm22-1",
         ),
         deprecated(
             note = "Starting from version 15.0, LLVM doesn't differentiate between pointer types. Use Context::ptr_type instead."

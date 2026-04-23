@@ -1,4 +1,3 @@
-use orbyte::Orbyte;
 use crate::{
     data::{Aggregate, Binding, Boolean, Function, Identity, Interface, Scale, Str},
     parser::{Element, ElementKind},
@@ -7,7 +6,7 @@ use crate::{
     tracker::Span,
 };
 
-#[derive(Clone, Debug, Orbyte)]
+#[derive(Clone, Debug)]
 pub struct Type<'typing> {
     pub identity: Identity,
     pub kind: TypeKind<'typing>,
@@ -25,7 +24,7 @@ impl<'typing> From<TypeKind<'typing>> for Type<'typing> {
     }
 }
 
-#[derive(Clone, Debug, Orbyte, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum TypeKind<'typing> {
     Integer { size: Scale, signed: Boolean },
     Float { size: Scale },

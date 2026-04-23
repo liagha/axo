@@ -32,6 +32,8 @@ pub const FIRST_CUSTOM_METADATA_KIND_ID: u32 = if cfg!(feature = "llvm11-0") {
     41
 } else if cfg!(any(feature = "llvm20-1", feature = "llvm21-1")) {
     42
+} else if cfg!(feature = "llvm22-1") {
+    47
 } else {
     panic!("Unhandled LLVM version")
 };
@@ -48,11 +50,13 @@ impl<'ctx> MetadataValue<'ctx> {
     ///
     /// The ref must be valid and of type metadata.
     pub unsafe fn new(value: LLVMValueRef) -> Self {
-        assert!(!value.is_null());
-        assert!(!LLVMIsAMDNode(value).is_null() || !LLVMIsAMDString(value).is_null());
+        unsafe {
+            assert!(!value.is_null());
+            assert!(!LLVMIsAMDNode(value).is_null() || !LLVMIsAMDString(value).is_null());
 
-        MetadataValue {
-            metadata_value: Value::new(value),
+            MetadataValue {
+                metadata_value: Value::new(value),
+            }
         }
     }
 
@@ -75,46 +79,44 @@ impl<'ctx> MetadataValue<'ctx> {
         unsafe { LLVMIsAMDString(self.as_value_ref()) == self.as_value_ref() }
     }
 
-    pub fn get_string_value(&self) -> Option<&CStr> {
-        if self.is_node() {
+    pub fn get_string_value(&self) -> Option<&[u8]> {
+        let mut len = 0;
+        let ptr = unsafe { LLVMGetMDString(self.as_value_ref(), &mut len) };
+        if ptr.is_null() {
             return None;
         }
 
-        let mut len = 0;
-        let c_str = unsafe { CStr::from_ptr(LLVMGetMDString(self.as_value_ref(), &mut len)) };
-
-        Some(c_str)
+        // Since LLVM 22, the verifier does not allow including the '\0' in the created MDString values.
+        unsafe { Some(core::slice::from_raw_parts(ptr as *const u8, len as usize)) }
     }
 
     // SubTypes: Node only one day
-    pub fn get_node_size(self) -> u32 {
+    pub fn get_node_size(self) -> Option<usize> {
         if self.is_string() {
-            return 0;
+            return None;
         }
 
-        unsafe { LLVMGetMDNodeNumOperands(self.as_value_ref()) }
+        let size = unsafe { LLVMGetMDNodeNumOperands(self.as_value_ref()) } as usize;
+        Some(size)
     }
 
     // SubTypes: Node only one day
     // REVIEW: BasicMetadataValueEnum only if you can put metadata in metadata...
-    pub fn get_node_values(self) -> Vec<BasicMetadataValueEnum<'ctx>> {
-        if self.is_string() {
-            return Vec::new();
-        }
-
-        let count = self.get_node_size() as usize;
+    pub fn get_node_values(self) -> Option<Vec<BasicMetadataValueEnum<'ctx>>> {
+        let count = self.get_node_size()?;
         let mut vec: Vec<LLVMValueRef> = Vec::with_capacity(count);
         let ptr = vec.as_mut_ptr();
 
         unsafe {
             LLVMGetMDNodeOperands(self.as_value_ref(), ptr);
-
-            vec.set_len(count)
+            vec.set_len(count);
         };
 
-        vec.iter()
+        let values = vec
+            .iter()
             .map(|val| unsafe { BasicMetadataValueEnum::new(*val) })
-            .collect()
+            .collect();
+        Some(values)
     }
 
     pub fn print_to_stderr(self) {

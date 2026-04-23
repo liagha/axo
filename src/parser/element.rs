@@ -1,4 +1,3 @@
-use orbyte::Orbyte;
 use crate::{
     data::*,
     parser::Symbol,
@@ -7,7 +6,6 @@ use crate::{
     tracker::Span,
 };
 
-#[derive(Orbyte)]
 pub struct Element<'element> {
     pub identity: Identity,
     pub kind: ElementKind<'element>,
@@ -16,7 +14,6 @@ pub struct Element<'element> {
     pub typing: Type<'element>,
 }
 
-#[derive(Orbyte)]
 pub enum ElementKind<'element> {
     Literal(Box<Token<'element>>),
     Delimited(Box<Delimited<Token<'element>, Element<'element>>>),

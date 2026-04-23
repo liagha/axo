@@ -10,9 +10,9 @@
 # See Cargo.toml.orig for the original contents.
 
 [package]
-edition = "2021"
+edition = "2024"
 name = "inkwell"
-version = "0.8.0"
+version = "0.9.0"
 authors = ["Daniel Kolsoi <thadan64@gmail.com>"]
 build = "build.rs"
 autolib = false
@@ -31,6 +31,9 @@ keywords = [
 categories = ["development-tools::ffi"]
 license = "Apache-2.0"
 repository = "https://github.com/TheDan64/inkwell"
+
+[package.metadata.docs.rs]
+features = ["llvm22-1-no-llvm-linking"]
 
 [badges.codecov]
 repository = "TheDan64/inkwell"
@@ -265,6 +268,27 @@ llvm21-1-prefer-static = [
     "llvm21-1",
     "llvm-sys-211/prefer-static",
 ]
+llvm22-1 = ["llvm-sys-221"]
+llvm22-1-force-dynamic = [
+    "llvm22-1",
+    "llvm-sys-221/force-dynamic",
+]
+llvm22-1-force-static = [
+    "llvm22-1",
+    "llvm-sys-221/force-static",
+]
+llvm22-1-no-llvm-linking = [
+    "llvm22-1",
+    "llvm-sys-221/no-llvm-linking",
+]
+llvm22-1-prefer-dynamic = [
+    "llvm22-1",
+    "llvm-sys-221/prefer-dynamic",
+]
+llvm22-1-prefer-static = [
+    "llvm22-1",
+    "llvm-sys-221/prefer-static",
+]
 nightly = ["inkwell_internals/nightly"]
 no-libffi-linking = []
 target-aarch64 = []
@@ -322,8 +346,11 @@ path = "examples/kaleidoscope/main.rs"
 name = "all"
 path = "tests/all/main.rs"
 
+[dependencies.bitflags]
+version = "2.10.0"
+
 [dependencies.inkwell_internals]
-version = "0.13.0"
+version = "0.14.0"
 
 [dependencies.libc]
 version = "0.2"
@@ -383,8 +410,10 @@ version = "211.0.0"
 optional = true
 package = "llvm-sys"
 
-[dependencies.once_cell]
-version = "1.16"
+[dependencies.llvm-sys-221]
+version = "221.0.0"
+optional = true
+package = "llvm-sys"
 
 [dependencies.serde]
 version = "1.0"

@@ -36,21 +36,26 @@ pub enum OrderingError {
     WeakerThanMonotic,
     WeakerSuccessOrdering,
     ReleaseOrAcqRel,
+    ReleaseOnLoad,
+    AcquireRelease,
+    AcquireOnStore,
+    InvalidOrderingOnFence,
+    InvalidOrderingOnAtomicRMW,
 }
 
-#[derive(Clone, Eq, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum BuilderError {
     Function,
     Parent,
     BlockInsertion,
     UnsetPosition,
     AlignmentError(AlignmentError),
+    OrderingError(OrderingError),
     ExtractOutOfRange,
     BitwidthError,
     PointeeTypeMismatch,
     NotSameType,
     NotPointerOrInteger,
-    OrderingError(OrderingError),
     GEPPointee,
     GEPIndex,
 }
@@ -187,24 +192,14 @@ impl Display for AlignmentError {
 impl Display for OrderingError {
     fn fmt(&self, f: &mut Formatter) -> Result {
         match self {
-            OrderingError::WeakerThanMonotic => {
-                write!(
-                    f,
-                    "Both success and failure orderings must be monotonic or stronger."
-                )
-            }
-            OrderingError::WeakerSuccessOrdering => {
-                write!(
-                    f,
-                    "The failure ordering may not be stronger than the success ordering."
-                )
-            }
-            OrderingError::ReleaseOrAcqRel => {
-                write!(
-                    f,
-                    "The failure ordering may not be release or acquire release."
-                )
-            }
+            OrderingError::WeakerThanMonotic => write!(f, "Both success and failure orderings must be monotonic or stronger."),
+            OrderingError::WeakerSuccessOrdering => write!(f, "The failure ordering may not be stronger than the success ordering."),
+            OrderingError::ReleaseOrAcqRel => write!(f, "The failure ordering may not be release or acquire release."),
+            OrderingError::ReleaseOnLoad => write!(f, "The release ordering is not valid on load instructions."),
+            OrderingError::AcquireRelease => write!(f, "The acq_rel ordering is not valid on load or store instructions."),
+            OrderingError::AcquireOnStore => write!(f, "The acquire ordering is not valid on store instructions."),
+            OrderingError::InvalidOrderingOnFence => write!(f, "Only acquire, release, acq_rel and sequentially consistent orderings are valid on fence instructions."),
+            OrderingError::InvalidOrderingOnAtomicRMW => write!(f, "The not_atomic and unordered orderings are not valid on atomicrmw instructions."),
         }
     }
 }
@@ -227,6 +222,9 @@ impl Display for BuilderError {
             BuilderError::AlignmentError(error) => {
                 write!(f, "Alignment error: {}", error)
             }
+            BuilderError::OrderingError(error) => {
+                write!(f, "Ordering error: {}", error)
+            }
             BuilderError::ExtractOutOfRange => {
                 write!(f, "Aggregate extract index out of range")
             }
@@ -244,9 +242,6 @@ impl Display for BuilderError {
             }
             BuilderError::NotPointerOrInteger => {
                 write!(f, "Values must have pointer or integer type")
-            }
-            BuilderError::OrderingError(_) => {
-                write!(f, "Ordering error or mismatch")
             }
             BuilderError::GEPPointee => {
                 write!(f, "GEP pointee is not a struct")
@@ -445,11 +440,14 @@ impl From<inkwell::builder::BuilderError> for BuilderError {
             inkwell::builder::BuilderError::NotPointerOrInteger => {
                 BuilderError::NotPointerOrInteger
             }
-            inkwell::builder::BuilderError::OrderingError(error) => {
-                BuilderError::OrderingError(error.into())
-            }
             inkwell::builder::BuilderError::GEPPointee => BuilderError::GEPPointee,
             inkwell::builder::BuilderError::GEPIndex => BuilderError::GEPIndex,
+            inkwell::builder::BuilderError::CmpxchgOrdering(err) => {
+                BuilderError::OrderingError(err.into())
+            }
+            inkwell::builder::BuilderError::AtomicOrdering(err) => {
+                BuilderError::OrderingError(err.into())
+            }
         }
     }
 }
@@ -474,14 +472,30 @@ impl From<inkwell::error::AlignmentError> for AlignmentError {
     }
 }
 
-impl From<inkwell::builder::OrderingError> for OrderingError {
-    fn from(error: inkwell::builder::OrderingError) -> Self {
+impl From<inkwell::builder::CmpxchgOrderingError> for OrderingError {
+    fn from(error: inkwell::builder::CmpxchgOrderingError) -> Self {
         match error {
-            inkwell::builder::OrderingError::WeakerThanMonotic => OrderingError::WeakerThanMonotic,
-            inkwell::builder::OrderingError::WeakerSuccessOrdering => {
+            inkwell::builder::CmpxchgOrderingError::WeakerThanMonotic => {
+                OrderingError::WeakerThanMonotic
+            }
+            inkwell::builder::CmpxchgOrderingError::WeakerSuccessOrdering => {
                 OrderingError::WeakerSuccessOrdering
             }
-            inkwell::builder::OrderingError::ReleaseOrAcqRel => OrderingError::ReleaseOrAcqRel,
+            inkwell::builder::CmpxchgOrderingError::ReleaseOrAcqRel => {
+                OrderingError::ReleaseOrAcqRel
+            }
+        }
+    }
+}
+
+impl From<inkwell::values::AtomicError> for OrderingError {
+    fn from(error: inkwell::values::AtomicError) -> Self {
+        match error {
+            inkwell::values::AtomicError::ReleaseOnLoad => OrderingError::ReleaseOnLoad,
+            inkwell::values::AtomicError::AcquireRelease => OrderingError::AcquireRelease,
+            inkwell::values::AtomicError::AcquireOnStore => OrderingError::AcquireOnStore,
+            inkwell::values::AtomicError::InvalidOrderingOnFence => OrderingError::InvalidOrderingOnFence,
+            inkwell::values::AtomicError::InvalidOrderingOnAtomicRMW => OrderingError::InvalidOrderingOnAtomicRMW,
         }
     }
 }

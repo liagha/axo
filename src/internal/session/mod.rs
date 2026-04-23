@@ -7,13 +7,13 @@ use {
         analyzer::Analyzer,
         combinator::{Action, Operation, Operator},
         data::{
-            memory::{transmute, Arc, PhantomData},
+            memory::{Arc, PhantomData},
             Identity, Module, Str,
         },
         identifier,
         internal::{
             hash::{DefaultHasher, Hash, Hasher},
-            platform::{catch_unwind, create_dir_all, read, write, AssertUnwindSafe, Lock},
+            platform::{create_dir_all, write, Lock},
             time::{Duration, Instant, UNIX_EPOCH},
         },
         literal, module,
@@ -21,7 +21,6 @@ use {
         resolver::Resolver,
         scanner::Scanner,
     },
-    orbyte::{Deserialize, Serialize},
 };
 
 #[cfg(feature = "interpreter")]
@@ -35,18 +34,6 @@ use crate::generator::{EmitAction, GenerateAction, RunAction};
 
 pub struct Prepare;
 pub struct Bootstrap;
-pub struct Restore<'source> {
-    pub keys: Vec<Identity>,
-    pub slot: u8,
-    pub name: &'static str,
-    pub phantom: PhantomData<&'source ()>,
-}
-pub struct Cache<'source> {
-    pub keys: Vec<Identity>,
-    pub slot: u8,
-    pub name: &'static str,
-    pub phantom: PhantomData<&'source ()>,
-}
 pub struct Report<'source> {
     pub keys: Vec<Identity>,
     pub slot: u8,
@@ -113,54 +100,6 @@ Action<
         } else {
             operation.set_reject();
         }
-    }
-}
-
-impl<'source>
-Action<
-    'static,
-    Operator<Arc<Lock<Session<'source>>>>,
-    Operation<'source, Arc<Lock<Session<'source>>>>,
-> for Restore<'source>
-{
-    fn action(
-        &self,
-        operator: &mut Operator<Arc<Lock<Session<'source>>>>,
-        operation: &mut Operation<'source, Arc<Lock<Session<'source>>>>,
-    ) {
-        let mut session = operator.store.write().unwrap();
-        match self.slot {
-            1 => session.restore_tokens(&self.keys),
-            2 => session.restore_elements(&self.keys),
-            3 => session.restore_analyses(&self.keys),
-            _ => {}
-        }
-        let _ = self.name;
-        operation.set_resolve(Vec::new());
-    }
-}
-
-impl<'source>
-Action<
-    'static,
-    Operator<Arc<Lock<Session<'source>>>>,
-    Operation<'source, Arc<Lock<Session<'source>>>>,
-> for Cache<'source>
-{
-    fn action(
-        &self,
-        operator: &mut Operator<Arc<Lock<Session<'source>>>>,
-        operation: &mut Operation<'source, Arc<Lock<Session<'source>>>>,
-    ) {
-        let mut session = operator.store.write().unwrap();
-        match self.slot {
-            1 => session.store_tokens(&self.keys),
-            2 => session.store_elements(&self.keys),
-            3 => session.store_analyses(&self.keys),
-            _ => {}
-        }
-        let _ = self.name;
-        operation.set_resolve(Vec::new());
     }
 }
 
@@ -365,21 +304,20 @@ Action<
     }
 }
 
-const DIRECTIVE_STAGE: u8 = 1;
-const SCAN_STAGE: u8 = 2;
-const PARSE_STAGE: u8 = 3;
-const RESOLVE_STAGE: u8 = 4;
-const ANALYZE_STAGE: u8 = 5;
-#[cfg(feature = "interpreter")]
-const INTERPRET_STAGE: u8 = 6;
-const CACHE_REV: u64 = 1;
+pub const DIRECTIVE_STAGE: u8 = 1;
+pub const SCAN_STAGE: u8 = 2;
+pub const PARSE_STAGE: u8 = 3;
+pub const RESOLVE_STAGE: u8 = 4;
+pub const ANALYZE_STAGE: u8 = 5;
+pub const INTERPRET_STAGE: u8 = 6;
+pub const CACHE_REV: u64 = 1;
 
 impl<'session> Session<'session> {
-    fn stage_key(stage: u8, key: Identity) -> Identity {
+    pub fn stage_key(stage: u8, key: Identity) -> Identity {
         ((stage as Identity) << 56) ^ key
     }
 
-    fn source_keys(&self, keys: &[Identity]) -> Vec<Identity> {
+    pub fn source_keys(&self, keys: &[Identity]) -> Vec<Identity> {
         let mut items = keys
             .iter()
             .copied()
@@ -394,7 +332,7 @@ impl<'session> Session<'session> {
         items
     }
 
-    fn all_source_keys(&self) -> Vec<Identity> {
+    pub fn all_source_keys(&self) -> Vec<Identity> {
         let mut keys = self
             .records
             .iter()
@@ -404,15 +342,15 @@ impl<'session> Session<'session> {
         keys
     }
 
-    fn stage_value(&self, stage: u8, key: Identity) -> usize {
+    pub fn stage_value(&self, stage: u8, key: Identity) -> usize {
         self.pipeline.get(&Self::stage_key(stage, key)).copied().unwrap_or(0)
     }
 
-    fn set_stage(&mut self, stage: u8, key: Identity, value: usize) {
+    pub fn set_stage(&mut self, stage: u8, key: Identity, value: usize) {
         self.pipeline.insert(Self::stage_key(stage, key), value);
     }
 
-    fn scan_signature(&self, key: Identity) -> usize {
+    pub fn scan_signature(&self, key: Identity) -> usize {
         let mut hasher = DefaultHasher::new();
 
         if let Some(record) = self.records.get(&key) {
@@ -423,7 +361,7 @@ impl<'session> Session<'session> {
         hasher.finish() as usize
     }
 
-    fn parse_signature(&self, key: Identity) -> usize {
+    pub fn parse_signature(&self, key: Identity) -> usize {
         let mut hasher = DefaultHasher::new();
 
         if let Some(record) = self.records.get(&key) {
@@ -448,11 +386,11 @@ impl<'session> Session<'session> {
         hasher.finish() as usize
     }
 
-    fn resolve_signature(&self, keys: &[Identity]) -> usize {
+    pub fn resolve_signature(&self, keys: &[Identity]) -> usize {
         self.combine_signature(keys, 2)
     }
 
-    fn analyze_signature(&self, keys: &[Identity]) -> usize {
+    pub fn analyze_signature(&self, keys: &[Identity]) -> usize {
         let mut hasher = DefaultHasher::new();
         self.combine_signature(keys, 2).hash(&mut hasher);
         self.stage_value(RESOLVE_STAGE, 0).hash(&mut hasher);
@@ -460,11 +398,11 @@ impl<'session> Session<'session> {
     }
 
     #[cfg(feature = "interpreter")]
-    fn interpret_signature(&self) -> usize {
+    pub fn interpret_signature(&self) -> usize {
         self.combine_signature(&self.all_source_keys(), 3)
     }
 
-    fn bootstrap(&mut self) {
+    pub fn bootstrap(&mut self) {
         if self.stage_value(DIRECTIVE_STAGE, 0) != 0 {
             return;
         }
@@ -480,112 +418,7 @@ impl<'session> Session<'session> {
         self.set_stage(DIRECTIVE_STAGE, 0, 1);
     }
 
-    fn restore_tokens(&mut self, keys: &[Identity]) {
-        for key in self.source_keys(keys) {
-            let (hash, dirty, present) = {
-                let record = self.records.get(&key).unwrap();
-                (record.hash, record.dirty, record.fetch(1).is_some())
-            };
-
-            if dirty || present {
-                continue;
-            }
-
-            if let Some(mut tokens) = self.cache::<Vec<crate::scanner::Token>>("tokens", hash, None) {
-                tokens.shrink_to_fit();
-                self.records.get_mut(&key).unwrap().store(1, Artifact::Tokens(tokens));
-            }
-        }
-    }
-
-    fn restore_elements(&mut self, keys: &[Identity]) {
-        for key in self.source_keys(keys) {
-            let (hash, dirty, present) = {
-                let record = self.records.get(&key).unwrap();
-                (record.hash, record.dirty, record.fetch(2).is_some())
-            };
-
-            if dirty || present {
-                continue;
-            }
-
-            if let Some(mut elements) = self.cache::<Vec<crate::parser::Element>>("elements", hash, None) {
-                elements.shrink_to_fit();
-                self.records.get_mut(&key).unwrap().store(2, Artifact::Elements(elements));
-            }
-        }
-    }
-
-    fn restore_analyses(&mut self, keys: &[Identity]) {
-        for key in self.source_keys(keys) {
-            let (hash, dirty, present) = {
-                let record = self.records.get(&key).unwrap();
-                (record.hash, record.dirty, record.fetch(3).is_some())
-            };
-
-            if dirty || present {
-                continue;
-            }
-
-            if let Some(mut analyses) = self.cache::<Vec<crate::analyzer::Analysis>>("analyses", hash, None) {
-                analyses.shrink_to_fit();
-                self.records.get_mut(&key).unwrap().store(3, Artifact::Analyses(analyses));
-            }
-        }
-    }
-
-    fn store_tokens(&mut self, keys: &[Identity]) {
-        for key in self.source_keys(keys) {
-            let (hash, tokens) = {
-                let record = self.records.get(&key).unwrap();
-                let tokens = match record.fetch(1) {
-                    Some(Artifact::Tokens(tokens)) => Some(tokens.clone()),
-                    _ => None,
-                };
-                (record.hash, tokens)
-            };
-
-            if let Some(tokens) = tokens {
-                _ = self.cache("tokens", hash, Some(tokens));
-            }
-        }
-    }
-
-    fn store_elements(&mut self, keys: &[Identity]) {
-        for key in self.source_keys(keys) {
-            let (hash, elements) = {
-                let record = self.records.get(&key).unwrap();
-                let elements = match record.fetch(2) {
-                    Some(Artifact::Elements(elements)) => Some(elements.clone()),
-                    _ => None,
-                };
-                (record.hash, elements)
-            };
-
-            if let Some(elements) = elements {
-                _ = self.cache("elements", hash, Some(elements));
-            }
-        }
-    }
-
-    fn store_analyses(&mut self, keys: &[Identity]) {
-        for key in self.source_keys(keys) {
-            let (hash, analyses) = {
-                let record = self.records.get(&key).unwrap();
-                let analyses = match record.fetch(3) {
-                    Some(Artifact::Analyses(analyses)) => Some(analyses.clone()),
-                    _ => None,
-                };
-                (record.hash, analyses)
-            };
-
-            if let Some(analyses) = analyses {
-                _ = self.cache("analyses", hash, Some(analyses));
-            }
-        }
-    }
-
-    fn report_tokens(&self, keys: &[Identity]) {
+    pub fn report_tokens(&self, keys: &[Identity]) {
         let Some(stencil) = self.get_stencil() else {
             return;
         };
@@ -604,7 +437,7 @@ impl<'session> Session<'session> {
         }
     }
 
-    fn report_elements(&self, keys: &[Identity]) {
+    pub fn report_elements(&self, keys: &[Identity]) {
         let Some(stencil) = self.get_stencil() else {
             return;
         };
@@ -623,7 +456,7 @@ impl<'session> Session<'session> {
         }
     }
 
-    fn report_analyses(&self, keys: &[Identity]) {
+    pub fn report_analyses(&self, keys: &[Identity]) {
         let Some(stencil) = self.get_stencil() else {
             return;
         };
@@ -642,70 +475,10 @@ impl<'session> Session<'session> {
         }
     }
 
-    fn decode<T: Deserialize<'session>>(bytes: &'session [u8]) -> Option<T> {
-        catch_unwind(AssertUnwindSafe(|| T::deserialize(bytes).ok()))
-            .ok()
-            .flatten()
-    }
-
-    pub fn cache<T: Deserialize<'session> + Serialize + Clone>(
-        &mut self,
-        name: &str,
-        hash: u64,
-        data: Option<T>,
-    ) -> Option<T> {
-        if self.get_directive(Str::from("Discard")).is_some() {
-            return data;
-        }
-
-        let base = self.base();
-        let cache = base.join("build").join("records").join(name);
-        _ = create_dir_all(&cache);
-        let path = cache.join(format!("{:016x}-{:016x}", CACHE_REV, hash));
-
-        if let Some(value) = data {
-            let buffer = Some(value.clone()).serialize();
-            _ = write(path, buffer);
-            Some(value)
-        } else if let Ok(mut bytes) = read(&path) {
-            bytes.shrink_to_fit();
-            self.buffers.push(bytes);
-            let raw = self.buffers.last().unwrap().as_slice();
-            let extended: &'session [u8] = unsafe { transmute(raw) };
-
-            let result = Self::decode(extended).flatten();
-            if result.is_none() {
-                self.buffers.pop();
-            }
-            result
-        } else {
-            None
-        }
-    }
-
     pub fn prepare(&mut self) -> bool {
         use crate::{
-            internal::hash::{DefaultHasher, Hash, Hasher, Map},
-            tracker::Location,
+            internal::hash::{DefaultHasher, Hash, Hasher},
         };
-
-        let manifest = self.manifest();
-        if self.cache.is_empty() && self.get_directive(Str::from("Discard")).is_none() {
-            if let Ok(mut data) = read(&manifest) {
-                data.shrink_to_fit();
-                self.buffers.push(data);
-                let raw = self.buffers.last().unwrap().as_slice();
-                let extended: &'session [u8] = unsafe { transmute(raw) };
-
-                if let Some(cache) =
-                    Session::decode::<Option<Map<Location<'session>, u64>>>(extended).flatten()
-                {
-                    self.cache = cache;
-                } else {
-                    self.buffers.pop();
-                }
-            }
-        }
 
         let mut keys: Vec<_> = self.records.keys().copied().collect();
         keys.sort();
@@ -836,14 +609,6 @@ impl<'session> Session<'session> {
             }
         }
 
-        if self.get_directive(Str::from("Discard")).is_none() {
-            if let Some(parent) = manifest.parent() {
-                _ = create_dir_all(parent);
-            }
-            let buffer = Some(self.cache.clone()).serialize();
-            _ = write(manifest, buffer);
-        }
-
         self.errors.is_empty()
     }
 
@@ -909,26 +674,6 @@ impl<'session> Session<'session> {
         let mut states = vec![
             Operation::new(Arc::new(Bootstrap)),
             Operation::new(Arc::new(Prepare)),
-            Operation::plan(vec![
-                Operation::new(Arc::new(Restore {
-                    keys: keys.clone(),
-                    slot: 1,
-                    name: "tokens",
-                    phantom: PhantomData,
-                })),
-                Operation::new(Arc::new(Restore {
-                    keys: keys.clone(),
-                    slot: 2,
-                    name: "elements",
-                    phantom: PhantomData,
-                })),
-                Operation::new(Arc::new(Restore {
-                    keys: keys.clone(),
-                    slot: 3,
-                    name: "analyses",
-                    phantom: PhantomData,
-                })),
-            ]),
             Operation::cycle(Operation::plan(vec![
                 Operation::new(Arc::new(Scan {
                     keys: keys.clone(),
@@ -950,26 +695,6 @@ impl<'session> Session<'session> {
                     phantom: PhantomData,
                 })),
             ])),
-            Operation::plan(vec![
-                Operation::new(Arc::new(Cache {
-                    keys: keys.clone(),
-                    slot: 1,
-                    name: "tokens",
-                    phantom: PhantomData,
-                })),
-                Operation::new(Arc::new(Cache {
-                    keys: keys.clone(),
-                    slot: 2,
-                    name: "elements",
-                    phantom: PhantomData,
-                })),
-                Operation::new(Arc::new(Cache {
-                    keys: keys.clone(),
-                    slot: 3,
-                    name: "analyses",
-                    phantom: PhantomData,
-                })),
-            ]),
             Operation::plan(vec![
                 Operation::new(Arc::new(Report {
                     keys: keys.clone(),
@@ -999,26 +724,6 @@ impl<'session> Session<'session> {
         let states = vec![
             Operation::new(Arc::new(Bootstrap)),
             Operation::new(Arc::new(Prepare)),
-            Operation::plan(vec![
-                Operation::new(Arc::new(Restore {
-                    keys: keys.clone(),
-                    slot: 1,
-                    name: "tokens",
-                    phantom: PhantomData,
-                })),
-                Operation::new(Arc::new(Restore {
-                    keys: keys.clone(),
-                    slot: 2,
-                    name: "elements",
-                    phantom: PhantomData,
-                })),
-                Operation::new(Arc::new(Restore {
-                    keys: keys.clone(),
-                    slot: 3,
-                    name: "analyses",
-                    phantom: PhantomData,
-                })),
-            ]),
             Operation::cycle(Operation::plan(vec![
                 Operation::new(Arc::new(Scan {
                     keys: keys.clone(),
@@ -1040,26 +745,6 @@ impl<'session> Session<'session> {
                     phantom: PhantomData,
                 })),
             ])),
-            Operation::plan(vec![
-                Operation::new(Arc::new(Cache {
-                    keys: keys.clone(),
-                    slot: 1,
-                    name: "tokens",
-                    phantom: PhantomData,
-                })),
-                Operation::new(Arc::new(Cache {
-                    keys: keys.clone(),
-                    slot: 2,
-                    name: "elements",
-                    phantom: PhantomData,
-                })),
-                Operation::new(Arc::new(Cache {
-                    keys: keys.clone(),
-                    slot: 3,
-                    name: "analyses",
-                    phantom: PhantomData,
-                })),
-            ]),
             Operation::plan(vec![
                 Operation::new(Arc::new(Report {
                     keys: keys.clone(),

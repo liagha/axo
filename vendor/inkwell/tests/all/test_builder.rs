@@ -1,6 +1,7 @@
 use inkwell::builder::BuilderError;
 use inkwell::context::Context;
 use inkwell::{AddressSpace, AtomicOrdering, AtomicRMWBinOp, OptimizationLevel};
+use std::num::NonZeroU32;
 
 use std::ptr::null;
 
@@ -84,12 +85,62 @@ fn test_build_call() {
         feature = "llvm18-1",
         feature = "llvm19-1",
         feature = "llvm20-1",
-        feature = "llvm21-1"
+        feature = "llvm21-1",
+        feature = "llvm22-1"
     ))]
     builder.build_indirect_call(fn_type2, load, &[], "call").unwrap();
     builder.build_return(None).unwrap();
 
     assert!(module.verify().is_ok());
+}
+
+#[test]
+fn test_build_call_with_metadata_string() {
+    let context = Context::create();
+    let module = context.create_module("sample");
+    let builder = context.create_builder();
+
+    let f64_type = context.f64_type();
+    let metadata_type = context.metadata_type();
+    let intrinsic_type = f64_type.fn_type(
+        &[
+            f64_type.into(),
+            f64_type.into(),
+            metadata_type.into(),
+            metadata_type.into(),
+        ],
+        false,
+    );
+    let intrinsic = module.add_function("llvm.experimental.constrained.fsub.f64", intrinsic_type, None);
+
+    let wrapper_type = f64_type.fn_type(&[f64_type.into(), f64_type.into()], false);
+    let wrapper = module.add_function("fsub_wrapper", wrapper_type, None);
+    let entry = context.append_basic_block(wrapper, "entry");
+    builder.position_at_end(entry);
+
+    let arg1 = wrapper.get_first_param().unwrap();
+    let arg2 = wrapper.get_nth_param(1).unwrap();
+    arg1.set_name("arg1");
+    arg2.set_name("arg2");
+
+    let ret = builder
+        .build_call(
+            intrinsic,
+            &[
+                arg1.into(),
+                arg2.into(),
+                context.metadata_string("round.tonearest").into(),
+                context.metadata_string("fpexcept.strict").into(),
+            ],
+            "ret",
+        )
+        .unwrap()
+        .try_as_basic_value()
+        .unwrap_basic()
+        .into_float_value();
+    builder.build_return(Some(&ret)).unwrap();
+
+    assert_eq!(module.verify(), Ok(()));
 }
 
 #[test]
@@ -328,7 +379,6 @@ fn landing_pad_filter() {
         builder.build_return(Some(&fakepi)).unwrap();
     }
 
-    module.print_to_stderr();
     assert!(module.verify().is_ok());
 }
 
@@ -714,6 +764,28 @@ fn test_unconditional_branch() {
 
     builder.position_at_end(skipped_bb);
     builder.build_unreachable().unwrap();
+}
+
+#[test]
+fn test_fence() {
+    let context = Context::create();
+    let builder = context.create_builder();
+
+    // Builder continues to function with different context
+    let context = Context::create();
+    let module = context.create_module("my_mod");
+    let void_type = context.void_type();
+    let fn_type = void_type.fn_type(&[], false);
+    let fn_value = module.add_function("my_fn", fn_type, None);
+    let entry = context.append_basic_block(fn_value, "entry");
+
+    builder.position_at_end(entry);
+    assert!(builder.build_fence(AtomicOrdering::NotAtomic, false, "fence").is_err());
+    assert!(
+        builder
+            .build_fence(AtomicOrdering::AcquireRelease, false, "fence")
+            .is_ok()
+    );
 }
 
 #[test]
@@ -1144,31 +1216,43 @@ fn test_insert_value() {
     let const_int3 = i32_type.const_int(6, false);
     let const_float = f32_type.const_float(2.0);
 
-    assert!(builder
-        .build_insert_value(array, const_int1, 0, "insert")
-        .unwrap()
-        .is_array_value());
-    assert!(builder
-        .build_insert_value(array, const_int2, 1, "insert")
-        .unwrap()
-        .is_array_value());
-    assert!(builder
-        .build_insert_value(array, const_int3, 2, "insert")
-        .unwrap()
-        .is_array_value());
-    assert!(builder
-        .build_insert_value(array, const_int3, 3, "insert")
-        .is_err_and(|e| e == BuilderError::ExtractOutOfRange));
-    assert!(builder
-        .build_insert_value(array, const_int3, 4, "insert")
-        .is_err_and(|e| e == BuilderError::ExtractOutOfRange));
+    assert!(
+        builder
+            .build_insert_value(array, const_int1, 0, "insert")
+            .unwrap()
+            .is_array_value()
+    );
+    assert!(
+        builder
+            .build_insert_value(array, const_int2, 1, "insert")
+            .unwrap()
+            .is_array_value()
+    );
+    assert!(
+        builder
+            .build_insert_value(array, const_int3, 2, "insert")
+            .unwrap()
+            .is_array_value()
+    );
+    assert!(
+        builder
+            .build_insert_value(array, const_int3, 3, "insert")
+            .is_err_and(|e| e == BuilderError::ExtractOutOfRange)
+    );
+    assert!(
+        builder
+            .build_insert_value(array, const_int3, 4, "insert")
+            .is_err_and(|e| e == BuilderError::ExtractOutOfRange)
+    );
 
     assert!(builder.build_extract_value(array, 0, "extract").unwrap().is_int_value());
     assert!(builder.build_extract_value(array, 1, "extract").unwrap().is_int_value());
     assert!(builder.build_extract_value(array, 2, "extract").unwrap().is_int_value());
-    assert!(builder
-        .build_extract_value(array, 3, "extract")
-        .is_err_and(|e| e == BuilderError::ExtractOutOfRange));
+    assert!(
+        builder
+            .build_extract_value(array, 3, "extract")
+            .is_err_and(|e| e == BuilderError::ExtractOutOfRange)
+    );
 
     let struct_alloca = builder.build_alloca(struct_type, "struct_alloca").unwrap();
     #[cfg(feature = "typed-pointers")]
@@ -1182,35 +1266,51 @@ fn test_insert_value() {
         .unwrap()
         .into_struct_value();
 
-    assert!(builder
-        .build_insert_value(struct_value, const_int2, 0, "insert")
-        .unwrap()
-        .is_struct_value());
-    assert!(builder
-        .build_insert_value(struct_value, const_float, 1, "insert")
-        .unwrap()
-        .is_struct_value());
-    assert!(builder
-        .build_insert_value(struct_value, const_float, 2, "insert")
-        .is_err_and(|e| e == BuilderError::ExtractOutOfRange));
-    assert!(builder
-        .build_insert_value(struct_value, const_float, 3, "insert")
-        .is_err_and(|e| e == BuilderError::ExtractOutOfRange));
+    assert!(
+        builder
+            .build_insert_value(struct_value, const_int2, 0, "insert")
+            .unwrap()
+            .is_struct_value()
+    );
+    assert!(
+        builder
+            .build_insert_value(struct_value, const_float, 1, "insert")
+            .unwrap()
+            .is_struct_value()
+    );
+    assert!(
+        builder
+            .build_insert_value(struct_value, const_float, 2, "insert")
+            .is_err_and(|e| e == BuilderError::ExtractOutOfRange)
+    );
+    assert!(
+        builder
+            .build_insert_value(struct_value, const_float, 3, "insert")
+            .is_err_and(|e| e == BuilderError::ExtractOutOfRange)
+    );
 
-    assert!(builder
-        .build_extract_value(struct_value, 0, "extract")
-        .unwrap()
-        .is_int_value());
-    assert!(builder
-        .build_extract_value(struct_value, 1, "extract")
-        .unwrap()
-        .is_float_value());
-    assert!(builder
-        .build_extract_value(struct_value, 2, "extract")
-        .is_err_and(|e| e == BuilderError::ExtractOutOfRange));
-    assert!(builder
-        .build_extract_value(struct_value, 3, "extract")
-        .is_err_and(|e| e == BuilderError::ExtractOutOfRange));
+    assert!(
+        builder
+            .build_extract_value(struct_value, 0, "extract")
+            .unwrap()
+            .is_int_value()
+    );
+    assert!(
+        builder
+            .build_extract_value(struct_value, 1, "extract")
+            .unwrap()
+            .is_float_value()
+    );
+    assert!(
+        builder
+            .build_extract_value(struct_value, 2, "extract")
+            .is_err_and(|e| e == BuilderError::ExtractOutOfRange)
+    );
+    assert!(
+        builder
+            .build_extract_value(struct_value, 3, "extract")
+            .is_err_and(|e| e == BuilderError::ExtractOutOfRange)
+    );
 
     builder.build_return(None).unwrap();
 
@@ -1326,7 +1426,10 @@ fn test_alignment_bytes() {
                 "alignment of {alignment} was a power of 2 under 2^64, but did not verify for memcpy."
             );
         } else {
-            assert!(result.is_err(), "alignment of {alignment} was a power of 2 under 2^64, yet verification passed for memcpy when it should not have.");
+            assert!(
+                result.is_err(),
+                "alignment of {alignment} was a power of 2 under 2^64, yet verification passed for memcpy when it should not have."
+            );
         }
 
         let result = run_memmove_on(&context, &module, alignment);
@@ -1337,7 +1440,10 @@ fn test_alignment_bytes() {
                 "alignment of {alignment} was a power of 2 under 2^64, but did not verify for memmove."
             );
         } else {
-            assert!(result.is_err(), "alignment of {alignment} was a power of 2 under 2^64, yet verification passed for memmove when it should not have.");
+            assert!(
+                result.is_err(),
+                "alignment of {alignment} was a power of 2 under 2^64, yet verification passed for memmove when it should not have."
+            );
         }
     };
 
@@ -1626,7 +1732,8 @@ fn test_bit_cast() {
         feature = "llvm18-1",
         feature = "llvm19-1",
         feature = "llvm20-1",
-        feature = "llvm21-1"
+        feature = "llvm21-1",
+        feature = "llvm22-1"
     ))]
     let i32_scalable_vec_type = i32_type.scalable_vec_type(2);
     let arg_types = [
@@ -1645,7 +1752,8 @@ fn test_bit_cast() {
             feature = "llvm18-1",
             feature = "llvm19-1",
             feature = "llvm20-1",
-            feature = "llvm21-1"
+            feature = "llvm21-1",
+            feature = "llvm22-1"
         ))]
         i32_scalable_vec_type.into(),
     ];
@@ -1668,7 +1776,8 @@ fn test_bit_cast() {
         feature = "llvm18-1",
         feature = "llvm19-1",
         feature = "llvm20-1",
-        feature = "llvm21-1"
+        feature = "llvm21-1",
+        feature = "llvm22-1"
     ))]
     let i32_scalable_vec_arg = fn_value.get_nth_param(5).unwrap();
 
@@ -1688,7 +1797,8 @@ fn test_bit_cast() {
         feature = "llvm18-1",
         feature = "llvm19-1",
         feature = "llvm20-1",
-        feature = "llvm21-1"
+        feature = "llvm21-1",
+        feature = "llvm22-1"
     ))]
     {
         let i64_scalable_vec_type = i64_type.scalable_vec_type(1);
@@ -1735,15 +1845,15 @@ fn test_atomicrmw() {
     builder.position_at_end(entry);
 
     let i32_type = context.i32_type();
-    let i31_type = context.custom_width_int_type(31);
-    let i4_type = context.custom_width_int_type(4);
+    let i31_type = context.custom_width_int_type(NonZeroU32::new(31).unwrap()).unwrap();
+    let i4_type = context.custom_width_int_type(NonZeroU32::new(4).unwrap()).unwrap();
 
     #[cfg(feature = "typed-pointers")]
     let ptr_value = i32_type.ptr_type(AddressSpace::default()).get_undef();
     #[cfg(not(feature = "typed-pointers"))]
     let ptr_value = context.ptr_type(AddressSpace::default()).get_undef();
     let zero_value = i32_type.const_zero();
-    let result = builder.build_atomicrmw(AtomicRMWBinOp::Add, ptr_value, zero_value, AtomicOrdering::Unordered);
+    let result = builder.build_atomicrmw(AtomicRMWBinOp::Add, ptr_value, zero_value, AtomicOrdering::Monotonic);
     assert!(result.is_ok());
 
     #[cfg(feature = "typed-pointers")]
@@ -1751,7 +1861,7 @@ fn test_atomicrmw() {
         let i64_type = context.i64_type();
         let ptr_value = i64_type.ptr_type(AddressSpace::default()).get_undef();
         let zero_value = i32_type.const_zero();
-        let result = builder.build_atomicrmw(AtomicRMWBinOp::Add, ptr_value, zero_value, AtomicOrdering::Unordered);
+        let result = builder.build_atomicrmw(AtomicRMWBinOp::Add, ptr_value, zero_value, AtomicOrdering::Monotonic);
         assert!(result.is_err());
     }
 
@@ -1760,7 +1870,7 @@ fn test_atomicrmw() {
     #[cfg(not(feature = "typed-pointers"))]
     let ptr_value = context.ptr_type(AddressSpace::default()).get_undef();
     let zero_value = i31_type.const_zero();
-    let result = builder.build_atomicrmw(AtomicRMWBinOp::Add, ptr_value, zero_value, AtomicOrdering::Unordered);
+    let result = builder.build_atomicrmw(AtomicRMWBinOp::Add, ptr_value, zero_value, AtomicOrdering::Monotonic);
     assert!(result.is_err());
 
     #[cfg(feature = "typed-pointers")]
@@ -1768,7 +1878,7 @@ fn test_atomicrmw() {
     #[cfg(not(feature = "typed-pointers"))]
     let ptr_value = context.ptr_type(AddressSpace::default()).get_undef();
     let zero_value = i4_type.const_zero();
-    let result = builder.build_atomicrmw(AtomicRMWBinOp::Add, ptr_value, zero_value, AtomicOrdering::Unordered);
+    let result = builder.build_atomicrmw(AtomicRMWBinOp::Add, ptr_value, zero_value, AtomicOrdering::Monotonic);
     assert!(result.is_err());
 }
 
@@ -1974,8 +2084,10 @@ fn test_safe_struct_gep() {
         assert!(builder.build_struct_gep(i32_ty, i32_ptr, 10, "struct_gep").is_err());
         assert!(builder.build_struct_gep(struct_ty, struct_ptr, 0, "struct_gep").is_ok());
         assert!(builder.build_struct_gep(struct_ty, struct_ptr, 1, "struct_gep").is_ok());
-        assert!(builder
-            .build_struct_gep(struct_ty, struct_ptr, 2, "struct_gep")
-            .is_err());
+        assert!(
+            builder
+                .build_struct_gep(struct_ty, struct_ptr, 2, "struct_gep")
+                .is_err()
+        );
     }
 }

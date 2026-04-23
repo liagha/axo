@@ -1,12 +1,12 @@
 use llvm_sys::core::LLVMGetVectorSize;
 use llvm_sys::prelude::LLVMTypeRef;
 
+use crate::AddressSpace;
 use crate::context::ContextRef;
 use crate::support::LLVMString;
 use crate::types::enums::BasicMetadataTypeEnum;
-use crate::types::{traits::AsTypeRef, ArrayType, BasicTypeEnum, FunctionType, PointerType, Type};
+use crate::types::{ArrayType, BasicTypeEnum, FunctionType, PointerType, Type, traits::AsTypeRef};
 use crate::values::{ArrayValue, IntValue, ScalableVectorValue};
-use crate::AddressSpace;
 
 use std::fmt::{self, Display};
 
@@ -22,10 +22,12 @@ impl<'ctx> ScalableVectorType<'ctx> {
     /// # Safety
     /// Undefined behavior, if referenced type isn't scalable vector type
     pub unsafe fn new(scalable_vector_type: LLVMTypeRef) -> Self {
-        assert!(!scalable_vector_type.is_null());
+        unsafe {
+            assert!(!scalable_vector_type.is_null());
 
-        ScalableVectorType {
-            scalable_vec_type: Type::new(scalable_vector_type),
+            ScalableVectorType {
+                scalable_vec_type: Type::new(scalable_vector_type),
+            }
         }
     }
 
@@ -168,6 +170,7 @@ impl<'ctx> ScalableVectorType<'ctx> {
             feature = "llvm19-1",
             feature = "llvm20-1",
             feature = "llvm21-1",
+            feature = "llvm22-1",
         ),
         deprecated(
             note = "Starting from version 15.0, LLVM doesn't differentiate between pointer types. Use Context::ptr_type instead."

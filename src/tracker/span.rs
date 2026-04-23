@@ -1,10 +1,9 @@
-use orbyte::Orbyte;
 use crate::{
     data::{Boolean, Identity, Offset},
     tracker::{Position, Spanned},
 };
 
-#[derive(Clone, Copy, Eq, Hash, Orbyte, PartialEq)]
+#[derive(Clone, Copy, Eq, Hash, PartialEq)]
 pub struct Span {
     pub identity: Identity,
     pub start: Offset,

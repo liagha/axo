@@ -1,10 +1,9 @@
-use orbyte::Orbyte;
 use crate::{
     format::{self, Debug, Display, Formatter},
     scanner::Character,
 };
 
-#[derive(Clone, Copy, Debug, Eq, Hash, Orbyte, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum PunctuationKind {
     Space,
     Tab,

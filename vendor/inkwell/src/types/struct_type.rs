@@ -8,13 +8,13 @@ use std::ffi::CStr;
 use std::fmt::{self, Display};
 use std::mem::forget;
 
+use crate::AddressSpace;
 use crate::context::ContextRef;
 use crate::support::LLVMString;
 use crate::types::enums::BasicMetadataTypeEnum;
 use crate::types::traits::AsTypeRef;
 use crate::types::{ArrayType, BasicTypeEnum, FunctionType, PointerType, Type};
 use crate::values::{ArrayValue, AsValueRef, BasicValueEnum, IntValue, StructValue};
-use crate::AddressSpace;
 
 /// A `StructType` is the type of a heterogeneous container of types.
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
@@ -28,10 +28,12 @@ impl<'ctx> StructType<'ctx> {
     /// # Safety
     /// Undefined behavior, if referenced type isn't struct type
     pub unsafe fn new(struct_type: LLVMTypeRef) -> Self {
-        assert!(!struct_type.is_null());
+        unsafe {
+            assert!(!struct_type.is_null());
 
-        StructType {
-            struct_type: Type::new(struct_type),
+            StructType {
+                struct_type: Type::new(struct_type),
+            }
         }
     }
 
@@ -197,6 +199,7 @@ impl<'ctx> StructType<'ctx> {
             feature = "llvm19-1",
             feature = "llvm20-1",
             feature = "llvm21-1",
+            feature = "llvm22-1",
         ),
         deprecated(
             note = "Starting from version 15.0, LLVM doesn't differentiate between pointer types. Use Context::ptr_type instead."

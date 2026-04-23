@@ -1,17 +1,16 @@
-use orbyte::Orbyte;
 use crate::{
     data::{Boolean, Char, Float, Integer, Str},
     scanner::{OperatorKind, PunctuationKind},
     tracker::Span,
 };
 
-#[derive(Clone, Debug, Hash, Orbyte)]
+#[derive(Clone, Debug, Hash)]
 pub struct Token<'token> {
     pub kind: TokenKind<'token>,
     pub span: Span,
 }
 
-#[derive(Clone, Debug, Eq, Hash, Orbyte, PartialEq)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub enum TokenKind<'token> {
     Float(Float),
     Integer(Integer),

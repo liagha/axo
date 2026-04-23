@@ -2,15 +2,15 @@ use llvm_sys::core::{LLVMConstReal, LLVMConstRealOfStringAndSize, LLVMGetTypeKin
 use llvm_sys::execution_engine::LLVMCreateGenericValueOfFloat;
 use llvm_sys::prelude::LLVMTypeRef;
 
+use crate::AddressSpace;
 use crate::context::ContextRef;
 use crate::support::LLVMString;
-use crate::types::enums::BasicMetadataTypeEnum;
-use crate::types::traits::AsTypeRef;
 #[llvm_versions(12..)]
 use crate::types::ScalableVectorType;
+use crate::types::enums::BasicMetadataTypeEnum;
+use crate::types::traits::AsTypeRef;
 use crate::types::{ArrayType, FunctionType, PointerType, Type, VectorType};
 use crate::values::{ArrayValue, FloatValue, GenericValue, IntValue};
-use crate::AddressSpace;
 
 use std::fmt::{self, Display};
 
@@ -26,10 +26,12 @@ impl<'ctx> FloatType<'ctx> {
     /// # Safety
     /// Undefined behavior, if referenced type isn't float type
     pub unsafe fn new(float_type: LLVMTypeRef) -> Self {
-        assert!(!float_type.is_null());
+        unsafe {
+            assert!(!float_type.is_null());
 
-        FloatType {
-            float_type: Type::new(float_type),
+            FloatType {
+                float_type: Type::new(float_type),
+            }
         }
     }
 
@@ -233,6 +235,7 @@ impl<'ctx> FloatType<'ctx> {
             feature = "llvm19-1",
             feature = "llvm20-1",
             feature = "llvm21-1",
+            feature = "llvm22-1",
         ),
         deprecated(
             note = "Starting from version 15.0, LLVM doesn't differentiate between pointer types. Use Context::ptr_type instead."
@@ -270,6 +273,7 @@ impl<'ctx> FloatType<'ctx> {
                 feature = "llvm19-1",
                 feature = "llvm20-1",
                 feature = "llvm21-1",
+                feature = "llvm22-1",
             ))]
             llvm_sys::LLVMTypeKind::LLVMBFloatTypeKind => 16,
             llvm_sys::LLVMTypeKind::LLVMFloatTypeKind => 32,

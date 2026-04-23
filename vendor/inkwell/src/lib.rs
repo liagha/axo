@@ -64,6 +64,8 @@ pub extern crate llvm_sys_191 as llvm_sys;
 pub extern crate llvm_sys_201 as llvm_sys;
 #[cfg(feature = "llvm21-1")]
 pub extern crate llvm_sys_211 as llvm_sys;
+#[cfg(feature = "llvm22-1")]
+pub extern crate llvm_sys_221 as llvm_sys;
 
 use llvm_sys::target_machine::LLVMCodeGenOptLevel;
 use llvm_sys::{
@@ -118,7 +120,8 @@ assert_unique_used_features! {
     "llvm18-1",
     "llvm19-1",
     "llvm20-1",
-    "llvm21-1"
+    "llvm21-1",
+    "llvm22-1"
 }
 
 #[cfg(all(
@@ -164,11 +167,7 @@ impl TryFrom<u32> for AddressSpace {
 
     fn try_from(val: u32) -> Result<Self, Self::Error> {
         // address space is a 24-bit integer
-        if val < 1 << 24 {
-            Ok(AddressSpace(val))
-        } else {
-            Err(())
-        }
+        if val < 1 << 24 { Ok(AddressSpace(val)) } else { Err(()) }
     }
 }
 

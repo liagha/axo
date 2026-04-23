@@ -1,4 +1,3 @@
-use orbyte::Orbyte;
 use crate::{
     data::Identity,
     internal::hash::Set,
@@ -7,7 +6,7 @@ use crate::{
     scanner::{Token, TokenKind},
 };
 
-#[derive(Clone, Orbyte)]
+#[derive(Clone)]
 pub struct Scope {
     pub symbols: Set<Identity>,
     pub parent: Option<Identity>,

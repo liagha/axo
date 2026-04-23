@@ -1,5 +1,5 @@
-use inkwell::context::Context;
 use inkwell::AddressSpace;
+use inkwell::context::Context;
 
 #[test]
 fn test_no_context_double_free() {
@@ -14,12 +14,15 @@ fn test_no_context_double_free() {
 #[test]
 fn test_no_context_double_free3() {
     unsafe {
+        #[allow(deprecated)]
         Context::get_global(|_ctx| ());
+        #[allow(deprecated)]
         Context::get_global(|_ctx| ());
     }
 }
 
 #[test]
+#[allow(deprecated)]
 fn test_get_context_from_contextless_value() {
     let context = Context::create();
 

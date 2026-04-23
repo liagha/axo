@@ -25,7 +25,8 @@ mod vec_value;
     feature = "llvm18-1",
     feature = "llvm19-1",
     feature = "llvm20-1",
-    feature = "llvm21-1"
+    feature = "llvm21-1",
+    feature = "llvm22-1"
 ))]
 pub(crate) mod operand_bundle;
 
@@ -37,6 +38,7 @@ pub(crate) mod operand_bundle;
     feature = "llvm19-1",
     feature = "llvm20-1",
     feature = "llvm21-1",
+    feature = "llvm22-1",
 )))]
 mod callable_value;
 
@@ -48,13 +50,16 @@ mod callable_value;
     feature = "llvm19-1",
     feature = "llvm20-1",
     feature = "llvm21-1",
+    feature = "llvm22-1",
 )))]
 pub use crate::values::callable_value::CallableValue;
 
 #[llvm_versions(18..)]
+pub use crate::values::instruction_value::FastMathFlags;
+#[llvm_versions(18..)]
 pub use crate::values::operand_bundle::OperandBundle;
 
-use crate::support::{to_c_str, LLVMString};
+use crate::support::{LLVMString, to_c_str};
 pub use crate::values::array_value::ArrayValue;
 pub use crate::values::basic_value_use::{BasicValueUse, Operand};
 pub use crate::values::call_site_value::{CallSiteValue, ValueKind};
@@ -69,7 +74,7 @@ pub use crate::values::instruction_value::{
     AtomicError, InstructionOpcode, InstructionValue, InstructionValueError, OperandIter, OperandUseIter,
 };
 pub use crate::values::int_value::IntValue;
-pub use crate::values::metadata_value::{MetadataValue, FIRST_CUSTOM_METADATA_KIND_ID};
+pub use crate::values::metadata_value::{FIRST_CUSTOM_METADATA_KIND_ID, MetadataValue};
 pub use crate::values::phi_value::IncomingIter;
 pub use crate::values::phi_value::PhiValue;
 pub use crate::values::ptr_value::PointerValue;

@@ -1,9 +1,9 @@
+use inkwell::OptimizationLevel;
 use inkwell::context::Context;
 use inkwell::memory_buffer::MemoryBuffer;
 use inkwell::module::Module;
 use inkwell::targets::{Target, TargetTriple};
 use inkwell::values::AnyValue;
-use inkwell::OptimizationLevel;
 
 use std::env::temp_dir;
 use std::fs::{self, remove_file};
@@ -136,28 +136,28 @@ fn test_write_and_load_memory_buffer() {
     );
 
     let memory_buffer2 = module.write_bitcode_to_memory();
-    let object_file = memory_buffer2.create_object_file();
+    let binary_file = memory_buffer2.create_binary_file(None);
 
-    assert!(object_file.is_err());
+    assert!(binary_file.is_err());
 }
 
 #[test]
 fn test_garbage_ir_fails_create_module_from_ir() {
     let context = Context::create();
-    let memory_buffer = MemoryBuffer::create_from_memory_range(b"garbage ir data", "my_ir");
+    let memory_buffer = MemoryBuffer::create_from_memory_range(b"garbage ir data\0", "my_ir");
 
-    assert_eq!(memory_buffer.get_size(), 15);
-    assert_eq!(memory_buffer.as_slice(), b"garbage ir data");
+    assert_eq!(memory_buffer.get_size(), 16);
+    assert_eq!(memory_buffer.as_slice(), b"garbage ir data\0");
     assert!(context.create_module_from_ir(memory_buffer).is_err());
 }
 
 #[test]
 fn test_garbage_ir_fails_create_module_from_ir_copy() {
     let context = Context::create();
-    let memory_buffer = MemoryBuffer::create_from_memory_range_copy(b"garbage ir data", "my_ir");
+    let memory_buffer = MemoryBuffer::create_from_memory_range_copy(b"garbage ir data\0", "my_ir");
 
-    assert_eq!(memory_buffer.get_size(), 15);
-    assert_eq!(memory_buffer.as_slice(), b"garbage ir data");
+    assert_eq!(memory_buffer.get_size(), 16);
+    assert_eq!(memory_buffer.as_slice(), b"garbage ir data\0");
     assert!(context.create_module_from_ir(memory_buffer).is_err());
 }
 
@@ -177,6 +177,7 @@ fn test_get_struct_type() {
 #[test]
 fn test_get_struct_type_global_context() {
     unsafe {
+        #[allow(deprecated)]
         Context::get_global(|context| {
             let module = context.create_module("my_module");
 
@@ -216,7 +217,7 @@ fn test_get_struct_type_global_context() {
 #[test]
 fn test_parse_from_buffer() {
     let context = Context::create();
-    let garbage_buffer = MemoryBuffer::create_from_memory_range(b"garbage ir data", "my_ir");
+    let garbage_buffer = MemoryBuffer::create_from_memory_range(b"garbage ir data\0", "my_ir");
     let module_result = Module::parse_bitcode_from_buffer(&garbage_buffer, &context);
 
     assert!(module_result.is_err());
@@ -514,4 +515,11 @@ fn test_double_ee_from_same_module() {
         .expect("Could not create Execution Engine");
 
     assert!(module.create_interpreter_execution_engine().is_err());
+}
+
+#[test]
+fn test_verify() {
+    let context = Context::create();
+    let module = context.create_module("a");
+    assert!(module.verify().is_ok());
 }

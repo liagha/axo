@@ -13,9 +13,8 @@ use crate::{
 };
 
 pub use core::str::{from_utf8, FromStr, Utf8Error};
-use orbyte::Orbyte;
 
-#[derive(Clone, Copy, Orbyte, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Str<'string>(pub &'string [u8]);
 
 impl<'string> Str<'string> {

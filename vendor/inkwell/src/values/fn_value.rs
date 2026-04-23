@@ -12,7 +12,11 @@ use llvm_sys::core::{
 };
 use llvm_sys::core::{LLVMGetPersonalityFn, LLVMSetPersonalityFn};
 use llvm_sys::debuginfo::{LLVMGetSubprogram, LLVMSetSubprogram};
+#[llvm_versions(20..)]
+use llvm_sys::error::LLVMGetErrorMessage;
 use llvm_sys::prelude::{LLVMBasicBlockRef, LLVMValueRef};
+#[llvm_versions(20..)]
+use llvm_sys::transforms::pass_builder::LLVMRunPassesOnFunction;
 
 use std::ffi::CStr;
 use std::fmt::{self, Display};
@@ -23,7 +27,13 @@ use crate::attributes::{Attribute, AttributeLoc};
 use crate::basic_block::BasicBlock;
 use crate::debug_info::DISubprogram;
 use crate::module::Linkage;
+#[llvm_versions(20..)]
+use crate::passes::PassBuilderOptions;
+#[llvm_versions(20..)]
+use crate::support::LLVMString;
 use crate::support::to_c_str;
+#[llvm_versions(20..)]
+use crate::targets::TargetMachine;
 use crate::types::FunctionType;
 use crate::values::traits::{AnyValue, AsValueRef};
 use crate::values::{BasicValueEnum, GlobalValue, Value};
@@ -40,13 +50,15 @@ impl<'ctx> FunctionValue<'ctx> {
     ///
     /// The ref must be valid and of type function.
     pub unsafe fn new(value: LLVMValueRef) -> Option<Self> {
-        if value.is_null() || LLVMIsAFunction(value).is_null() {
-            return None;
-        }
+        unsafe {
+            if value.is_null() || LLVMIsAFunction(value).is_null() {
+                return None;
+            }
 
-        Some(FunctionValue {
-            fn_value: Value::new(value),
-        })
+            Some(FunctionValue {
+                fn_value: Value::new(value),
+            })
+        }
     }
 
     pub fn get_linkage(self) -> Linkage {
@@ -201,7 +213,7 @@ impl<'ctx> FunctionValue<'ctx> {
 
     // TODO: Look for ways to prevent use after delete but maybe not possible
     pub unsafe fn delete(self) {
-        LLVMDeleteFunction(self.as_value_ref())
+        unsafe { LLVMDeleteFunction(self.as_value_ref()) }
     }
 
     pub fn get_type(self) -> FunctionType<'ctx> {
@@ -517,6 +529,36 @@ impl<'ctx> FunctionValue<'ctx> {
     pub fn append_existing_basic_block(&self, basic_block: BasicBlock<'ctx>) {
         unsafe {
             LLVMAppendExistingBasicBlock(self.as_value_ref(), basic_block.as_mut_ptr());
+        }
+    }
+
+    /// Construct and run a set of passes over a function.
+    ///
+    /// Behaves the same as [`Module::run_passes`](crate::module::Module::run_passes), but
+    /// operates on a single function instead of an entire module.
+    ///
+    /// See [`Module::run_passes`](crate::module::Module::run_passes) for details on
+    /// the passes format.
+    #[llvm_versions(20..)]
+    pub fn run_passes(
+        &self,
+        passes: &str,
+        machine: &TargetMachine,
+        options: PassBuilderOptions,
+    ) -> Result<(), LLVMString> {
+        unsafe {
+            let error = LLVMRunPassesOnFunction(
+                self.as_value_ref(),
+                to_c_str(passes).as_ptr(),
+                machine.target_machine,
+                options.options_ref,
+            );
+            if error.is_null() {
+                Ok(())
+            } else {
+                let message = LLVMGetErrorMessage(error);
+                Err(LLVMString::new(message as *const libc::c_char))
+            }
         }
     }
 }

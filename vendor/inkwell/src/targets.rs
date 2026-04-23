@@ -21,15 +21,15 @@ use llvm_sys::target_machine::{
     LLVMTargetMachineOptionsSetCodeGenOptLevel, LLVMTargetMachineOptionsSetCodeModel,
     LLVMTargetMachineOptionsSetFeatures, LLVMTargetMachineOptionsSetRelocMode,
 };
-use once_cell::sync::Lazy;
-use std::sync::RwLock;
+use std::sync::{LazyLock, RwLock};
 
 use crate::context::AsContextRef;
 use crate::data_layout::DataLayout;
 use crate::memory_buffer::MemoryBuffer;
 use crate::module::Module;
+#[allow(deprecated)]
 use crate::passes::PassManager;
-use crate::support::{to_c_str, LLVMString};
+use crate::support::{LLVMString, to_c_str};
 use crate::types::{AnyType, AsTypeRef, IntType, StructType};
 use crate::values::{AsValueRef, GlobalValue};
 use crate::{AddressSpace, OptimizationLevel};
@@ -37,7 +37,6 @@ use crate::{AddressSpace, OptimizationLevel};
 use std::default::Default;
 use std::ffi::CStr;
 use std::fmt;
-use std::mem::MaybeUninit;
 use std::path::Path;
 use std::ptr;
 
@@ -169,7 +168,7 @@ impl fmt::Display for TargetTriple {
     }
 }
 
-static TARGET_LOCK: Lazy<RwLock<()>> = Lazy::new(|| RwLock::new(()));
+static TARGET_LOCK: LazyLock<RwLock<()>> = LazyLock::new(|| RwLock::new(()));
 
 // NOTE: Versions verified as target-complete: 3.6, 3.7, 3.8, 3.9, 4.0
 #[derive(Debug, Eq, PartialEq)]
@@ -1014,16 +1013,16 @@ impl Target {
 
     pub fn from_triple(triple: &TargetTriple) -> Result<Self, LLVMString> {
         let mut target = ptr::null_mut();
-        let mut err_string = MaybeUninit::uninit();
+        let mut err_string: *mut ::libc::c_char = ::core::ptr::null_mut();
 
         let code = {
             let _guard = TARGET_LOCK.read().unwrap_or_else(|e| e.into_inner());
-            unsafe { LLVMGetTargetFromTriple(triple.as_ptr(), &mut target, err_string.as_mut_ptr()) }
+            unsafe { LLVMGetTargetFromTriple(triple.as_ptr(), &mut target, &mut err_string) }
         };
 
         if code == 1 {
             unsafe {
-                return Err(LLVMString::new(err_string.assume_init()));
+                return Err(LLVMString::new(err_string));
             }
         }
 
@@ -1135,6 +1134,7 @@ impl TargetMachine {
     }
 
     // TODO: Move to PassManager?
+    #[allow(deprecated)]
     pub fn add_analysis_passes<T>(&self, pass_manager: &PassManager<T>) {
         unsafe { LLVMAddAnalysisPasses(self.target_machine, pass_manager.pass_manager) }
     }
@@ -1173,9 +1173,13 @@ impl TargetMachine {
     ///
     /// let buffer = target_machine.write_to_memory_buffer(&module, FileType::Assembly).unwrap();
     /// ```
-    pub fn write_to_memory_buffer(&self, module: &Module, file_type: FileType) -> Result<MemoryBuffer, LLVMString> {
+    pub fn write_to_memory_buffer(
+        &self,
+        module: &Module,
+        file_type: FileType,
+    ) -> Result<MemoryBuffer<'static>, LLVMString> {
         let mut memory_buffer = ptr::null_mut();
-        let mut err_string = MaybeUninit::uninit();
+        let mut err_string: *mut ::libc::c_char = ::core::ptr::null_mut();
         let return_code = unsafe {
             let module_ptr = module.module.get();
             let file_type_ptr = file_type.as_llvm_file_type();
@@ -1184,14 +1188,14 @@ impl TargetMachine {
                 self.target_machine,
                 module_ptr,
                 file_type_ptr,
-                err_string.as_mut_ptr(),
+                &mut err_string,
                 &mut memory_buffer,
             )
         };
 
         if return_code == 1 {
             unsafe {
-                return Err(LLVMString::new(err_string.assume_init()));
+                return Err(LLVMString::new(err_string));
             }
         }
 
@@ -1238,7 +1242,7 @@ impl TargetMachine {
     pub fn write_to_file(&self, module: &Module, file_type: FileType, path: &Path) -> Result<(), LLVMString> {
         let path = path.to_str().expect("Did not find a valid Unicode path string");
         let path_c_string = to_c_str(path);
-        let mut err_string = MaybeUninit::uninit();
+        let mut err_string: *mut ::libc::c_char = ::core::ptr::null_mut();
         let return_code = unsafe {
             // REVIEW: Why does LLVM need a mutable ptr to path...?
             let module_ptr = module.module.get();
@@ -1250,13 +1254,13 @@ impl TargetMachine {
                 module_ptr,
                 path_ptr,
                 file_type_ptr,
-                err_string.as_mut_ptr(),
+                &mut err_string,
             )
         };
 
         if return_code == 1 {
             unsafe {
-                return Err(LLVMString::new(err_string.assume_init()));
+                return Err(LLVMString::new(err_string));
             }
         }
 
@@ -1477,7 +1481,7 @@ impl TargetMachineOptions {
     /// - The only way to access it is via this private method.
     /// - Disposal is taken care of automatically in `Drop::drop`.
     unsafe fn inner(&mut self) -> LLVMTargetMachineOptionsRef {
-        *self.0.get_or_insert_with(|| LLVMCreateTargetMachineOptions())
+        unsafe { *self.0.get_or_insert_with(|| LLVMCreateTargetMachineOptions()) }
     }
 }
 

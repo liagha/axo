@@ -1,27 +1,25 @@
 use {
     crate::{
-        analyzer::{Analysis, Analyzer},
+        analyzer::Analysis,
         data::*,
-        format::{Display, Show, Stencil},
+        format::{Display, Stencil},
         identifier,
         internal::{
             hash::{DefaultHasher, Hash, Hasher, Map},
-            platform::{args, read_dir, OS, ARCH, PathBuf},
+            platform::{args, OS, ARCH, PathBuf},
             time::{Duration, Instant},
             SessionError,
         },
         literal,
-        parser::{Element, ElementKind, Parser, Symbol, SymbolKind},
+        parser::{Element, ElementKind, Symbol, SymbolKind},
         reporter::Error,
         resolver::Resolver,
-        scanner::{Scanner, Token, TokenKind},
+        scanner::{Token, TokenKind},
         tracker::{Location, Span},
     },
     broccli::{xprintln, Color, TextStyle},
 };
-
-#[cfg(feature = "interpreter")]
-use crate::interpreter::Interpreter;
+use crate::format::Show;
 
 pub const BASE: &[(&str, &str)] = &[
     ("./base/cast.axo", include_str!("../../../base/cast.axo")),
@@ -239,131 +237,6 @@ impl<'session> Session<'session> {
             .collect::<Vec<String>>()
             .join(" ")
             .into()
-    }
-
-    pub fn traverse(target: &Location<'session>, records: &mut Map<Identity, Record<'session>>) -> bool {
-        let Ok(path) = target.to_path() else {
-            return false;
-        };
-
-        if !path.is_dir() {
-            return false;
-        }
-
-        let mut stack = vec![path];
-
-        while let Some(current) = stack.pop() {
-            if let Ok(entries) = read_dir(current) {
-                for entry in entries.flatten() {
-                    let child = entry.path();
-                    if child.is_dir() {
-                        stack.push(child);
-                    } else {
-                        let string = child.to_string_lossy().into_owned();
-                        if let Some(kind) = RecordKind::from_path(&string) {
-                            let location = Location::from(string.clone());
-                            let mut hasher = DefaultHasher::new();
-                            Hash::hash(&string, &mut hasher);
-                            let identity = (hasher.finish() as Identity) | 0x40000000;
-                            records.insert(identity, Record::new(kind, location));
-                        }
-                    }
-                }
-            }
-        }
-
-        true
-    }
-
-    #[cfg(feature = "interpreter")]
-    pub fn execute(session: &mut Self, core: &mut Interpreter<'session>, keys: &[Identity]) {
-        session.errors.clear();
-        session.bootstrap();
-        if !session.prepare() {
-            session.report_all();
-            return;
-        }
-
-        session.restore_tokens(keys);
-        session.restore_elements(keys);
-        session.restore_analyses(keys);
-
-        loop {
-            let mut changed = false;
-
-            for key in session.source_keys(keys) {
-                let signature = session.scan_signature(key);
-                if session.stage_value(super::SCAN_STAGE, key) != signature
-                    || session.records.get(&key).unwrap().fetch(1).is_none()
-                {
-                    let before = session.records.get(&key).map(|record| record.artifact_version(1)).unwrap_or(0);
-                    Scanner::execute(session, &[key]);
-                    let after = session.records.get(&key).map(|record| record.artifact_version(1)).unwrap_or(0);
-                    session.set_stage(super::SCAN_STAGE, key, signature);
-                    changed |= before != after;
-                }
-            }
-
-            for key in session.source_keys(keys) {
-                let signature = session.parse_signature(key);
-                if session.stage_value(super::PARSE_STAGE, key) != signature
-                    || session.records.get(&key).unwrap().fetch(2).is_none()
-                {
-                    let before = session.records.get(&key).map(|record| record.artifact_version(2)).unwrap_or(0);
-                    Parser::execute(session, &[key]);
-                    let after = session.records.get(&key).map(|record| record.artifact_version(2)).unwrap_or(0);
-                    session.set_stage(super::PARSE_STAGE, key, signature);
-                    changed |= before != after;
-                }
-            }
-
-            let targets = session.all_source_keys();
-            let resolve = session.resolve_signature(&targets);
-            if session.stage_value(super::RESOLVE_STAGE, 0) != resolve {
-                let before = session.resolver.registry.len();
-                Resolver::execute(session, &targets);
-                let after = session.resolver.registry.len();
-                session.set_stage(super::RESOLVE_STAGE, 0, resolve);
-                changed |= before != after;
-            }
-
-            let analyze = session.analyze_signature(&targets);
-            if session.stage_value(super::ANALYZE_STAGE, 0) != analyze
-                || targets.iter().any(|key| session.records.get(key).unwrap().fetch(3).is_none())
-            {
-                let before = targets
-                    .iter()
-                    .map(|key| session.records.get(key).map(|record| record.artifact_version(3)).unwrap_or(0))
-                    .sum::<usize>();
-                Analyzer::execute(session, &targets);
-                let after = targets
-                    .iter()
-                    .map(|key| session.records.get(key).map(|record| record.artifact_version(3)).unwrap_or(0))
-                    .sum::<usize>();
-                session.set_stage(super::ANALYZE_STAGE, 0, analyze);
-                changed |= before != after;
-            }
-
-            let interpret = session.interpret_signature();
-            if session.stage_value(super::INTERPRET_STAGE, 0) != interpret {
-                core.reset();
-                Interpreter::process(session, core, &targets);
-                session.set_stage(super::INTERPRET_STAGE, 0, interpret);
-                changed = true;
-            }
-
-            if !changed || !session.errors.is_empty() {
-                break;
-            }
-        }
-
-        session.store_tokens(keys);
-        session.store_elements(keys);
-        session.store_analyses(keys);
-        session.report_tokens(keys);
-        session.report_elements(keys);
-        session.report_analyses(keys);
-        session.report_all();
     }
 
     pub fn get_directive(&self, key: Str<'session>) -> Option<Token<'session>> {

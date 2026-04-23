@@ -4,7 +4,7 @@ use crate::{
         memory::take,
         Function, Invoke, Str,
     },
-    interpreter::{error::ErrorKind, Call, Instruction, Interpreter, Opcode, Slot, Value},
+    interpreter::{error::ErrorKind, Call, Instruction, InterpretError, Interpreter, Opcode, Slot, Value},
     resolver::{Type, TypeKind},
     tracker::Span,
 };
@@ -51,19 +51,17 @@ impl<'a> Interpreter<'a> {
     }
 
     pub fn compile(&mut self) {
-        let mut modules: Vec<_> = self.modules.keys().cloned().collect();
-        modules.sort();
+        let mut units = self.units.clone();
+        units.sort_by(|left, right| left.stem.cmp(&right.stem));
 
-        for module in &modules {
-            let analyses = self.modules.get(module).cloned().unwrap_or_default();
-            self.current_module = *module;
-            self.declare(analyses);
+        for unit in &units {
+            self.current_module = unit.stem;
+            self.declare(unit.analyses.clone());
         }
 
-        for module in &modules {
-            let analyses = self.modules.get(module).cloned().unwrap_or_default();
-            self.current_module = *module;
-            self.generate(analyses);
+        for unit in &units {
+            self.current_module = unit.stem;
+            self.generate(unit.analyses.clone());
         }
 
         let entry = self.calls.iter().find_map(|(&identity, items)| {
@@ -90,13 +88,13 @@ impl<'a> Interpreter<'a> {
         self.finish_calls();
     }
 
-    pub fn extend(&mut self, module: Str<'a>, analyses: Vec<Analysis<'a>>) -> usize {
+    pub fn eval(&mut self, stem: Str<'a>, analyses: Vec<Analysis<'a>>) -> Result<Option<Value>, InterpretError<'a>> {
         let start = self.code.len();
         let previous = self.current_module;
 
-        self.current_module = module;
+        self.current_module = stem;
         self.declare(analyses.clone());
-        self.generate(analyses);
+        self.value(analyses);
 
         if let Some(span) = self.code.last().map(|instruction| instruction.span.clone()) {
             self.emit(Opcode::Halt, span);
@@ -104,9 +102,9 @@ impl<'a> Interpreter<'a> {
 
         self.current_module = previous;
         self.finish_calls();
-
-        self.pointer = start;
-        start
+        self.begin(start);
+        self.run()?;
+        Ok(self.extract())
     }
 
     fn finish_calls(&mut self) {
@@ -144,10 +142,13 @@ impl<'a> Interpreter<'a> {
 
     fn generate(&mut self, analyses: Vec<Analysis<'a>>) {
         for analysis in analyses {
+            let span = analysis.span.clone();
+            self.emit(Opcode::Mark, span.clone());
+
             match analysis.kind {
                 AnalysisKind::Function(function) => {
                     if !matches!(function.interface, crate::data::Interface::C) {
-                        self.define(function, analysis.typing, analysis.span.clone());
+                        self.define(function, analysis.typing, span.clone());
                     }
                 }
                 AnalysisKind::Structure(structure) => {
@@ -159,6 +160,19 @@ impl<'a> Interpreter<'a> {
                 AnalysisKind::Module(stem, inner) => self.scope(stem, Self::generate, inner),
                 _ => self.walk(analysis),
             }
+
+            self.emit(Opcode::Restore(0), span);
+        }
+    }
+
+    fn value(&mut self, analyses: Vec<Analysis<'a>>) {
+        let count = analyses.len();
+
+        for (index, analysis) in analyses.into_iter().enumerate() {
+            let span = analysis.span.clone();
+            self.emit(Opcode::Mark, span.clone());
+            self.walk(analysis);
+            self.emit(Opcode::Restore(usize::from(index + 1 == count)), span);
         }
     }
 

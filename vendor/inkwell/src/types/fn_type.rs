@@ -1,17 +1,17 @@
+use llvm_sys::LLVMTypeKind;
 use llvm_sys::core::{
     LLVMCountParamTypes, LLVMGetParamTypes, LLVMGetReturnType, LLVMGetTypeKind, LLVMIsFunctionVarArg,
 };
 use llvm_sys::prelude::LLVMTypeRef;
-use llvm_sys::LLVMTypeKind;
 
 use std::fmt::{self, Display};
 use std::mem::forget;
 
+use crate::AddressSpace;
 use crate::context::ContextRef;
 use crate::support::LLVMString;
 use crate::types::traits::AsTypeRef;
 use crate::types::{AnyType, BasicMetadataTypeEnum, BasicTypeEnum, PointerType, Type};
-use crate::AddressSpace;
 
 /// A `FunctionType` is the type of a function variable.
 #[derive(PartialEq, Eq, Clone, Copy)]
@@ -25,10 +25,12 @@ impl<'ctx> FunctionType<'ctx> {
     /// # Safety
     /// Undefined behavior, if referenced type isn't function type
     pub unsafe fn new(fn_type: LLVMTypeRef) -> Self {
-        assert!(!fn_type.is_null());
+        unsafe {
+            assert!(!fn_type.is_null());
 
-        FunctionType {
-            fn_type: Type::new(fn_type),
+            FunctionType {
+                fn_type: Type::new(fn_type),
+            }
         }
     }
 
@@ -57,6 +59,7 @@ impl<'ctx> FunctionType<'ctx> {
             feature = "llvm19-1",
             feature = "llvm20-1",
             feature = "llvm21-1",
+            feature = "llvm22-1",
         ),
         deprecated(
             note = "Starting from version 15.0, LLVM doesn't differentiate between pointer types. Use Context::ptr_type instead."

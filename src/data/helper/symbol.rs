@@ -1,4 +1,3 @@
-use orbyte::Orbyte;
 use crate::{
     data::Boolean,
     internal::{
@@ -6,7 +5,7 @@ use crate::{
     },
 };
 
-#[derive(Debug, Eq, Orbyte)]
+#[derive(Debug, Eq)]
 pub struct Binding<Target, Value, Type> {
     pub target: Target,
     pub value: Option<Value>,
@@ -14,24 +13,24 @@ pub struct Binding<Target, Value, Type> {
     pub kind: BindingKind,
 }
 
-#[derive(Clone, Copy, Debug, Eq, Hash, Orbyte, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum BindingKind {
     Static,
     Let,
 }
 
-#[derive(Debug, Eq, Orbyte)]
+#[derive(Debug, Eq)]
 pub struct Aggregate<Target, Field> {
     pub target: Target,
     pub members: Vec<Field>,
 }
 
-#[derive(Debug, Orbyte)]
+#[derive(Debug)]
 pub struct Module<Target> {
     pub target: Target,
 }
 
-#[derive(Debug, Eq, Orbyte)]
+#[derive(Debug, Eq)]
 pub struct Function<Target, Parameter, Body, Output> {
     pub target: Target,
     pub members: Vec<Parameter>,
@@ -42,7 +41,7 @@ pub struct Function<Target, Parameter, Body, Output> {
     pub variadic: Boolean,
 }
 
-#[derive(Clone, Copy, Debug, Eq, Orbyte, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum Interface {
     C,
     Rust,

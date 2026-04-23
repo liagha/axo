@@ -12,6 +12,7 @@ mod test_execution_engine;
 mod test_instruction_conversion;
 mod test_instruction_values;
 mod test_intrinsics;
+mod test_memory_buffer;
 mod test_module;
 mod test_object_file;
 #[cfg(not(any(
@@ -19,9 +20,11 @@ mod test_object_file;
     feature = "llvm18-1",
     feature = "llvm19-1",
     feature = "llvm20-1",
-    feature = "llvm21-1"
+    feature = "llvm21-1",
+    feature = "llvm22-1"
 )))]
 mod test_passes;
+mod test_passes_on_function;
 mod test_targets;
 mod test_tari_example;
 mod test_types;

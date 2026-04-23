@@ -1,11 +1,10 @@
 use {
-    orbyte::{Orbyte},
     crate::internal::{
         hash::{Hash, Hasher},
     }
 };
 
-#[derive(Debug, Eq, Orbyte)]
+#[derive(Debug, Eq)]
 pub struct Delimited<Delimiter, Item> {
     pub start: Delimiter,
     pub members: Vec<Item>,
@@ -13,26 +12,26 @@ pub struct Delimited<Delimiter, Item> {
     pub end: Delimiter,
 }
 
-#[derive(Debug, Eq, Orbyte)]
+#[derive(Debug, Eq)]
 pub struct Binary<Left, Operator, Right> {
     pub left: Left,
     pub operator: Operator,
     pub right: Right,
 }
 
-#[derive(Debug, Eq, Orbyte)]
+#[derive(Debug, Eq)]
 pub struct Unary<Operator, Operand> {
     pub operator: Operator,
     pub operand: Operand,
 }
 
-#[derive(Debug, Eq, Orbyte)]
+#[derive(Debug, Eq)]
 pub struct Index<Target, Value> {
     pub target: Target,
     pub members: Vec<Value>,
 }
 
-#[derive(Debug, Eq, Orbyte)]
+#[derive(Debug, Eq)]
 pub struct Invoke<Target, Argument> {
     pub target: Target,
     pub members: Vec<Argument>,

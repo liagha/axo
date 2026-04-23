@@ -44,6 +44,8 @@ pub enum Value {
 
 #[derive(Clone, Debug)]
 pub enum Opcode {
+    Mark,
+    Restore(Scale),
     Push(Value),
     Pop,
     Add,
@@ -111,8 +113,15 @@ pub struct Frame {
     pub locals: Vec<Value>,
 }
 
+#[derive(Clone, Debug)]
+pub struct CompilationUnit<'a> {
+    pub stem: Str<'a>,
+    pub analyses: Vec<Analysis<'a>>,
+}
+
 pub struct Interpreter<'a> {
     pub stack: Vec<Value>,
+    pub marks: Vec<Address>,
     pub frames: Vec<Frame>,
     pub memory: Vec<Value>,
     pub code: Vec<Instruction>,
@@ -121,7 +130,8 @@ pub struct Interpreter<'a> {
     pub calls: Map<Identity, Vec<(Type<'a>, Call)>>,
     pub values: Map<Str<'a>, Value>,
     pub function_frames: Map<Address, (Address, Scale, Scale)>,
-    pub modules: Map<Str<'a>, Vec<Analysis<'a>>>,
+    pub modules: Map<Str<'a>, ()>,
+    pub units: Vec<CompilationUnit<'a>>,
     pub current_module: Str<'a>,
     pub pending: Vec<(Address, Identity, Type<'a>)>,
     pub loops: Vec<(Address, Vec<Address>)>,
@@ -134,6 +144,7 @@ impl<'a> Interpreter<'a> {
     pub fn new(capacity: Scale) -> Self {
         Self {
             stack: Vec::new(),
+            marks: Vec::new(),
             frames: Vec::new(),
             memory: vec![Value::Empty; capacity],
             code: Vec::new(),
@@ -143,6 +154,7 @@ impl<'a> Interpreter<'a> {
             values: Map::new(),
             function_frames: Map::new(),
             modules: Map::new(),
+            units: Vec::new(),
             current_module: Str::default(),
             pending: Vec::new(),
             loops: Vec::new(),
@@ -178,6 +190,7 @@ impl<'a> Interpreter<'a> {
 
     pub fn reset(&mut self) {
         self.stack.clear();
+        self.marks.clear();
         self.frames.clear();
         self.memory.fill(Value::Empty);
         self.code.clear();
@@ -185,6 +198,7 @@ impl<'a> Interpreter<'a> {
         self.values.clear();
         self.function_frames.clear();
         self.modules.clear();
+        self.units.clear();
         self.pending.clear();
         self.loops.clear();
         self.memory_top = 0;
@@ -238,11 +252,20 @@ impl<'a> Interpreter<'a> {
         Ok(())
     }
 
+    pub fn begin(&mut self, start: Address) {
+        self.pointer = start;
+        self.stack.clear();
+        self.marks.clear();
+        self.frames.clear();
+    }
+
     fn step(&mut self) -> Result<(), InterpretError<'a>> {
         let instruction = self.code[self.pointer].clone();
         self.pointer += 1;
 
         match instruction.opcode {
+            Opcode::Mark => self.marks.push(self.stack.len()),
+            Opcode::Restore(count) => self.restore(count),
             Opcode::Push(value) => self.stack.push(value),
             Opcode::Pop => self.pop()?,
             Opcode::Add => self.add()?,
@@ -285,6 +308,25 @@ impl<'a> Interpreter<'a> {
         }
 
         Ok(())
+    }
+
+    fn restore(&mut self, count: Scale) {
+        let Some(mark) = self.marks.pop() else {
+            return;
+        };
+
+        let available = self.stack.len().saturating_sub(mark);
+        let keep = count.min(available);
+
+        if keep == 0 {
+            self.stack.truncate(mark);
+            return;
+        }
+
+        let start = self.stack.len() - keep;
+        let values: Vec<_> = self.stack.drain(start..).collect();
+        self.stack.truncate(mark);
+        self.stack.extend(values);
     }
 
     fn pop(&mut self) -> Result<(), InterpretError<'a>> {
