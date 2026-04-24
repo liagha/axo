@@ -1,9 +1,8 @@
-use std::num::{IntErrorKind, ParseFloatError};
 use crate::{
     format::{Debug, Display, Formatter, Result},
     scanner::Character,
     tracker::TrackError,
-    data::ParseIntError
+    data::{ParseIntError, ParseFloatError, IntErrorKind}
 };
 
 #[derive(Clone, Eq, Hash, PartialEq)]

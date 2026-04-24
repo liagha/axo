@@ -6,6 +6,7 @@ use crate::{
         session::{
             ANALYZE_STAGE, INTERPRET_STAGE, PARSE_STAGE, RESOLVE_STAGE, SCAN_STAGE,
         },
+        time::Instant,
         Record, RecordKind, Session,
     },
     interpreter,
@@ -46,10 +47,6 @@ impl Dialog {
                 input.pop();
             }
 
-            if !input.trim().is_empty() {
-                self.history.push(input.clone());
-            }
-
             return Some(input);
         }
 
@@ -78,6 +75,35 @@ impl Dialog {
                         let _ = disable_raw_mode();
                         println!();
                         return None;
+                    }
+                    KeyCode::Char('l') if modifiers.contains(KeyModifiers::CONTROL) => {
+                        print!("\x1B[2J\x1B[1;1H");
+                        render(&buffer, cursor);
+                    }
+                    KeyCode::Char('w') if modifiers.contains(KeyModifiers::CONTROL) => {
+                        while cursor > 0 && buffer[cursor - 1].is_whitespace() {
+                            cursor -= 1;
+                            buffer.remove(cursor);
+                        }
+                        while cursor > 0 && !buffer[cursor - 1].is_whitespace() {
+                            cursor -= 1;
+                            buffer.remove(cursor);
+                        }
+                        render(&buffer, cursor);
+                    }
+                    KeyCode::Home => {
+                        cursor = 0;
+                        render(&buffer, cursor);
+                    }
+                    KeyCode::End => {
+                        cursor = buffer.len();
+                        render(&buffer, cursor);
+                    }
+                    KeyCode::Delete => {
+                        if cursor < buffer.len() {
+                            buffer.remove(cursor);
+                            render(&buffer, cursor);
+                        }
                     }
                     KeyCode::Backspace => {
                         if cursor > 0 {
@@ -133,12 +159,7 @@ impl Dialog {
         let _ = disable_raw_mode();
         println!();
 
-        let result: String = buffer.into_iter().collect();
-        if !result.trim().is_empty() {
-            self.history.push(result.clone());
-        }
-
-        Some(result)
+        Some(buffer.into_iter().collect())
     }
 
     pub fn refresh<'a>(
@@ -244,16 +265,61 @@ impl Dialog {
         Self::refresh(&mut session, Some(&mut core), &keys);
 
         let mut terminal = Self::new();
+        let mut timing = false;
+
+        let is_closed = |text: &str| -> bool {
+            let mut braces = 0;
+            let mut parens = 0;
+            let mut string = false;
+            let mut escape = false;
+
+            for item in text.chars() {
+                if escape {
+                    escape = false;
+                    continue;
+                }
+                match item {
+                    '\\' => escape = true,
+                    '"' => string = !string,
+                    '{' if !string => braces += 1,
+                    '}' if !string => braces -= 1,
+                    '(' if !string => parens += 1,
+                    ')' if !string => parens -= 1,
+                    _ => {}
+                }
+            }
+
+            braces <= 0 && parens <= 0 && !string
+        };
 
         loop {
-            let Some(input) = terminal.read("> ").map(Str::from) else {
-                break;
-            };
+            let mut content = String::new();
+            let mut prompt = "> ";
 
-            let trimmed = input.trim();
+            loop {
+                let Some(input) = terminal.read(prompt) else {
+                    return;
+                };
+
+                if content.is_empty() {
+                    content = input;
+                } else {
+                    content.push('\n');
+                    content.push_str(&input);
+                }
+
+                if is_closed(&content) {
+                    break;
+                }
+                prompt = ". ";
+            }
+
+            let trimmed = content.trim();
             if trimmed.is_empty() {
                 continue;
             }
+
+            terminal.history.push(trimmed.to_string());
 
             if trimmed.starts_with(':') {
                 let mut parts = trimmed.split_whitespace();
@@ -277,6 +343,17 @@ impl Dialog {
                             }
                         }
                     }
+                    ":clear" => {
+                        print!("\x1B[2J\x1B[1;1H");
+                        let _ = stdout().flush();
+                    }
+                    ":time" => {
+                        timing = !timing;
+                        println!("{}", timing);
+                    }
+                    ":help" => {
+                        println!(":history  :cd  :ls  :clear  :time  :help  :exit  :q");
+                    }
                     ":exit" | ":q" => break,
                     _ => {}
                 }
@@ -286,16 +363,24 @@ impl Dialog {
             let identity = session.records.len() | 0x40000000;
             let location = Location::from("dialog");
             let mut record = Record::new(RecordKind::Source, location);
-            record.set_content(input);
+            record.set_content(Str::from(content));
             session.records.insert(identity, record);
 
             Self::refresh(&mut session, None, &[identity]);
 
             if session.errors.is_empty() {
-                if let Ok(Some(result)) = Interpreter::execute_line(&session, &mut core, identity) {
+                let start = Instant::now();
+                let outcome = Interpreter::execute_line(&session, &mut core, identity);
+                let elapsed = start.elapsed();
+
+                if let Ok(Some(result)) = outcome {
                     if !matches!(result, interpreter::Value::Empty) {
                         println!("{:?}", result);
                     }
+                }
+
+                if timing {
+                    println!("{:?}", elapsed);
                 }
             } else {
                 session.records.remove(&identity);

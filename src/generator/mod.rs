@@ -208,7 +208,7 @@ Combinator<
 
                 record.store(5, Artifact::Object(object));
 
-                let mut command = std::process::Command::new("clang");
+                let mut command = Command::new("clang");
                 if let Some(t) = &target_str {
                     command.arg("-target").arg(t);
                 }
@@ -227,7 +227,7 @@ Combinator<
             }
         }
 
-        let mut link = std::process::Command::new("clang");
+        let mut link = Command::new("clang");
         if let Some(t) = &target_str {
             link.arg("-target").arg(t);
         }

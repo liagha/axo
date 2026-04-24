@@ -13,7 +13,7 @@ use {
         identifier,
         internal::{
             hash::{DefaultHasher, Hash, Hasher},
-            platform::{Lock},
+            platform::{Lock, Command},
             time::{Duration, Instant, UNIX_EPOCH},
         },
         literal, module,
@@ -577,7 +577,7 @@ impl<'session> Session<'session> {
                 let recompile = dirty || !library.exists();
 
                 if recompile {
-                    let mut command = std::process::Command::new("clang");
+                    let mut command = Command::new("clang");
                     let mut is_msvc = cfg!(target_env = "msvc");
 
                     if let Some(target) = self.get_target() {

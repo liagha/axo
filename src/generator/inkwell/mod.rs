@@ -19,7 +19,7 @@ pub use {
 use {
     crate::{
         analyzer::{Analysis, AnalysisKind},
-        data::Str,
+        data::{Str, NonZeroU32},
         generator::{GenerateError},
         internal::hash::Map,
         resolver::{Type, TypeKind},
@@ -262,7 +262,7 @@ impl<'backend> Generator<'backend> {
                 32 => self.context.i32_type().into(),
                 64 => self.context.i64_type().into(),
                 128 => self.context.i128_type().into(),
-                size => self.context.custom_width_int_type(std::num::NonZeroU32::new(*size as u32).unwrap()).unwrap().into(),
+                size => self.context.custom_width_int_type(NonZeroU32::new(*size as u32).unwrap()).unwrap().into(),
             },
             TypeKind::Float { size: bits } => match bits {
                 16 => self.context.f16_type().into(),
