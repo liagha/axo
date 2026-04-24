@@ -1,8 +1,9 @@
+use std::num::{IntErrorKind, ParseFloatError};
 use crate::{
     format::{Debug, Display, Formatter, Result},
     scanner::Character,
-    text::numeral::ParseNumberError,
     tracker::TrackError,
+    data::ParseIntError
 };
 
 #[derive(Clone, Eq, Hash, PartialEq)]
@@ -12,7 +13,16 @@ pub enum ErrorKind<'error> {
     Unterminated(&'static str),
     InvalidCharacter(CharacterError),
     InvalidEscape(EscapeError),
-    NumberParse(ParseNumberError),
+    NumberParse(ParseError),
+}
+
+#[derive(Clone, Eq, Hash, PartialEq)]
+pub enum ParseError {
+    Empty,
+    InvalidDigit,
+    PosOverflow,
+    NegOverflow,
+    Zero,
 }
 
 #[derive(Clone, Eq, Hash, PartialEq)]
@@ -59,3 +69,45 @@ impl<'error> Debug for ErrorKind<'error> {
         write!(f, "{}", self)
     }
 }
+
+impl Display for ParseError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
+        match self {
+            ParseError::Empty => {
+                write!(f, "value being parsed is empty..")
+            }
+            ParseError::InvalidDigit => {
+                write!(f, "contains an invalid digit in its context.")
+            }
+            ParseError::PosOverflow => {
+                write!(f, "value being parsed is too large.")
+            }
+            ParseError::NegOverflow => {
+                write!(f, "value being parsed is too small.")
+            }
+            ParseError::Zero => {
+                write!(f, "value being parsed is zero.")
+            }
+        }
+    }
+}
+
+impl Into<ParseError> for ParseIntError {
+    fn into(self) -> ParseError {
+        match self.kind() {
+            IntErrorKind::Empty => ParseError::Empty,
+            IntErrorKind::InvalidDigit => ParseError::InvalidDigit,
+            IntErrorKind::PosOverflow => ParseError::PosOverflow,
+            IntErrorKind::NegOverflow => ParseError::NegOverflow,
+            IntErrorKind::Zero => ParseError::Zero,
+            _ => unreachable!(),
+        }
+    }
+}
+
+impl Into<ParseError> for ParseFloatError {
+    fn into(self) -> ParseError {
+        ParseError::Empty
+    }
+}
+

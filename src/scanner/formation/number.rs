@@ -1,8 +1,7 @@
 use crate::{
     combinator::{Formation, Form},
-    data::{Float, Integer, Str},
+    data::{Float, Str},
     scanner::{Character, ErrorKind, ScanError, Scanner, Token, TokenKind},
-    text::parser,
     tracker::Spanned,
 };
 
@@ -36,17 +35,16 @@ impl<'a> Scanner<'a> {
                 let form = former.forms.get_mut(formation.form).unwrap();
                 let inputs = form.collect_inputs();
                 let span = inputs.span().clone();
-                let parser = parser::<Integer>();
                 let number: Str = inputs.into_iter().collect();
 
-                match parser.parse(&number) {
+                match number.parse() {
                     Ok(number) => {
                         *form = Form::output(Token::new(TokenKind::integer(number), span));
 
                         Ok(())
                     }
 
-                    Err(error) => Err(ScanError::new(ErrorKind::NumberParse(error), span)),
+                    Err(error) => Err(ScanError::new(ErrorKind::NumberParse(error.into()), span)),
                 }
             },
         )
@@ -70,17 +68,16 @@ impl<'a> Scanner<'a> {
                 let form = former.forms.get_mut(formation.form).unwrap();
                 let inputs = form.collect_inputs();
                 let span = inputs.span().clone();
-                let parser = parser::<Integer>();
                 let number: Str = inputs.into_iter().collect();
 
-                match parser.parse(&number) {
+                match number.parse() {
                     Ok(number) => {
                         *form = Form::output(Token::new(TokenKind::integer(number), span));
 
                         Ok(())
                     }
 
-                    Err(error) => Err(ScanError::new(ErrorKind::NumberParse(error), span)),
+                    Err(error) => Err(ScanError::new(ErrorKind::NumberParse(error.into()), span)),
                 }
             },
         )
@@ -104,17 +101,16 @@ impl<'a> Scanner<'a> {
                 let form = former.forms.get_mut(formation.form).unwrap();
                 let inputs = form.collect_inputs();
                 let span = inputs.span().clone();
-                let parser = parser::<Integer>();
                 let number: Str = inputs.into_iter().collect();
 
-                match parser.parse(&number) {
+                match number.parse() {
                     Ok(number) => {
                         *form = Form::output(Token::new(TokenKind::integer(number), span));
 
                         Ok(())
                     }
 
-                    Err(error) => Err(ScanError::new(ErrorKind::NumberParse(error), span)),
+                    Err(error) => Err(ScanError::new(ErrorKind::NumberParse(error.into()), span)),
                 }
             },
         )
@@ -152,9 +148,7 @@ impl<'a> Scanner<'a> {
                 let number: Str = inputs.into_iter().collect();
 
                 if number.contains(".") || number.to_lowercase().contains('e') {
-                    let parser = parser::<f64>();
-
-                    match parser.parse(&number) {
+                    match number.parse::<f64>() {
                         Ok(number) => {
                             *form = Form::output(Token::new(
                                 TokenKind::float(Float::from(number)),
@@ -164,19 +158,17 @@ impl<'a> Scanner<'a> {
                             Ok(())
                         }
 
-                        Err(error) => Err(ScanError::new(ErrorKind::NumberParse(error), span)),
+                        Err(error) => Err(ScanError::new(ErrorKind::NumberParse(error.into()), span)),
                     }
                 } else {
-                    let parser = parser::<Integer>();
-
-                    match parser.parse(&number) {
+                    match number.parse() {
                         Ok(number) => {
                             *form = Form::output(Token::new(TokenKind::integer(number), span));
 
                             Ok(())
                         }
 
-                        Err(error) => Err(ScanError::new(ErrorKind::NumberParse(error), span)),
+                        Err(error) => Err(ScanError::new(ErrorKind::NumberParse(error.into()), span)),
                     }
                 }
             },

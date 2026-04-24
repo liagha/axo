@@ -20,7 +20,6 @@ pub mod dialog;
 pub mod internal;
 pub mod reporter;
 
-pub mod text;
 
 pub mod tracker;
 

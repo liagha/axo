@@ -1,7 +1,6 @@
 use crate::{
     data::{Char, Str},
     scanner::Scanner,
-    text::{is_alphabetic, is_alphanumeric, is_numeric, is_whitespace},
     tracker::{Position, Span},
 };
 
@@ -28,19 +27,19 @@ impl<'character> Character {
     }
 
     pub fn is_numeric(&self) -> bool {
-        is_numeric(self.value)
+        self.value.is_numeric()
     }
 
     pub fn is_alphabetic(&self) -> bool {
-        is_alphabetic(self.value)
+        self.value.is_alphabetic()
     }
 
     pub fn is_alphanumeric(&self) -> bool {
-        is_alphanumeric(self.value)
+        self.value.is_alphanumeric()
     }
 
     pub fn is_whitespace(&self) -> bool {
-        is_whitespace(self.value)
+        self.value.is_whitespace()
     }
 }
 
