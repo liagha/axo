@@ -1,16 +1,14 @@
-use {
-    crate::{
-        analyzer::Analysis,
-        data::{
-            memory::{Arc, RefCell},
-            CString, Identity, Scale, Str,
-        },
-        internal::hash::Map,
-        interpreter::{error::ErrorKind, InterpretError},
-        reporter::Error,
-        resolver::Type,
-        tracker::Span,
+use crate::{
+    analyzer::Analysis,
+    data::{
+        memory::{Arc, RefCell},
+        CString, Identity, Scale, Str,
     },
+    internal::hash::Map,
+    interpreter::{error::ErrorKind, InterpretError},
+    reporter::Error,
+    resolver::Type,
+    tracker::Span,
 };
 
 pub type Native<'a> = fn(&[Value], Span) -> Result<Value, InterpretError<'a>>;
@@ -118,6 +116,7 @@ pub struct CompilationUnit<'a> {
     pub analyses: Vec<Analysis<'a>>,
 }
 
+#[derive(Clone)]
 pub struct Interpreter<'a> {
     pub stack: Vec<Value>,
     pub marks: Vec<Address>,
