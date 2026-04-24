@@ -1,3 +1,5 @@
+// src/combinator/mod.rs
+
 use crate::data::{
     memory::Arc,
     sync::{AtomicUsize, Ordering},
@@ -78,6 +80,14 @@ pub struct Deferred<State> {
 }
 
 pub struct Optional<State> {
+    pub state: Box<State>,
+}
+
+pub struct Snapshot<State> {
+    pub state: Box<State>,
+}
+
+pub struct Group<State> {
     pub state: Box<State>,
 }
 

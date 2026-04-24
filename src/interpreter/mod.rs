@@ -1,5 +1,3 @@
-#![allow(unused)]
-
 mod error;
 mod interpreter;
 mod translator;
@@ -20,7 +18,7 @@ use {
         resolver::{Type, TypeKind},
     },
     libffi::middle::{Arg, Cif, CodePtr, Type as FfiType},
-    libloading::{Library, Symbol},
+    libloading::{Library},
 };
 
 pub type InterpretError<'error> = Error<'error, ErrorKind>;
@@ -82,15 +80,6 @@ impl<'source> Combinator<
 }
 
 impl<'source> Interpreter<'source> {
-    fn member_name(typing: &Type<'source>) -> Option<Str<'source>> {
-        match &typing.kind {
-            TypeKind::Binding(binding) => Some(binding.target),
-            TypeKind::Function(function) if !function.target.is_empty() => Some(function.target),
-            TypeKind::Has(target) => Self::member_name(target),
-            _ => None,
-        }
-    }
-
     fn value_type(typing: &Type<'source>) -> Type<'source> {
         match &typing.kind {
             TypeKind::Binding(binding) => binding
@@ -110,7 +99,7 @@ impl<'source> Interpreter<'source> {
                 crate::scanner::TokenKind::Float(value) => Some(Value::Float(f64::from(*value))),
                 crate::scanner::TokenKind::Boolean(value) => Some(Value::Boolean(*value)),
                 crate::scanner::TokenKind::Character(value) => Some(Value::Character(*value as char)),
-                crate::scanner::TokenKind::String(value) => Some(Value::Text(value.to_string())),
+                crate::scanner::TokenKind::String(value) => Some(Value::String(value.to_string())),
                 _ => None,
             },
             _ => None,
@@ -421,7 +410,7 @@ fn build_closure(
                 }
                 NativeType::String => {
                     types.push(FfiType::pointer());
-                    if let Value::Text(v) = input {
+                    if let Value::String(v) = input {
                         if let Ok(string) = CString::new(v.clone()) {
                             strings.push(string);
                             values.push(FfiValue::Ptr(
@@ -488,10 +477,10 @@ fn build_closure(
             NativeType::String => {
                 let ret: *mut CChar = unsafe { cif.call(address, &args) };
                 if ret.is_null() {
-                    Ok(Value::Text(String::new()))
+                    Ok(Value::String(String::new()))
                 } else {
                     let text = unsafe { CStr::from_ptr(ret) };
-                    Ok(Value::Text(text.to_string_lossy().into_owned()))
+                    Ok(Value::String(text.to_string_lossy().into_owned()))
                 }
             }
             NativeType::Character => {

@@ -231,19 +231,6 @@ impl<'a> Interpreter<'a> {
         self.patch(bypass, Opcode::Jump(self.code.len()));
     }
 
-    fn member(&self, typing: &Type<'a>, field: &Str<'a>) -> bool {
-        match &value_type(typing).kind {
-            TypeKind::Pointer { target } => self.member(target, field),
-            TypeKind::Has(target) => member_name(target).is_some_and(|name| &name == field),
-            TypeKind::And(left, right) => self.member(left, field) || self.member(right, field),
-            TypeKind::Structure(aggregate) | TypeKind::Union(aggregate) => aggregate
-                .members
-                .iter()
-                .any(|member| member_name(member).is_some_and(|name| name == *field)),
-            _ => false,
-        }
-    }
-
     fn module(&self, analysis: &Analysis<'a>) -> bool {
         match &analysis.kind {
             AnalysisKind::Usage(name) => self.has_module(name),
@@ -373,7 +360,7 @@ impl<'a> Interpreter<'a> {
             AnalysisKind::Float { value, .. } => self.emit(Opcode::Push(Value::Float(f64::from(value))), span),
             AnalysisKind::Boolean { value } => self.emit(Opcode::Push(Value::Boolean(value)), span),
             AnalysisKind::Character { value } => self.emit(Opcode::Push(Value::Character(value as char)), span),
-            AnalysisKind::String { value } => self.emit(Opcode::Push(Value::Text(value.to_string())), span),
+            AnalysisKind::String { value } => self.emit(Opcode::Push(Value::String(value.to_string())), span),
             AnalysisKind::Array(elements) => {
                 let size = elements.len();
                 for element in elements {

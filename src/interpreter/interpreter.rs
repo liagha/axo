@@ -34,10 +34,9 @@ pub enum Value {
     Float(f64),
     Boolean(bool),
     Character(char),
-    Text(String),
+    String(String),
     Sequence(Vec<Value>),
     Structure(Identity, Vec<Value>),
-    Variant(Tag, Box<Value>),
     Pointer(Address),
     Empty,
 }
