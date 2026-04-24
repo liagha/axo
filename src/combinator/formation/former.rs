@@ -6,7 +6,6 @@ pub mod outcome {
         Failed,
         Blank,
         Ignored,
-        Custom(i8),
     }
 
     impl Outcome {
@@ -18,7 +17,6 @@ pub mod outcome {
                 Outcome::Aligned => 2,
                 Outcome::Ignored => 1,
                 Outcome::Blank => 0,
-                Outcome::Custom(v) => v,
             }
         }
 
@@ -69,7 +67,6 @@ pub mod outcome {
                 Outcome::Failed => 0,
                 Outcome::Blank => -1,
                 Outcome::Ignored => -2,
-                Outcome::Custom(value) => value,
             }
         }
     }
@@ -82,7 +79,7 @@ pub mod outcome {
                 0 => Outcome::Failed,
                 -1 => Outcome::Blank,
                 -2 => Outcome::Ignored,
-                value => Outcome::Custom(value),
+                _ => unreachable!(),
             }
         }
     }
