@@ -6,7 +6,7 @@ mod error;
 pub use {analysis::*, analyzer::*, error::*};
 
 use crate::{
-    combinator::{Action, Operation, Operator},
+    combinator::{Combinator, Operation, Operator},
     data::memory::Arc,
     internal::{platform::Lock, Session},
     reporter::Error,
@@ -15,13 +15,13 @@ use crate::{
 pub type AnalyzeError<'error> = Error<'error, ErrorKind<'error>>;
 
 impl<'source>
-Action<
+Combinator<
     'static,
     Operator<Arc<Lock<Session<'source>>>>,
     Operation<'source, Arc<Lock<Session<'source>>>>,
 > for Analyzer<'source>
 {
-    fn action(
+    fn combinator(
         &self,
         operator: &mut Operator<Arc<Lock<Session<'source>>>>,
         operation: &mut Operation<'source, Arc<Lock<Session<'source>>>>,

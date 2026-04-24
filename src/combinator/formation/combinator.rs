@@ -1,5 +1,5 @@
 use crate::combinator::{
-    outcome::Outcome, Action, Alternative, Deferred, Fail, Form, Formable, Formation, Former,
+    outcome::Outcome, Combinator, Alternative, Deferred, Fail, Form, Formable, Formation, Former,
     Ignore, Literal, Memo, Multiple, Optional, Panic, Predicate, Record, Recover, Repetition,
     Sequence, Skip, Transform,
 };
@@ -34,7 +34,7 @@ fn push_input<'a, 'source, Source, Input, Output, Failure>(
 }
 
 impl<'a, 'source, Source, Input, Output, Failure>
-Action<
+Combinator<
     'a,
     Former<'a, 'source, Source, Input, Output, Failure>,
     Formation<'a, 'source, Source, Input, Output, Failure>,
@@ -53,19 +53,19 @@ where
     Failure: Formable<'a>,
 {
     #[inline]
-    fn action(
+    fn combinator(
         &self,
         former: &mut Former<'a, 'source, Source, Input, Output, Failure>,
         formation: &mut Formation<'a, 'source, Source, Input, Output, Failure>,
     ) {
-        for action in self.actions.iter() {
-            action.action(former, formation);
+        for combinator in self.combinators.iter() {
+            combinator.combinator(former, formation);
         }
     }
 }
 
 impl<'a, 'source, Source, Input, Output, Failure>
-Action<
+Combinator<
     'a,
     Former<'a, 'source, Source, Input, Output, Failure>,
     Formation<'a, 'source, Source, Input, Output, Failure>,
@@ -78,7 +78,7 @@ where
     Failure: Formable<'a>,
 {
     #[inline]
-    fn action(
+    fn combinator(
         &self,
         former: &mut Former<'a, 'source, Source, Input, Output, Failure>,
         formation: &mut Formation<'a, 'source, Source, Input, Output, Failure>,
@@ -97,7 +97,7 @@ where
 }
 
 impl<'a, 'source, Source, Input, Output, Failure>
-Action<
+Combinator<
     'a,
     Former<'a, 'source, Source, Input, Output, Failure>,
     Formation<'a, 'source, Source, Input, Output, Failure>,
@@ -110,7 +110,7 @@ where
     Failure: Formable<'a>,
 {
     #[inline]
-    fn action(
+    fn combinator(
         &self,
         former: &mut Former<'a, 'source, Source, Input, Output, Failure>,
         formation: &mut Formation<'a, 'source, Source, Input, Output, Failure>,
@@ -129,7 +129,7 @@ where
 }
 
 impl<'a, 'source, Source, Input, Output, Failure, const SIZE: Scale>
-Action<
+Combinator<
     'a,
     Former<'a, 'source, Source, Input, Output, Failure>,
     Formation<'a, 'source, Source, Input, Output, Failure>,
@@ -142,7 +142,7 @@ where
     Failure: Formable<'a>,
 {
     #[inline]
-    fn action(
+    fn combinator(
         &self,
         former: &mut Former<'a, 'source, Source, Input, Output, Failure>,
         formation: &mut Formation<'a, 'source, Source, Input, Output, Failure>,
@@ -156,7 +156,7 @@ where
 
         for (index, state) in self.states.iter().enumerate() {
             let mut child = Formation::create(
-                state.action.clone(),
+                state.combinator.clone(),
                 formation.marker,
                 formation.state,
                 consumed,
@@ -248,7 +248,7 @@ where
 }
 
 impl<'a, 'source, Source, Input, Output, Failure>
-Action<
+Combinator<
     'a,
     Former<'a, 'source, Source, Input, Output, Failure>,
     Formation<'a, 'source, Source, Input, Output, Failure>,
@@ -261,7 +261,7 @@ where
     Failure: Formable<'a>,
 {
     #[inline]
-    fn action(
+    fn combinator(
         &self,
         former: &mut Former<'a, 'source, Source, Input, Output, Failure>,
         formation: &mut Formation<'a, 'source, Source, Input, Output, Failure>,
@@ -307,12 +307,12 @@ where
             return;
         }
 
-        let action = match former.stash.iter().find(|(item, _)| *item == id) {
-            Some((_, action)) => action.clone(),
+        let combinator = match former.stash.iter().find(|(item, _)| *item == id) {
+            Some((_, combinator)) => combinator.clone(),
             None => {
                 let state = (self.factory)();
-                former.stash.push((id, state.action.clone()));
-                state.action
+                former.stash.push((id, state.combinator.clone()));
+                state.combinator
             }
         };
 
@@ -327,7 +327,7 @@ where
         );
 
         let mut child = Formation::create(
-            action,
+            combinator,
             formation.marker,
             formation.state,
             consumed,
@@ -382,7 +382,7 @@ where
 }
 
 impl<'a, 'source, Source, Input, Output, Failure>
-Action<
+Combinator<
     'a,
     Former<'a, 'source, Source, Input, Output, Failure>,
     Formation<'a, 'source, Source, Input, Output, Failure>,
@@ -395,7 +395,7 @@ where
     Failure: Formable<'a>,
 {
     #[inline]
-    fn action(
+    fn combinator(
         &self,
         former: &mut Former<'a, 'source, Source, Input, Output, Failure>,
         formation: &mut Formation<'a, 'source, Source, Input, Output, Failure>,
@@ -407,7 +407,7 @@ where
             formation.stack.len(),
         );
 
-        let mut child = formation.create_child(self.state.action.clone());
+        let mut child = formation.create_child(self.state.combinator.clone());
         former.build(&mut child);
 
         let panicked = child.is_panicked();
@@ -437,7 +437,7 @@ where
 }
 
 impl<'a, 'source, Source, Input, Output, Failure, const SIZE: Scale>
-Action<
+Combinator<
     'a,
     Former<'a, 'source, Source, Input, Output, Failure>,
     Formation<'a, 'source, Source, Input, Output, Failure>,
@@ -450,7 +450,7 @@ where
     Failure: Formable<'a>,
 {
     #[inline]
-    fn action(
+    fn combinator(
         &self,
         former: &mut Former<'a, 'source, Source, Input, Output, Failure>,
         formation: &mut Formation<'a, 'source, Source, Input, Output, Failure>,
@@ -471,7 +471,7 @@ where
 
         for state in &self.states {
             let mut child = Formation::create(
-                state.action.clone(),
+                state.combinator.clone(),
                 formation.marker,
                 formation.state,
                 consumed,
@@ -543,7 +543,7 @@ where
 }
 
 impl<'a, 'source, Source, Input, Output, Failure>
-Action<
+Combinator<
     'a,
     Former<'a, 'source, Source, Input, Output, Failure>,
     Formation<'a, 'source, Source, Input, Output, Failure>,
@@ -556,7 +556,7 @@ where
     Failure: Formable<'a>,
 {
     #[inline]
-    fn action(
+    fn combinator(
         &self,
         former: &mut Former<'a, 'source, Source, Input, Output, Failure>,
         formation: &mut Formation<'a, 'source, Source, Input, Output, Failure>,
@@ -583,7 +583,7 @@ where
             );
 
             let mut child = Formation::create(
-                self.state.action.clone(),
+                self.state.combinator.clone(),
                 formation.marker,
                 formation.state,
                 consumed,
@@ -680,7 +680,7 @@ where
 }
 
 impl<'a, 'source, Source, Input, Output, Failure>
-Action<
+Combinator<
     'a,
     Former<'a, 'source, Source, Input, Output, Failure>,
     Formation<'a, 'source, Source, Input, Output, Failure>,
@@ -701,7 +701,7 @@ where
     Failure: Formable<'a>,
 {
     #[inline]
-    fn action(
+    fn combinator(
         &self,
         former: &mut Former<'a, 'source, Source, Input, Output, Failure>,
         formation: &mut Formation<'a, 'source, Source, Input, Output, Failure>,
@@ -758,7 +758,7 @@ where
 }
 
 impl<'a, 'source, Source, Input, Output, Failure>
-Action<
+Combinator<
     'a,
     Former<'a, 'source, Source, Input, Output, Failure>,
     Formation<'a, 'source, Source, Input, Output, Failure>,
@@ -771,7 +771,7 @@ where
     Failure: Formable<'a>,
 {
     #[inline]
-    fn action(
+    fn combinator(
         &self,
         _former: &mut Former<'a, 'source, Source, Input, Output, Failure>,
         formation: &mut Formation<'a, 'source, Source, Input, Output, Failure>,
@@ -784,7 +784,7 @@ where
 }
 
 impl<'a, 'source, Source, Input, Output, Failure>
-Action<
+Combinator<
     'a,
     Former<'a, 'source, Source, Input, Output, Failure>,
     Formation<'a, 'source, Source, Input, Output, Failure>,
@@ -797,7 +797,7 @@ where
     Failure: Formable<'a>,
 {
     #[inline]
-    fn action(
+    fn combinator(
         &self,
         _former: &mut Former<'a, 'source, Source, Input, Output, Failure>,
         formation: &mut Formation<'a, 'source, Source, Input, Output, Failure>,
@@ -810,7 +810,7 @@ where
 }
 
 impl<'a, 'source, Source, Input, Output, Failure>
-Action<
+Combinator<
     'a,
     Former<'a, 'source, Source, Input, Output, Failure>,
     Formation<'a, 'source, Source, Input, Output, Failure>,
@@ -830,7 +830,7 @@ where
     Failure: Formable<'a>,
 {
     #[inline]
-    fn action(
+    fn combinator(
         &self,
         former: &mut Former<'a, 'source, Source, Input, Output, Failure>,
         formation: &mut Formation<'a, 'source, Source, Input, Output, Failure>,
@@ -848,7 +848,7 @@ where
 }
 
 impl<'a, 'source, Source, Input, Output, Failure>
-Action<
+Combinator<
     'a,
     Former<'a, 'source, Source, Input, Output, Failure>,
     Formation<'a, 'source, Source, Input, Output, Failure>,
@@ -868,7 +868,7 @@ where
     Failure: Formable<'a>,
 {
     #[inline]
-    fn action(
+    fn combinator(
         &self,
         former: &mut Former<'a, 'source, Source, Input, Output, Failure>,
         formation: &mut Formation<'a, 'source, Source, Input, Output, Failure>,
@@ -886,7 +886,7 @@ where
 }
 
 impl<'a, 'source, Source, Input, Output, Failure>
-Action<
+Combinator<
     'a,
     Former<'a, 'source, Source, Input, Output, Failure>,
     Formation<'a, 'source, Source, Input, Output, Failure>,
@@ -906,7 +906,7 @@ where
     Failure: Formable<'a>,
 {
     #[inline]
-    fn action(
+    fn combinator(
         &self,
         former: &mut Former<'a, 'source, Source, Input, Output, Failure>,
         formation: &mut Formation<'a, 'source, Source, Input, Output, Failure>,

@@ -4,41 +4,36 @@ use {
         data::{Number, Str},
         format::Display,
         internal::Record,
-        reporter::{Failure, Hint},
+        reporter::{Failure},
         tracker::Span,
     },
     broccli::{Color, TextStyle},
 };
 
 #[derive(Clone, Eq, Hash, PartialEq)]
-pub struct Error<'error, K, H = Str<'error>>
+pub struct Error<'error, K>
 where
     K: Clone + Display,
-    H: Clone + Display,
 {
     pub kind: K,
     pub span: Span,
-    pub hints: Vec<Hint<H>>,
     pub phantom: PhantomData<&'error ()>,
 }
 
-impl<'error, K, H> Failure for Error<'error, K, H>
+impl<'error, K> Failure for Error<'error, K>
 where
     K: Clone + Display,
-    H: Clone + Display,
 {
 }
 
-impl<'error, K, H> Error<'error, K, H>
+impl<'error, K> Error<'error, K>
 where
     K: Clone + Display,
-    H: Clone + Display,
 {
     pub fn new(kind: K, span: Span) -> Self {
         Self {
             kind,
             span,
-            hints: Vec::new(),
             phantom: PhantomData,
         }
     }
@@ -88,10 +83,6 @@ where
             if !mark.is_empty() {
                 details.push_str(&format!("{}|  {}\n", " ".repeat(max), mark.colorize(Color::Red)));
             }
-        }
-
-        for hint in &self.hints {
-            details.push_str(format!("{}: {}", "hint".colorize(Color::Blue), hint.message).as_str());
         }
 
         (message, Str::from(details))

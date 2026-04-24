@@ -9,7 +9,7 @@ pub use {error::*, interpreter::*};
 use {
     crate::{
         analyzer::{Analysis, AnalysisKind},
-        combinator::{Action, Operation, Operator},
+        combinator::{Combinator, Operation, Operator},
         data::{memory::{null_mut, Arc}, CString, Function, Identity, Interface, Str},
         internal::{
             foreign::{CChar, CStr, CVoid},
@@ -38,23 +38,23 @@ enum NativeType {
     U8,
 }
 
-pub struct InterpretAction<'source> {
+pub struct InterpretCombinator<'source> {
     pub core: Arc<Lock<Interpreter<'source>>>,
 }
 
-impl<'source> InterpretAction<'source> {
+impl<'source> InterpretCombinator<'source> {
     pub fn new(core: Arc<Lock<Interpreter<'source>>>) -> Self {
         Self { core }
     }
 }
 
-impl<'source> Action<
+impl<'source> Combinator<
     'static,
     Operator<Arc<Lock<Session<'source>>>>,
     Operation<'source, Arc<Lock<Session<'source>>>>,
-> for InterpretAction<'source>
+> for InterpretCombinator<'source>
 {
-    fn action(
+    fn combinator(
         &self,
         operator: &mut Operator<Arc<Lock<Session<'source>>>>,
         operation: &mut Operation<'source, Arc<Lock<Session<'source>>>>,

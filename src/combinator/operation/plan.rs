@@ -1,5 +1,5 @@
 use crate::{
-    combinator::{Action, Operation, Operator, Status},
+    combinator::{Combinator, Operation, Operator, Status},
     data::memory::take,
     internal::platform::scope,
 };
@@ -8,9 +8,9 @@ pub struct Plan<'source, Store = ()> {
     pub states: Vec<Operation<'source, Store>>,
 }
 
-impl<'source, Store: Clone + Send + Sync + 'source> Action<'static, Operator<Store>, Operation<'source, Store>> for Plan<'source, Store> {
+impl<'source, Store: Clone + Send + Sync + 'source> Combinator<'static, Operator<Store>, Operation<'source, Store>> for Plan<'source, Store> {
     #[inline]
-    fn action(&self, operator: &mut Operator<Store>, operation: &mut Operation<'source, Store>) {
+    fn combinator(&self, operator: &mut Operator<Store>, operation: &mut Operation<'source, Store>) {
         let mut all_resolved = true;
         let mut any_rejected = false;
         let mut final_payload = take(&mut operation.payload);
@@ -18,7 +18,7 @@ impl<'source, Store: Clone + Send + Sync + 'source> Action<'static, Operator<Sto
         for state in &self.states {
             let mut child = Operation::create(
                 state.identity,
-                state.action.clone(),
+                state.combinator.clone(),
                 Status::Pending,
                 operation.depth + 1,
                 take(&mut operation.stack),
@@ -54,9 +54,9 @@ pub struct Parallel<'source, Store = ()> {
     pub states: Vec<Operation<'source, Store>>,
 }
 
-impl<'source, Store: Clone + Send + Sync + 'source> Action<'static, Operator<Store>, Operation<'source, Store>> for Parallel<'source, Store> {
+impl<'source, Store: Clone + Send + Sync + 'source> Combinator<'static, Operator<Store>, Operation<'source, Store>> for Parallel<'source, Store> {
     #[inline]
-    fn action(&self, operator: &mut Operator<Store>, operation: &mut Operation<'source, Store>) {
+    fn combinator(&self, operator: &mut Operator<Store>, operation: &mut Operation<'source, Store>) {
         let mut all_resolved = true;
         let mut any_rejected = false;
         let mut final_payload = take(&mut operation.payload);
@@ -68,7 +68,7 @@ impl<'source, Store: Clone + Send + Sync + 'source> Action<'static, Operator<Sto
             for state in &self.states {
                 let mut child = Operation::create(
                     state.identity,
-                    state.action.clone(),
+                    state.combinator.clone(),
                     Status::Pending,
                     operation.depth + 1,
                     stack.clone(),

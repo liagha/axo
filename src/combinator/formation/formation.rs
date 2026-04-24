@@ -1,7 +1,7 @@
 use crate::{
     combinator::{
         formation::former::outcome::Outcome, Former,
-        next_identity, Action, Alternative, Deferred, Fail, Formable, Ignore, Literal,
+        next_identity, Combinator, Alternative, Deferred, Fail, Formable, Ignore, Literal,
         Multiple, Optional, Panic, Predicate, Recover, Repetition, Sequence, Skip, Transform,
     },
     data::{
@@ -20,8 +20,8 @@ where
     Failure: Formable<'a>,
 {
     pub identity: Identity,
-    pub action:
-        Arc<dyn Action<'a, Former<'a, 'source, Source, Input, Output, Failure>, Self> + Send + Sync + 'source>,
+    pub combinator:
+        Arc<dyn Combinator<'a, Former<'a, 'source, Source, Input, Output, Failure>, Self> + Send + Sync + 'source>,
     pub marker: Offset,
     pub state: Source::State,
     pub consumed: Vec<Identity>,
@@ -42,15 +42,15 @@ where
 {
     #[inline]
     pub fn new(
-        action: Arc<
-            dyn Action<'a, Former<'a, 'source, Source, Input, Output, Failure>, Self> + Send + Sync + 'source,
+        combinator: Arc<
+            dyn Combinator<'a, Former<'a, 'source, Source, Input, Output, Failure>, Self> + Send + Sync + 'source,
         >,
         marker: Offset,
         state: Source::State,
     ) -> Self {
         Self {
             identity: next_identity(),
-            action,
+            combinator,
             marker,
             state,
             consumed: Vec::new(),
@@ -63,8 +63,8 @@ where
 
     #[inline]
     pub(super) fn create(
-        action: Arc<
-            dyn Action<'a, Former<'a, 'source, Source, Input, Output, Failure>, Self> + Send + Sync + 'source,
+        combinator: Arc<
+            dyn Combinator<'a, Former<'a, 'source, Source, Input, Output, Failure>, Self> + Send + Sync + 'source,
         >,
         marker: Offset,
         state: Source::State,
@@ -76,7 +76,7 @@ where
     ) -> Self {
         Self {
             identity: next_identity(),
-            action,
+            combinator,
             marker,
             state,
             consumed,
@@ -90,13 +90,13 @@ where
     #[inline]
     pub(super) fn create_child(
         &mut self,
-        action: Arc<
-            dyn Action<'a, Former<'a, 'source, Source, Input, Output, Failure>, Self> + Send + Sync + 'source,
+        combinator: Arc<
+            dyn Combinator<'a, Former<'a, 'source, Source, Input, Output, Failure>, Self> + Send + Sync + 'source,
         >,
     ) -> Self {
         Self {
             identity: next_identity(),
-            action,
+            combinator,
             marker: self.marker,
             state: self.state,
             consumed: take(&mut self.consumed),
@@ -304,14 +304,14 @@ where
     }
 
     #[inline]
-    pub fn with_action(
+    pub fn with_combinator(
         mut self,
-        action: Arc<
-            dyn Action<'a, Former<'a, 'source, Source, Input, Output, Failure>, Self> + Send + Sync + 'source,
+        combinator: Arc<
+            dyn Combinator<'a, Former<'a, 'source, Source, Input, Output, Failure>, Self> + Send + Sync + 'source,
         >,
     ) -> Self {
-        let actions = vec![self.action.clone(), action];
-        self.action = Arc::new(Multiple { actions });
+        let combinators = vec![self.combinator.clone(), combinator];
+        self.combinator = Arc::new(Multiple { combinators });
         self
     }
 
@@ -326,7 +326,7 @@ where
         + Sync
         + 'source,
     {
-        self.with_action(Arc::new(Fail {
+        self.with_combinator(Arc::new(Fail {
             emitter: Arc::new(emitter),
             phantom: Default::default(),
         }))
@@ -334,17 +334,17 @@ where
 
     #[inline]
     pub fn with_ignore(self) -> Self {
-        self.with_action(Arc::new(Ignore))
+        self.with_combinator(Arc::new(Ignore))
     }
 
     #[inline]
     pub fn with_multiple(
         self,
-        actions: Vec<
-            Arc<dyn Action<'a, Former<'a, 'source, Source, Input, Output, Failure>, Self> + Send + Sync + 'source>,
+        combinators: Vec<
+            Arc<dyn Combinator<'a, Former<'a, 'source, Source, Input, Output, Failure>, Self> + Send + Sync + 'source>,
         >,
     ) -> Self {
-        self.with_action(Arc::new(Multiple { actions }))
+        self.with_combinator(Arc::new(Multiple { combinators }))
     }
 
     #[inline]
@@ -358,7 +358,7 @@ where
         + Sync
         + 'source,
     {
-        self.with_action(Self::panic(emitter))
+        self.with_combinator(Self::panic(emitter))
     }
 
     #[inline]
@@ -373,12 +373,12 @@ where
         + Sync
         + 'source,
     {
-        self.with_action(Self::recover(sync, emitter))
+        self.with_combinator(Self::recover(sync, emitter))
     }
 
     #[inline]
     pub fn with_skip(self) -> Self {
-        self.with_action(Arc::new(Skip))
+        self.with_combinator(Arc::new(Skip))
     }
 
     #[inline]
@@ -392,7 +392,7 @@ where
         + Sync
         + 'source,
     {
-        self.with_action(Self::transform(transform))
+        self.with_combinator(Self::transform(transform))
     }
 
     #[inline]
@@ -408,7 +408,7 @@ where
     #[inline]
     pub fn transform<T>(
         transformer: T,
-    ) -> Arc<dyn Action<'a, Former<'a, 'source, Source, Input, Output, Failure>, Self> + Send + Sync + 'source>
+    ) -> Arc<dyn Combinator<'a, Former<'a, 'source, Source, Input, Output, Failure>, Self> + Send + Sync + 'source>
     where
         T: Fn(
             &mut Former<'a, 'source, Source, Input, Output, Failure>,
@@ -427,7 +427,7 @@ where
     #[inline]
     pub fn fail<T>(
         emitter: T,
-    ) -> Arc<dyn Action<'a, Former<'a, 'source, Source, Input, Output, Failure>, Self> + Send + Sync + 'source>
+    ) -> Arc<dyn Combinator<'a, Former<'a, 'source, Source, Input, Output, Failure>, Self> + Send + Sync + 'source>
     where
         T: Fn(
             &mut Former<'a, 'source, Source, Input, Output, Failure>,
@@ -446,7 +446,7 @@ where
     #[inline]
     pub fn panic<T>(
         emitter: T,
-    ) -> Arc<dyn Action<'a, Former<'a, 'source, Source, Input, Output, Failure>, Self> + Send + Sync + 'source>
+    ) -> Arc<dyn Combinator<'a, Former<'a, 'source, Source, Input, Output, Failure>, Self> + Send + Sync + 'source>
     where
         T: Fn(
             &mut Former<'a, 'source, Source, Input, Output, Failure>,
@@ -466,7 +466,7 @@ where
     pub fn recover<S, E>(
         sync: S,
         emitter: E,
-    ) -> Arc<dyn Action<'a, Former<'a, 'source, Source, Input, Output, Failure>, Self> + Send + Sync + 'source>
+    ) -> Arc<dyn Combinator<'a, Former<'a, 'source, Source, Input, Output, Failure>, Self> + Send + Sync + 'source>
     where
         S: Fn(&Input) -> bool + Send + Sync + 'source,
         E: Fn(
@@ -485,23 +485,23 @@ where
     }
 
     #[inline]
-    pub fn ignore() -> Arc<dyn Action<'a, Former<'a, 'source, Source, Input, Output, Failure>, Self> + Send + Sync + 'source>
+    pub fn ignore() -> Arc<dyn Combinator<'a, Former<'a, 'source, Source, Input, Output, Failure>, Self> + Send + Sync + 'source>
     {
         Arc::new(Ignore)
     }
 
     #[inline]
     pub fn multiple(
-        actions: Vec<
-            Arc<dyn Action<'a, Former<'a, 'source, Source, Input, Output, Failure>, Self> + Send + Sync + 'source>,
+        combinators: Vec<
+            Arc<dyn Combinator<'a, Former<'a, 'source, Source, Input, Output, Failure>, Self> + Send + Sync + 'source>,
         >,
-    ) -> Arc<dyn Action<'a, Former<'a, 'source, Source, Input, Output, Failure>, Self> + Send + Sync + 'source>
+    ) -> Arc<dyn Combinator<'a, Former<'a, 'source, Source, Input, Output, Failure>, Self> + Send + Sync + 'source>
     {
-        Arc::new(Multiple { actions })
+        Arc::new(Multiple { combinators })
     }
 
     #[inline]
-    pub fn skip() -> Arc<dyn Action<'a, Former<'a, 'source, Source, Input, Output, Failure>, Self> + Send + Sync + 'source>
+    pub fn skip() -> Arc<dyn Combinator<'a, Former<'a, 'source, Source, Input, Output, Failure>, Self> + Send + Sync + 'source>
     {
         Arc::new(Skip)
     }

@@ -3,7 +3,7 @@ mod inkwell;
 
 use {
     crate::{
-        combinator::{Action, Operation, Operator},
+        combinator::{Combinator, Operation, Operator},
         data::{memory::Arc, Str},
         internal::{
             platform::{create_dir_all, Command, Lock},
@@ -18,16 +18,16 @@ pub use inkwell::*;
 
 pub type GenerateError<'error> = Error<'error, ErrorKind<'error>>;
 
-pub struct GenerateAction;
+pub struct GenerateCombinator;
 
 impl<'source>
-Action<
+Combinator<
     'static,
     Operator<Arc<Lock<Session<'source>>>>,
     Operation<'source, Arc<Lock<Session<'source>>>>,
-> for GenerateAction
+> for GenerateCombinator
 {
-    fn action(
+    fn combinator(
         &self,
         operator: &mut Operator<Arc<Lock<Session<'source>>>>,
         operation: &mut Operation<'source, Arc<Lock<Session<'source>>>>,
@@ -127,16 +127,16 @@ Action<
     }
 }
 
-pub struct EmitAction;
+pub struct EmitCombinator;
 
 impl<'source>
-Action<
+Combinator<
     'static,
     Operator<Arc<Lock<Session<'source>>>>,
     Operation<'source, Arc<Lock<Session<'source>>>>,
-> for EmitAction
+> for EmitCombinator
 {
-    fn action(
+    fn combinator(
         &self,
         operator: &mut Operator<Arc<Lock<Session<'source>>>>,
         operation: &mut Operation<'source, Arc<Lock<Session<'source>>>>,
@@ -282,16 +282,16 @@ Action<
     }
 }
 
-pub struct RunAction;
+pub struct RunCombinator;
 
 impl<'source>
-Action<
+Combinator<
     'static,
     Operator<Arc<Lock<Session<'source>>>>,
     Operation<'source, Arc<Lock<Session<'source>>>>,
-> for RunAction
+> for RunCombinator
 {
-    fn action(
+    fn combinator(
         &self,
         operator: &mut Operator<Arc<Lock<Session<'source>>>>,
         operation: &mut Operation<'source, Arc<Lock<Session<'source>>>>,

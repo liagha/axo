@@ -43,10 +43,10 @@ impl<'a> Interpreter<'a> {
         self.code[index].opcode = opcode;
     }
 
-    fn scope(&mut self, stem: Str<'a>, action: fn(&mut Self, Vec<Analysis<'a>>), analyses: Vec<Analysis<'a>>) {
+    fn scope(&mut self, stem: Str<'a>, combinator: fn(&mut Self, Vec<Analysis<'a>>), analyses: Vec<Analysis<'a>>) {
         let previous = self.current_module;
         self.current_module = stem;
-        action(self, analyses);
+        combinator(self, analyses);
         self.current_module = previous;
     }
 

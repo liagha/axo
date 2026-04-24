@@ -1,7 +1,7 @@
 use {
     crate::{
         combinator::{
-            next_identity, Action, Alternative, Command, Condition, Cycle, Multiple, Operator,
+            next_identity, Combinator, Alternative, Command, Condition, Cycle, Multiple, Operator,
             Plan, Repetition, Sequence, Transform, Trigger,
         },
         data::{memory::Arc, memory::PhantomData, Identity, Scale},
@@ -18,7 +18,7 @@ pub enum Status {
 
 pub struct Operation<'source, Store = ()> {
     pub identity: Identity,
-    pub action: Arc<dyn Action<'static, Operator<Store>, Self> + Send + Sync + 'source>,
+    pub combinator: Arc<dyn Combinator<'static, Operator<Store>, Self> + Send + Sync + 'source>,
     pub status: Status,
     pub depth: Scale,
     pub stack: Vec<Identity>,
@@ -67,11 +67,11 @@ impl<'source, Store> Operation<'source, Store> {
 impl<'source, Store: Clone + Send + Sync + 'source> Operation<'source, Store> {
     #[inline]
     pub fn new(
-        action: Arc<dyn Action<'static, Operator<Store>, Self> + Send + Sync + 'source>,
+        combinator: Arc<dyn Combinator<'static, Operator<Store>, Self> + Send + Sync + 'source>,
     ) -> Self {
         Self {
             identity: next_identity(),
-            action,
+            combinator,
             status: Status::Pending,
             depth: 0,
             stack: Vec::new(),
@@ -83,7 +83,7 @@ impl<'source, Store: Clone + Send + Sync + 'source> Operation<'source, Store> {
     #[inline]
     pub fn create(
         identity: Identity,
-        action: Arc<dyn Action<'static, Operator<Store>, Self> + Send + Sync + 'source>,
+        combinator: Arc<dyn Combinator<'static, Operator<Store>, Self> + Send + Sync + 'source>,
         status: Status,
         depth: Scale,
         stack: Vec<Identity>,
@@ -92,7 +92,7 @@ impl<'source, Store: Clone + Send + Sync + 'source> Operation<'source, Store> {
     ) -> Self {
         Self {
             identity,
-            action,
+            combinator,
             status,
             depth,
             stack,
@@ -108,27 +108,27 @@ impl<'source, Store: Clone + Send + Sync + 'source> Operation<'source, Store> {
 
     #[inline]
     pub fn delay(mut self, duration: Duration) -> Self {
-        self.action = Arc::new(Trigger {
+        self.combinator = Arc::new(Trigger {
             condition: Condition::Time(SystemTime::now() + duration),
-            action: self.action.clone(),
+            combinator: self.combinator.clone(),
         });
         self
     }
 
     #[inline]
     pub fn wait(mut self, time: SystemTime) -> Self {
-        self.action = Arc::new(Trigger {
+        self.combinator = Arc::new(Trigger {
             condition: Condition::Time(time),
-            action: self.action.clone(),
+            combinator: self.combinator.clone(),
         });
         self
     }
 
     #[inline]
     pub fn trigger(mut self, condition: Condition) -> Self {
-        self.action = Arc::new(Trigger {
+        self.combinator = Arc::new(Trigger {
             condition,
-            action: self.action.clone(),
+            combinator: self.combinator.clone(),
         });
         self
     }
@@ -177,9 +177,9 @@ impl<'source, Store: Clone + Send + Sync + 'source> Operation<'source, Store> {
 
     #[inline]
     pub fn multiple(
-        actions: Vec<Arc<dyn Action<'static, Operator<Store>, Self> + Send + Sync + 'source>>,
+        combinators: Vec<Arc<dyn Combinator<'static, Operator<Store>, Self> + Send + Sync + 'source>>,
     ) -> Self {
-        Self::new(Arc::new(Multiple { actions }))
+        Self::new(Arc::new(Multiple { combinators }))
     }
 
     #[inline]
@@ -189,10 +189,10 @@ impl<'source, Store: Clone + Send + Sync + 'source> Operation<'source, Store> {
 
     #[inline]
     pub fn map(mut state: Self, transform: fn(Vec<u8>) -> Vec<u8>) -> Self {
-        let action = state.action.clone();
-        state.action = Arc::new(Transform::<'static, 'source, Operator<Store>, Self, ()> {
+        let combinator = state.combinator.clone();
+        state.combinator = Arc::new(Transform::<'static, 'source, Operator<Store>, Self, ()> {
             transformer: Arc::new(move |operator, operation| {
-                action.action(operator, operation);
+                combinator.combinator(operator, operation);
                 if let Status::Resolved(data) = &operation.status {
                     operation.status = Status::Resolved(transform(data.clone()));
                 }

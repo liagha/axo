@@ -214,7 +214,7 @@ impl<'a> Scanner<'a> {
 
     fn fallback<'source>() -> Formation<'a, 'source, Self, Character, Token<'a>, ScanError<'a>>
     {
-        Formation::with_action(
+        Formation::with_combinator(
             Formation::anything(),
             Formation::fail(|former, formation| {
                 let form = former.forms.get_mut(formation.form).unwrap();

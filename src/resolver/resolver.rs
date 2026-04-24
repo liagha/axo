@@ -85,17 +85,17 @@ impl<'a> Resolver<'a> {
         }
     }
 
-    pub fn nest<T>(&mut self, action: impl FnOnce(&mut Self) -> T) -> (T, Scope) {
+    pub fn nest<T>(&mut self, combinator: impl FnOnce(&mut Self) -> T) -> (T, Scope) {
         self.enter();
-        let value = action(self);
+        let value = combinator(self);
         let active = self.active;
         self.exit();
         (value, self.scopes.remove(&active).unwrap())
     }
 
-    pub fn within<T>(&mut self, scope: Scope, action: impl FnOnce(&mut Self) -> T) -> (T, Scope) {
+    pub fn within<T>(&mut self, scope: Scope, combinator: impl FnOnce(&mut Self) -> T) -> (T, Scope) {
         self.enter_scope(scope);
-        let value = action(self);
+        let value = combinator(self);
         let active = self.active;
         self.exit();
         (value, self.scopes.remove(&active).unwrap())
@@ -172,7 +172,6 @@ impl<'a> Resolver<'a> {
                 query: target.target().unwrap().clone(),
             },
             span: target.span.clone(),
-            hints: Vec::new(),
             phantom: Default::default(),
         }]
     }
@@ -259,7 +258,7 @@ impl<'a> Resolver<'a> {
     fn visit(
         session: &mut Session<'a>,
         source: &[Identity],
-        action: impl Fn(&mut Element<'a>, &mut Resolver<'a>) + Copy,
+        combinator: impl Fn(&mut Element<'a>, &mut Resolver<'a>) + Copy,
     ) {
         for &key in source {
             let Some(target) = Self::module_target(session, key) else {
@@ -274,7 +273,7 @@ impl<'a> Resolver<'a> {
                     session.records.get_mut(&key).unwrap().fetch_mut(2)
                 {
                     for element in elements {
-                        action(element, resolver);
+                        combinator(element, resolver);
                     }
                 }
             });

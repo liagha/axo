@@ -32,7 +32,7 @@ where
     fn clone(&self) -> Self {
         Self {
             identity: self.identity,
-            action: self.action.clone(),
+            combinator: self.combinator.clone(),
             marker: self.marker,
             state: self.state,
             consumed: self.consumed.clone(),

@@ -1,6 +1,6 @@
 use {
     crate::{
-        combinator::{Action, Operation, Operator},
+        combinator::{Combinator, Operation, Operator},
         data::memory::Arc,
         internal::time::SystemTime,
     },
@@ -17,5 +17,5 @@ pub enum Condition {
 
 pub struct Trigger<'source, Store = ()> {
     pub condition: Condition,
-    pub action: Arc<dyn Action<'static, Operator<Store>, Operation<'source, Store>> + Send + Sync + 'source>,
+    pub combinator: Arc<dyn Combinator<'static, Operator<Store>, Operation<'source, Store>> + Send + Sync + 'source>,
 }

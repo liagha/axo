@@ -14,20 +14,20 @@ pub use {
 pub type ScanError<'error> = Error<'error, ErrorKind<'error>>;
 
 use crate::{
-    combinator::{Action, Operation},
+    combinator::{Combinator, Operation},
     data::memory::Arc,
     internal::{platform::Lock, Session},
     reporter::Error,
 };
 
 impl<'source>
-Action<
+Combinator<
     'static,
     crate::combinator::Operator<Arc<Lock<Session<'source>>>>,
     Operation<'source, Arc<Lock<Session<'source>>>>,
 > for Scanner<'source>
 {
-    fn action(
+    fn combinator(
         &self,
         operator: &mut crate::combinator::Operator<Arc<Lock<Session<'source>>>>,
         operation: &mut Operation<'source, Arc<Lock<Session<'source>>>>,

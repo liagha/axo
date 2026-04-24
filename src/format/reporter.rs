@@ -6,10 +6,9 @@ use {
     broccli::{Color, TextStyle},
 };
 
-impl<'error, K, H> Show<'error> for Error<'error, K, H>
+impl<'error, K> Show<'error> for Error<'error, K>
 where
     K: Clone + Display,
-    H: Clone + Display,
 {
     fn format(&self, config: Stencil) -> Stencil {
         let (message, details) = self.handle();
@@ -22,10 +21,9 @@ where
     }
 }
 
-impl<'error, K, H> Display for Error<'error, K, H>
+impl<'error, K> Display for Error<'error, K>
 where
     K: Clone + Display,
-    H: Clone + Display,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         let (message, details) = self.handle();
@@ -40,10 +38,9 @@ where
     }
 }
 
-impl<'error, K, H> Debug for Error<'error, K, H>
+impl<'error, K> Debug for Error<'error, K>
 where
     K: Clone + Display,
-    H: Clone + Display,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         let (message, details) = self.handle();

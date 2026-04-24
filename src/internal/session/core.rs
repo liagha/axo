@@ -364,10 +364,9 @@ impl<'session> Session<'session> {
         }
     }
 
-    pub fn report_error<K, H>(&self, error: &Error<K, H>)
+    pub fn report_error<K>(&self, error: &Error<K>)
     where
         K: Clone + Display,
-        H: Clone + Display,
     {
         let (message, details) = error.handle_record(self.records.get(&error.span.identity));
         xprintln!(

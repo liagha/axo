@@ -22,12 +22,12 @@ pub trait Formable<'a>: Clone + Eq + Hash + PartialEq + Show<'a> + 'a {}
 
 impl<'a, T> Formable<'a> for T where T: Clone + Eq + Hash + PartialEq + Show<'a> + 'a {}
 
-pub trait Action<'a, Host, State>: Send + Sync {
-    fn action(&self, host: &mut Host, state: &mut State);
+pub trait Combinator<'a, Host, State>: Send + Sync {
+    fn combinator(&self, host: &mut Host, state: &mut State);
 }
 
 pub struct Multiple<'a, 'source, Host, State> {
-    pub actions: Vec<Arc<dyn Action<'a, Host, State> + Send + Sync + 'source>>,
+    pub combinators: Vec<Arc<dyn Combinator<'a, Host, State> + Send + Sync + 'source>>,
 }
 
 pub struct Ignore;

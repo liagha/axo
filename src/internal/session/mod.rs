@@ -5,7 +5,7 @@ pub use core::*;
 use {
     crate::{
         analyzer::Analyzer,
-        combinator::{Action, Operation, Operator},
+        combinator::{Combinator, Operation, Operator},
         data::{
             memory::{Arc, PhantomData},
             Identity, Module, Str,
@@ -30,7 +30,7 @@ use crate::{
 };
 
 #[cfg(feature = "generator")]
-use crate::generator::{EmitAction, GenerateAction, RunAction};
+use crate::generator::{EmitCombinator, GenerateCombinator, RunCombinator};
 
 pub struct Prepare;
 pub struct Bootstrap;
@@ -63,13 +63,13 @@ pub struct Interpret<'source> {
 }
 
 impl<'source>
-Action<
+Combinator<
     'static,
     Operator<Arc<Lock<Session<'source>>>>,
     Operation<'source, Arc<Lock<Session<'source>>>>,
 > for Bootstrap
 {
-    fn action(
+    fn combinator(
         &self,
         operator: &mut Operator<Arc<Lock<Session<'source>>>>,
         operation: &mut Operation<'source, Arc<Lock<Session<'source>>>>,
@@ -82,13 +82,13 @@ Action<
 }
 
 impl<'source>
-Action<
+Combinator<
     'static,
     Operator<Arc<Lock<Session<'source>>>>,
     Operation<'source, Arc<Lock<Session<'source>>>>,
 > for Prepare
 {
-    fn action(
+    fn combinator(
         &self,
         operator: &mut Operator<Arc<Lock<Session<'source>>>>,
         operation: &mut Operation<'source, Arc<Lock<Session<'source>>>>,
@@ -104,13 +104,13 @@ Action<
 }
 
 impl<'source>
-Action<
+Combinator<
     'static,
     Operator<Arc<Lock<Session<'source>>>>,
     Operation<'source, Arc<Lock<Session<'source>>>>,
 > for Report<'source>
 {
-    fn action(
+    fn combinator(
         &self,
         operator: &mut Operator<Arc<Lock<Session<'source>>>>,
         operation: &mut Operation<'source, Arc<Lock<Session<'source>>>>,
@@ -129,13 +129,13 @@ Action<
 }
 
 impl<'source>
-Action<
+Combinator<
     'static,
     Operator<Arc<Lock<Session<'source>>>>,
     Operation<'source, Arc<Lock<Session<'source>>>>,
 > for Scan<'source>
 {
-    fn action(
+    fn combinator(
         &self,
         operator: &mut Operator<Arc<Lock<Session<'source>>>>,
         operation: &mut Operation<'source, Arc<Lock<Session<'source>>>>,
@@ -164,13 +164,13 @@ Action<
 }
 
 impl<'source>
-Action<
+Combinator<
     'static,
     Operator<Arc<Lock<Session<'source>>>>,
     Operation<'source, Arc<Lock<Session<'source>>>>,
 > for Parse<'source>
 {
-    fn action(
+    fn combinator(
         &self,
         operator: &mut Operator<Arc<Lock<Session<'source>>>>,
         operation: &mut Operation<'source, Arc<Lock<Session<'source>>>>,
@@ -199,13 +199,13 @@ Action<
 }
 
 impl<'source>
-Action<
+Combinator<
     'static,
     Operator<Arc<Lock<Session<'source>>>>,
     Operation<'source, Arc<Lock<Session<'source>>>>,
 > for Resolve<'source>
 {
-    fn action(
+    fn combinator(
         &self,
         operator: &mut Operator<Arc<Lock<Session<'source>>>>,
         operation: &mut Operation<'source, Arc<Lock<Session<'source>>>>,
@@ -230,13 +230,13 @@ Action<
 }
 
 impl<'source>
-Action<
+Combinator<
     'static,
     Operator<Arc<Lock<Session<'source>>>>,
     Operation<'source, Arc<Lock<Session<'source>>>>,
 > for Analyze<'source>
 {
-    fn action(
+    fn combinator(
         &self,
         operator: &mut Operator<Arc<Lock<Session<'source>>>>,
         operation: &mut Operation<'source, Arc<Lock<Session<'source>>>>,
@@ -270,13 +270,13 @@ Action<
 
 #[cfg(feature = "interpreter")]
 impl<'source>
-Action<
+Combinator<
     'static,
     Operator<Arc<Lock<Session<'source>>>>,
     Operation<'source, Arc<Lock<Session<'source>>>>,
 > for Interpret<'source>
 {
-    fn action(
+    fn combinator(
         &self,
         operator: &mut Operator<Arc<Lock<Session<'source>>>>,
         operation: &mut Operation<'source, Arc<Lock<Session<'source>>>>,
@@ -776,9 +776,9 @@ impl<'session> Session<'session> {
 
         #[cfg(feature = "generator")]
         {
-            states.push(Operation::new(Arc::new(GenerateAction)));
-            states.push(Operation::new(Arc::new(EmitAction)));
-            states.push(Operation::new(Arc::new(RunAction)));
+            states.push(Operation::new(Arc::new(GenerateCombinator)));
+            states.push(Operation::new(Arc::new(EmitCombinator)));
+            states.push(Operation::new(Arc::new(RunCombinator)));
         }
 
         Operation::plan(states)

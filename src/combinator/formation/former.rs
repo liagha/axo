@@ -87,7 +87,7 @@ pub mod outcome {
 
 use crate::combinator::outcome::Outcome;
 use crate::{
-    combinator::{Action, Formation, Form, Formable},
+    combinator::{Combinator, Formation, Form, Formable},
     data::{
         memory::{replace, Arc},
         Identity, Offset,
@@ -99,7 +99,7 @@ use crate::{
 pub type Stash<'a, 'source, Source, Input, Output, Failure> = Vec<(
     usize,
     Arc<
-        dyn Action<
+        dyn Combinator<
             'a,
             Former<'a, 'source, Source, Input, Output, Failure>,
             Formation<'a, 'source, Source, Input, Output, Failure>,
@@ -169,8 +169,8 @@ where
 
     #[inline(always)]
     pub fn build(&mut self, formation: &mut Formation<'a, 'source, Source, Input, Output, Failure>) {
-        let action = formation.action.clone();
-        action.action(self, formation);
+        let combinator = formation.combinator.clone();
+        combinator.combinator(self, formation);
     }
 
     #[inline(always)]
@@ -178,7 +178,7 @@ where
         &mut self,
         formation: Formation<'a, 'source, Source, Input, Output, Failure>,
     ) -> Form<'a, Input, Output, Failure> {
-        let mut active = Formation::new(formation.action.clone(), 0, self.source.origin());
+        let mut active = Formation::new(formation.combinator.clone(), 0, self.source.origin());
         self.build(&mut active);
 
         if matches!(active.outcome, Outcome::Aligned | Outcome::Failed) {

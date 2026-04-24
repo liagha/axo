@@ -10,7 +10,7 @@ mod typing;
 pub use {error::*, resolver::*, scope::*, typing::*};
 
 use crate::{
-    combinator::{Action, Operation, Operator},
+    combinator::{Combinator, Operation, Operator},
     data::{
         memory::Arc,
         sync::{AtomicUsize, Ordering},
@@ -29,13 +29,13 @@ pub fn next_identity() -> Identity {
 pub type ResolveError<'error> = Error<'error, ErrorKind<'error>>;
 
 impl<'source>
-Action<
+Combinator<
     'static,
     Operator<Arc<Lock<Session<'source>>>>,
     Operation<'source, Arc<Lock<Session<'source>>>>,
 > for Resolver<'source>
 {
-    fn action(
+    fn combinator(
         &self,
         operator: &mut Operator<Arc<Lock<Session<'source>>>>,
         operation: &mut Operation<'source, Arc<Lock<Session<'source>>>>,

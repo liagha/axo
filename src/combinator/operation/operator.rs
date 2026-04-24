@@ -42,8 +42,8 @@ impl<Store: Clone + Send + Sync> Operator<Store> {
             }
         }
 
-        let action = operation.action.clone();
-        action.action(self, operation);
+        let combinator = operation.combinator.clone();
+        combinator.combinator(self, operation);
 
         if !operation.is_pending() {
             self.cache.insert(operation.identity, operation.status.clone());

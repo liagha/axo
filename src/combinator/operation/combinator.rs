@@ -1,7 +1,7 @@
 use {
     crate::{
         combinator::{
-            Action, Alternative, Command, Condition, Cycle, Multiple, Operation, Operator,
+            Combinator, Alternative, Command, Condition, Cycle, Multiple, Operation, Operator,
             Repetition, Sequence, Status, Transform, Trigger,
         },
         data::{memory::take, Identity, Scale},
@@ -12,9 +12,9 @@ use {
     },
 };
 
-impl<'source, Store: Clone + Send + Sync + 'source> Action<'static, Operator<Store>, Operation<'source, Store>> for Command {
+impl<'source, Store: Clone + Send + Sync + 'source> Combinator<'static, Operator<Store>, Operation<'source, Store>> for Command {
     #[inline]
-    fn action(&self, _operator: &mut Operator<Store>, operation: &mut Operation<'source, Store>) {
+    fn combinator(&self, _operator: &mut Operator<Store>, operation: &mut Operation<'source, Store>) {
         let mut terminal = Terminal::new(&self.program);
         terminal.args(&self.arguments);
 
@@ -47,9 +47,9 @@ impl<'source, Store: Clone + Send + Sync + 'source> Action<'static, Operator<Sto
     }
 }
 
-impl<'source, Store: Clone + Send + Sync + 'source> Action<'static, Operator<Store>, Operation<'source, Store>> for Trigger<'source, Store> {
+impl<'source, Store: Clone + Send + Sync + 'source> Combinator<'static, Operator<Store>, Operation<'source, Store>> for Trigger<'source, Store> {
     #[inline]
-    fn action(&self, operator: &mut Operator<Store>, operation: &mut Operation<'source, Store>) {
+    fn combinator(&self, operator: &mut Operator<Store>, operation: &mut Operation<'source, Store>) {
         match &self.condition {
             Condition::Always => {}
             Condition::Time(time) => {
@@ -89,26 +89,26 @@ impl<'source, Store: Clone + Send + Sync + 'source> Action<'static, Operator<Sto
             }
         }
 
-        self.action.action(operator, operation);
+        self.combinator.combinator(operator, operation);
     }
 }
 
-impl<'source, Store: Clone + Send + Sync + 'source> Action<'static, Operator<Store>, Operation<'source, Store>>
+impl<'source, Store: Clone + Send + Sync + 'source> Combinator<'static, Operator<Store>, Operation<'source, Store>>
 for Multiple<'static, 'source, Operator<Store>, Operation<'source, Store>>
 {
     #[inline]
-    fn action(&self, operator: &mut Operator<Store>, operation: &mut Operation<'source, Store>) {
-        for step in self.actions.iter() {
-            step.action(operator, operation);
+    fn combinator(&self, operator: &mut Operator<Store>, operation: &mut Operation<'source, Store>) {
+        for step in self.combinators.iter() {
+            step.combinator(operator, operation);
         }
     }
 }
 
-impl<'source, Store: Clone + Send + Sync + 'source, const SIZE: Scale> Action<'static, Operator<Store>, Operation<'source, Store>>
+impl<'source, Store: Clone + Send + Sync + 'source, const SIZE: Scale> Combinator<'static, Operator<Store>, Operation<'source, Store>>
 for Sequence<Operation<'source, Store>, SIZE>
 {
     #[inline]
-    fn action(&self, operator: &mut Operator<Store>, operation: &mut Operation<'source, Store>) {
+    fn combinator(&self, operator: &mut Operator<Store>, operation: &mut Operation<'source, Store>) {
         let mut current_stack = take(&mut operation.stack);
         let mut current_payload = take(&mut operation.payload);
         let base_stack = current_stack.len();
@@ -117,7 +117,7 @@ for Sequence<Operation<'source, Store>, SIZE>
         for state in &self.states {
             let mut child = Operation::create(
                 state.identity,
-                state.action.clone(),
+                state.combinator.clone(),
                 Status::Pending,
                 operation.depth + 1,
                 current_stack,
@@ -155,11 +155,11 @@ for Sequence<Operation<'source, Store>, SIZE>
     }
 }
 
-impl<'source, Store: Clone + Send + Sync + 'source, const SIZE: Scale> Action<'static, Operator<Store>, Operation<'source, Store>>
+impl<'source, Store: Clone + Send + Sync + 'source, const SIZE: Scale> Combinator<'static, Operator<Store>, Operation<'source, Store>>
 for Alternative<Operation<'source, Store>, SIZE>
 {
     #[inline]
-    fn action(&self, operator: &mut Operator<Store>, operation: &mut Operation<'source, Store>) {
+    fn combinator(&self, operator: &mut Operator<Store>, operation: &mut Operation<'source, Store>) {
         let mut best: Option<Operation<'source, Store>> = None;
         let current_stack = take(&mut operation.stack);
         let current_payload = take(&mut operation.payload);
@@ -167,7 +167,7 @@ for Alternative<Operation<'source, Store>, SIZE>
         for state in &self.states {
             let mut child = Operation::create(
                 state.identity,
-                state.action.clone(),
+                state.combinator.clone(),
                 Status::Pending,
                 operation.depth + 1,
                 current_stack.clone(),
@@ -213,9 +213,9 @@ for Alternative<Operation<'source, Store>, SIZE>
     }
 }
 
-impl<'source, Store: Clone + Send + Sync + 'source> Action<'static, Operator<Store>, Operation<'source, Store>> for Repetition<Operation<'source, Store>> {
+impl<'source, Store: Clone + Send + Sync + 'source> Combinator<'static, Operator<Store>, Operation<'source, Store>> for Repetition<Operation<'source, Store>> {
     #[inline]
-    fn action(&self, operator: &mut Operator<Store>, operation: &mut Operation<'source, Store>) {
+    fn combinator(&self, operator: &mut Operator<Store>, operation: &mut Operation<'source, Store>) {
         let mut current_stack = take(&mut operation.stack);
         let mut current_payload = take(&mut operation.payload);
         let base_stack = current_stack.len();
@@ -226,7 +226,7 @@ impl<'source, Store: Clone + Send + Sync + 'source> Action<'static, Operator<Sto
 
             let mut child = Operation::create(
                 crate::combinator::next_identity(),
-                self.state.action.clone(),
+                self.state.combinator.clone(),
                 Status::Pending,
                 operation.depth + 1,
                 current_stack,
@@ -285,11 +285,11 @@ impl<'source, Store: Clone + Send + Sync + 'source> Action<'static, Operator<Sto
     }
 }
 
-impl<'source, Store: Clone + Send + Sync + 'source> Action<'static, Operator<Store>, Operation<'source, Store>>
+impl<'source, Store: Clone + Send + Sync + 'source> Combinator<'static, Operator<Store>, Operation<'source, Store>>
 for Cycle<Operation<'source, Store>>
 {
     #[inline]
-    fn action(&self, operator: &mut Operator<Store>, operation: &mut Operation<'source, Store>) {
+    fn combinator(&self, operator: &mut Operator<Store>, operation: &mut Operation<'source, Store>) {
         let mut local = Operator::new(operator.store.clone());
         let mut current_stack = take(&mut operation.stack);
         let mut current_payload = take(&mut operation.payload);
@@ -299,7 +299,7 @@ for Cycle<Operation<'source, Store>>
 
             let mut child = Operation::create(
                 self.state.identity,
-                self.state.action.clone(),
+                self.state.combinator.clone(),
                 Status::Pending,
                 operation.depth + 1,
                 current_stack,
@@ -323,11 +323,11 @@ for Cycle<Operation<'source, Store>>
     }
 }
 
-impl<'source, Store: Clone + Send + Sync + 'source, Failure> Action<'static, Operator<Store>, Operation<'source, Store>>
+impl<'source, Store: Clone + Send + Sync + 'source, Failure> Combinator<'static, Operator<Store>, Operation<'source, Store>>
 for Transform<'static, 'source, Operator<Store>, Operation<'source, Store>, Failure>
 {
     #[inline]
-    fn action(&self, operator: &mut Operator<Store>, operation: &mut Operation<'source, Store>) {
+    fn combinator(&self, operator: &mut Operator<Store>, operation: &mut Operation<'source, Store>) {
         let _ = (self.transformer)(operator, operation);
     }
 }
