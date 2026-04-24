@@ -511,14 +511,6 @@ impl<'session> Session<'session> {
                 if let Some(value) = hash {
                     record.hash = value;
 
-                    if let Some(&prior) = self.cache.get(&location) {
-                        record.dirty = prior != value;
-                    } else {
-                        record.dirty = true;
-                    }
-
-                    self.cache.insert(location, value);
-
                     if record.dirty {
                         if record.content.is_none() {
                             if let Ok(text) = location.get_value() {
@@ -556,17 +548,27 @@ impl<'session> Session<'session> {
                             _ = create_dir_all(&build);
                             if let Some(name) = path.file_name() {
                                 let build_path = build.join(name);
-                                if !build_path.exists() || record.dirty {
+                                let mut file_dirty = record.dirty;
+
+                                if build_path.exists() {
+                                    if let Ok(existing_content) = std::fs::read(&build_path) {
+                                        file_dirty = existing_content != content.as_bytes();
+                                    }
+                                } else {
+                                    file_dirty = true;
+                                }
+
+                                if file_dirty {
                                     _ = write(build_path.clone(), content.as_bytes().to_vec());
+                                    dirty = true;
                                 }
                                 sources.push(build_path);
                             }
                         } else {
                             sources.push(path);
-                        }
-
-                        if record.dirty {
-                            dirty = true;
+                            if record.dirty {
+                                dirty = true;
+                            }
                         }
                     }
                 }

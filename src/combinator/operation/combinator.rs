@@ -295,8 +295,6 @@ for Cycle<Operation<'source, Store>>
         let mut current_payload = take(&mut operation.payload);
 
         loop {
-            local.cache.clear();
-
             let mut child = Operation::create(
                 self.state.identity,
                 self.state.combinator.clone(),

@@ -173,7 +173,6 @@ pub struct Session<'session> {
     pub directives: Vec<Symbol<'session>>,
     pub errors: Vec<SessionError<'session>>,
     pub target: Option<Location<'session>>,
-    pub cache: Map<Location<'session>, u64>,
     pub pipeline: Map<Identity, usize>,
     pub buffers: Vec<Vec<u8>>,
 }
@@ -189,7 +188,6 @@ impl<'session> Session<'session> {
 
         let resolver = Resolver::new();
         let mut records = Map::new();
-        let cache = Map::new();
 
         let mut record = Record::new(RecordKind::Flag, Location::from("flag"));
         record.set_content(flag);
@@ -218,7 +216,6 @@ impl<'session> Session<'session> {
             directives,
             errors: failures,
             target: None,
-            cache,
             pipeline: Map::default(),
             buffers: Vec::new(),
         }

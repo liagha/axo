@@ -22,7 +22,7 @@ impl<'a> Parser<'a> {
         Formation::sequence([
             Formation::predicate(|token: &Token| {
                 if let Some(id) = token.kind.try_unwrap_identifier() {
-                    matches!(id.as_str().unwrap(), "static" | "let" | "meta")
+                    matches!(id.as_str().unwrap(), "static" | "let")
                 } else {
                     false
                 }
