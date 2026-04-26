@@ -13,7 +13,7 @@ use {
         identifier,
         internal::{
             hash::{DefaultHasher, Hash, Hasher},
-            platform::{Lock, Command},
+            platform::{Lock, Command, var},
             time::{Duration, Instant, UNIX_EPOCH},
         },
         literal, module,
@@ -74,9 +74,11 @@ Combinator<
         operator: &mut Operator<Arc<Lock<Session<'source>>>>,
         operation: &mut Operation<'source, Arc<Lock<Session<'source>>>>,
     ) {
+        Session::trace("bootstrap:start");
         let mut guard = operator.store.write().unwrap();
         let session = &mut *guard;
         session.bootstrap();
+        Session::trace("bootstrap:end");
         operation.set_resolve(Vec::new());
     }
 }
@@ -93,9 +95,11 @@ Combinator<
         operator: &mut Operator<Arc<Lock<Session<'source>>>>,
         operation: &mut Operation<'source, Arc<Lock<Session<'source>>>>,
     ) {
+        Session::trace("prepare:start");
         let mut guard = operator.store.write().unwrap();
         let session = &mut *guard;
         if session.prepare() {
+            Session::trace("prepare:end");
             operation.set_resolve(Vec::new());
         } else {
             operation.set_reject();
@@ -140,6 +144,7 @@ Combinator<
         operator: &mut Operator<Arc<Lock<Session<'source>>>>,
         operation: &mut Operation<'source, Arc<Lock<Session<'source>>>>,
     ) {
+        Session::trace("scan:start");
         let mut session = operator.store.write().unwrap();
         let mut changed = false;
         for key in session.source_keys(&self.keys) {
@@ -156,6 +161,7 @@ Combinator<
             changed |= before != after;
         }
         if session.errors.is_empty() {
+            Session::trace("scan:end");
             operation.set_resolve(if changed { vec![1] } else { Vec::new() });
         } else {
             operation.set_reject();
@@ -175,6 +181,7 @@ Combinator<
         operator: &mut Operator<Arc<Lock<Session<'source>>>>,
         operation: &mut Operation<'source, Arc<Lock<Session<'source>>>>,
     ) {
+        Session::trace("parse:start");
         let mut session = operator.store.write().unwrap();
         let mut changed = false;
         for key in session.source_keys(&self.keys) {
@@ -191,6 +198,7 @@ Combinator<
             changed |= before != after;
         }
         if session.errors.is_empty() {
+            Session::trace("parse:end");
             operation.set_resolve(if changed { vec![1] } else { Vec::new() });
         } else {
             operation.set_reject();
@@ -210,6 +218,7 @@ Combinator<
         operator: &mut Operator<Arc<Lock<Session<'source>>>>,
         operation: &mut Operation<'source, Arc<Lock<Session<'source>>>>,
     ) {
+        Session::trace("resolve:start");
         let mut session = operator.store.write().unwrap();
         let targets = session.all_source_keys();
         let signature = session.resolve_signature(&targets);
@@ -222,6 +231,7 @@ Combinator<
         let after = session.resolver.registry.len();
         session.set_stage(RESOLVE_STAGE, 0, signature);
         if session.errors.is_empty() {
+            Session::trace("resolve:end");
             operation.set_resolve(if before != after { vec![1] } else { Vec::new() });
         } else {
             operation.set_reject();
@@ -241,6 +251,7 @@ Combinator<
         operator: &mut Operator<Arc<Lock<Session<'source>>>>,
         operation: &mut Operation<'source, Arc<Lock<Session<'source>>>>,
     ) {
+        Session::trace("analyze:start");
         let mut session = operator.store.write().unwrap();
         let targets = session.all_source_keys();
         let signature = session.analyze_signature(&targets);
@@ -261,6 +272,7 @@ Combinator<
             .sum::<usize>();
         session.set_stage(ANALYZE_STAGE, 0, signature);
         if session.errors.is_empty() {
+            Session::trace("analyze:end");
             operation.set_resolve(if before != after { vec![1] } else { Vec::new() });
         } else {
             operation.set_reject();
@@ -313,6 +325,12 @@ pub const INTERPRET_STAGE: u8 = 6;
 pub const CACHE_REV: u64 = 1;
 
 impl<'session> Session<'session> {
+    pub(crate) fn trace(stage: &str) {
+        if var("AXO_TRACE").is_ok() {
+            eprintln!("AXO_TRACE {}", stage);
+        }
+    }
+
     pub fn stage_key(stage: u8, key: Identity) -> Identity {
         ((stage as Identity) << 56) ^ key
     }

@@ -25,6 +25,11 @@ inkwell = { version = "0.9.0", features = ["llvm19-1-prefer-dynamic"], optional 
 libloading = { version = "0.9.0", optional = true }
 libffi = { version = "5.1.0", optional = true }
 crossterm = "0.29.0"
+cranelift = "0.131.0"
+cranelift-codegen = "0.131.0"
+cranelift-frontend = "0.131.0"
+cranelift-module = "0.131.0"
+cranelift-object = "0.131.0"
 
 [workspace]
 members = [

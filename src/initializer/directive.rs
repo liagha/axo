@@ -18,12 +18,14 @@ impl<'a> Initializer<'a> {
             } else if let Some(value) = input.kind.try_unwrap_integer() {
                 result.push_str(&value.to_string());
             } else if let Some(operator) = input.kind.try_unwrap_operator() {
-                match operator {
-                    OperatorKind::Slash => result.push('/'),
-                    OperatorKind::Dot => result.push('.'),
-                    OperatorKind::Backslash => result.push('\\'),
-                    OperatorKind::Colon => result.push(':'),
-                    _ => {}
+                for operator in operator.as_slice() {
+                    match operator {
+                        OperatorKind::Slash => result.push('/'),
+                        OperatorKind::Dot => result.push('.'),
+                        OperatorKind::Backslash => result.push('\\'),
+                        OperatorKind::Colon => result.push(':'),
+                        _ => {}
+                    }
                 }
             }
         }
@@ -33,15 +35,20 @@ impl<'a> Initializer<'a> {
     fn separator<'source>(
     ) -> Formation<'a, 'source, Self, Token<'a>, Symbol<'a>, InitializeError<'a>> {
         Formation::predicate(|token: &Token| {
-            matches!(
-                token.kind.try_unwrap_operator(),
-                Some(
-                    OperatorKind::Slash
-                        | OperatorKind::Backslash
-                        | OperatorKind::Dot
-                        | OperatorKind::Colon
-                )
-            )
+            token.kind
+                .try_unwrap_operator()
+                .map(|operator| {
+                    operator.as_slice().iter().all(|operator| {
+                        matches!(
+                            operator,
+                            OperatorKind::Slash
+                                | OperatorKind::Backslash
+                                | OperatorKind::Dot
+                                | OperatorKind::Colon
+                        )
+                    })
+                })
+                .unwrap_or(false)
         })
     }
 
@@ -75,14 +82,23 @@ impl<'a> Initializer<'a> {
     ) -> Formation<'a, 'source, Self, Token<'a>, Symbol<'a>, InitializeError<'a>> {
         Formation::with_transform(
             Formation::sequence([
-                Formation::repetition(
+                Formation::alternative([
+                    Formation::repetition(
+                        Formation::predicate(|token: &Token| {
+                            matches!(token.kind.try_unwrap_operator(), Some(OperatorKind::Minus))
+                        }),
+                        1,
+                        Some(2),
+                    )
+                        .with_ignore(),
                     Formation::predicate(|token: &Token| {
-                        matches!(token.kind.try_unwrap_operator(), Some(OperatorKind::Minus))
-                    }),
-                    1,
-                    Some(2),
-                )
-                    .with_ignore(),
+                        matches!(
+                            token.kind.try_unwrap_operator(),
+                            Some(op) if op.as_slice() == [OperatorKind::Minus, OperatorKind::Minus]
+                        )
+                    })
+                        .with_ignore(),
+                ]),
                 Formation::predicate(move |token: &Token| {
                     if let Some(identifier) = token.kind.try_unwrap_identifier() {
                         matcher(identifier)
@@ -267,6 +283,11 @@ impl<'a> Initializer<'a> {
     pub fn bare<'source>(
     ) -> Formation<'a, 'source, Self, Token<'a>, Symbol<'a>, InitializeError<'a>> {
         Self::flag(Str::from("Bare"), |identifier| *identifier == "bare")
+    }
+
+    pub fn cranelift<'source>(
+    ) -> Formation<'a, 'source, Self, Token<'a>, Symbol<'a>, InitializeError<'a>> {
+        Self::flag(Str::from("Cranelift"), |identifier| *identifier == "cranelift")
     }
 
     pub fn implicit<'source>(

@@ -1,4 +1,5 @@
-mod generator;
+mod cranelift;
+mod error;
 mod inkwell;
 
 use {
@@ -10,15 +11,32 @@ use {
             Artifact, RecordKind, Session, SessionError,
         },
         reporter::Error,
-        tracker::{error::ErrorKind as TrackErrorKind, Span, TrackError},
+        tracker::{Span, TrackError},
+    },
+    std::sync::atomic::{AtomicBool, Ordering},
+};
+
+pub use {
+    cranelift::CraneliftGenerator,
+    error::*,
+    inkwell::{
+        Context,
+        ContextRef,
+        Generator,
+        TargetMachine,
     },
 };
 
-pub use inkwell::*;
+pub static CRANELIFT: AtomicBool = AtomicBool::new(false);
 
-pub type GenerateError<'error> = Error<'error, ErrorKind<'error>>;
+pub type GenerateError<'source> = Error<'source, ErrorKind<'source>>;
 
 pub struct GenerateCombinator;
+
+fn use_cranelift<'source>(session: &Session<'source>) -> bool {
+    CRANELIFT.load(Ordering::Relaxed)
+        || session.get_directive(Str::from("Cranelift")).is_some()
+}
 
 impl<'source>
 Combinator<
@@ -32,99 +50,129 @@ Combinator<
         operator: &mut Operator<Arc<Lock<Session<'source>>>>,
         operation: &mut Operation<'source, Arc<Lock<Session<'source>>>>,
     ) {
-        let mut guard = operator.store.write().unwrap();
-        let session = &mut *guard;
+        Session::trace("generate:start");
+        let guard = operator.store.read().unwrap();
+        let cranelift = use_cranelift(&guard);
+        drop(guard);
 
-        let context = Context::create();
-        let reference = unsafe { ContextRef::new(context.raw()) };
-        let mut generator = Generator::new(reference);
+        if cranelift {
+            generate_cranelift(operator, operation);
+        } else {
+            generate_inkwell(operator, operation);
+        }
+        Session::trace("generate:end");
+    }
+}
 
-        let triple = TargetMachine::get_default_triple();
-        let base = session.base();
+fn generate_inkwell<'source>(
+    operator: &mut Operator<Arc<Lock<Session<'source>>>>,
+    operation: &mut Operation<'source, Arc<Lock<Session<'source>>>>,
+) {
+    let mut guard = operator.store.write().unwrap();
+    let session = &mut *guard;
 
-        let mut keys: Vec<_> = session
-            .records
-            .iter()
-            .filter_map(|(&key, record)| {
-                if record.kind == RecordKind::Source && record.fetch(0).is_some() {
-                    Some(key)
-                } else {
-                    None
-                }
-            })
-            .collect();
-        keys.sort();
+    let context = Context::create();
+    let reference = unsafe { ContextRef::new(context.raw()) };
+    let mut generator = Generator::new(reference);
 
-        let discard = session.get_directive(Str::from("Discard")).is_some();
+    let triple = TargetMachine::get_default_triple();
+    let base = session.base();
 
-        for &key in &keys {
-            let record = session.records.get_mut(&key).unwrap();
-            let location = record.location;
-            let schema = Session::schema(&base, location);
+    let mut keys: Vec<_> = session
+        .records
+        .iter()
+        .filter_map(|(&key, record)| {
+            if record.kind == RecordKind::Source && record.fetch(0).is_some() {
+                Some(key)
+            } else {
+                None
+            }
+        })
+        .collect();
+    keys.sort();
 
-            let stem = Str::from(location.stem().unwrap().to_string());
+    let discard = session.get_directive(Str::from("Discard")).is_some();
 
-            if let Some(Artifact::Analyses(analysis_ref)) = record.fetch(3) {
-                let analysis = analysis_ref.clone();
-                let module = generator.context.create_module(stem.as_str().unwrap());
+    for &key in &keys {
+        let record = session.records.get_mut(&key).unwrap();
+        let location = record.location;
+        let schema = Session::schema(&base, location);
 
-                module.set_triple(&triple);
+        let stem = Str::from(location.stem().unwrap().to_string());
 
-                generator.modules.insert(stem, module);
-                generator.current_module = stem;
+        if let Some(Artifact::Analyses(analysis_ref)) = record.fetch(3) {
+            let analysis = analysis_ref.clone();
+            let module = generator.context.create_module(stem.as_str().unwrap());
 
-                generator.generate(analysis);
+            module.set_triple(&triple);
 
-                if discard {
-                    continue;
-                }
+            generator.modules.insert(stem, module);
+            generator.current_module = stem;
 
-                match schema.as_path() {
-                    Ok(path) => {
-                        let parent = path.parent().unwrap();
-                        _ = create_dir_all(parent);
+            generator.generate(analysis);
 
-                        match crate::internal::platform::File::create(&path) {
-                            Ok(mut file) => {
-                                use crate::internal::platform::Write;
-                                let string = generator
-                                    .current_module()
-                                    .print_to_string()
-                                    .to_string();
-                                if let Err(error) = file.write_all(string.as_bytes()) {
-                                    let kind = TrackErrorKind::from_io(error, schema);
-                                    let track = TrackError::new(kind, Span::void());
-                                    session.errors.push(SessionError::Track(track));
-                                    operation.set_reject();
-                                    return;
-                                }
-                                record.store(4, Artifact::Output(schema));
-                            }
-                            Err(error) => {
-                                let kind = TrackErrorKind::from_io(error, schema);
+            if discard {
+                continue;
+            }
+
+            match schema.as_path() {
+                Ok(path) => {
+                    let parent = path.parent().unwrap();
+                    _ = create_dir_all(parent);
+
+                    match crate::internal::platform::File::create(&path) {
+                        Ok(mut file) => {
+                            use crate::internal::platform::Write;
+                            let string = generator.current_module().print_to_string().to_string();
+                            if let Err(error) = file.write_all(string.as_bytes()) {
+                                let kind = crate::tracker::ErrorKind::from_io(error, schema);
                                 let track = TrackError::new(kind, Span::void());
                                 session.errors.push(SessionError::Track(track));
+                                operation.set_reject();
+                                return;
                             }
+                            record.store(4, Artifact::Output(schema));
+                        }
+                        Err(error) => {
+                            let kind = crate::tracker::ErrorKind::from_io(error, schema);
+                            let track = TrackError::new(kind, Span::void());
+                            session.errors.push(SessionError::Track(track));
                         }
                     }
-                    Err(error) => session.errors.push(SessionError::Track(error)),
                 }
+                Err(error) => session.errors.push(SessionError::Track(error)),
             }
         }
-
-        session.errors.extend(
-            generator
-                .errors
-                .iter()
-                .map(|error| SessionError::Generate(error.clone())),
-        );
-
-        if session.errors.is_empty() {
-            operation.set_resolve(Vec::new());
-        } else {
-            operation.set_reject();
-        }
     }
+
+    session.errors.extend(
+        generator
+            .errors
+            .iter()
+            .map(|error| SessionError::Generate(error.clone())),
+    );
+
+    if session.errors.is_empty() {
+        operation.set_resolve(Vec::new());
+    } else {
+        operation.set_reject();
+    }
+}
+
+fn generate_cranelift<'source>(
+    operator: &mut Operator<Arc<Lock<Session<'source>>>>,
+    operation: &mut Operation<'source, Arc<Lock<Session<'source>>>>,
+) {
+    let mut guard = operator.store.write().unwrap();
+    let session = &mut *guard;
+
+    session.errors.push(SessionError::Generate(GenerateError::new(
+        ErrorKind::Verification(
+            "Cranelift backend is wired for selection but is still incomplete".to_string(),
+        ),
+        Span::void(),
+    )));
+    operation.set_reject();
 }
 
 pub struct EmitCombinator;
@@ -141,6 +189,7 @@ Combinator<
         operator: &mut Operator<Arc<Lock<Session<'source>>>>,
         operation: &mut Operation<'source, Arc<Lock<Session<'source>>>>,
     ) {
+        Session::trace("emit:start");
         let mut session = operator.store.write().unwrap();
         if session.get_directive(Str::from("Discard")).is_some() {
             if session.errors.is_empty() {
@@ -157,15 +206,16 @@ Combinator<
         let mut keys: Vec<_> = session.records.keys().copied().collect();
         keys.sort();
 
-        let target_str = session.get_target().map(|t| t.as_str().unwrap().to_string());
-        let is_msvc = target_str.as_ref()
+        let target = session.get_target().map(|t| t.as_str().unwrap().to_string());
+        let msvc = target
+            .as_ref()
             .map(|t| t.contains("msvc"))
             .unwrap_or_else(|| cfg!(target_env = "msvc"));
 
         for &key in &keys {
             let record = session.records.get_mut(&key).unwrap();
 
-            let target = match record.kind {
+            let path = match record.kind {
                 RecordKind::Source => {
                     if let Some(Artifact::Output(location)) = record.fetch(4) {
                         Some(location.to_string())
@@ -181,15 +231,17 @@ Combinator<
                         let build = base.join("build").join("base");
 
                         _ = create_dir_all(&build);
-                        let build_path = build.join(name);
+                        let output = build.join(name);
 
-                        if !build_path.exists() {
-                            if let Ok(mut file) = crate::internal::platform::File::create(&build_path) {
+                        if !output.exists() {
+                            if let Ok(mut file) =
+                                crate::internal::platform::File::create(&output)
+                            {
                                 use crate::internal::platform::Write;
                                 _ = file.write_all(content.as_bytes());
                             }
                         }
-                        Some(build_path.to_string_lossy().into_owned())
+                        Some(output.to_string_lossy().into_owned())
                     } else {
                         Some(record.location.to_string())
                     }
@@ -201,7 +253,7 @@ Combinator<
                 RecordKind::Flag => None,
             };
 
-            if let Some(path) = target {
+            if let Some(path) = path {
                 let object = Session::object(&base, record.location, &record.kind, None);
                 let parent = object.to_path().unwrap().parent().unwrap().to_path_buf();
                 _ = create_dir_all(&parent);
@@ -209,17 +261,29 @@ Combinator<
                 record.store(5, Artifact::Object(object));
 
                 let mut command = Command::new("clang");
-                if let Some(t) = &target_str {
+                if let Some(t) = &target {
                     command.arg("-target").arg(t);
                 }
 
-                if is_msvc {
-                    command.arg("/nologo").arg("/c").arg(path.clone()).arg(format!("/Fo{}", object));
+                if msvc {
+                    command
+                        .arg("/nologo")
+                        .arg("/c")
+                        .arg(path.clone())
+                        .arg(format!("/Fo{}", object));
                 } else {
-                    command.arg("-w").arg("-Wno-override-module").arg("-c").arg(path.clone()).arg("-o").arg(object.to_string());
+                    command
+                        .arg("-w")
+                        .arg("-Wno-override-module")
+                        .arg("-c")
+                        .arg(path.clone())
+                        .arg("-o")
+                        .arg(object.to_string());
                 }
 
-                let status = command.status().expect("failed compiling: clang not found or execution failed");
+                let status = command
+                    .status()
+                    .expect("failed compiling: clang not found or execution failed");
 
                 if !status.success() {
                     panic!("failed compiling: {}", path);
@@ -228,11 +292,11 @@ Combinator<
         }
 
         let mut link = Command::new("clang");
-        if let Some(t) = &target_str {
+        if let Some(t) = &target {
             link.arg("-target").arg(t);
         }
 
-        if is_msvc {
+        if msvc {
             link.arg("/nologo");
         } else {
             link.arg("-w");
@@ -260,13 +324,15 @@ Combinator<
 
         let executable = Session::executable(&base, location, None);
 
-        if is_msvc {
+        if msvc {
             link.arg(format!("/Fe{}", executable));
         } else {
             link.arg("-w").arg("-o").arg(executable.to_string());
         }
 
-        let status = link.status().expect("failed linking: clang not found or execution failed");
+        let status = link
+            .status()
+            .expect("failed linking: clang not found or execution failed");
 
         if !status.success() {
             panic!("emitter failed: {}", status);
@@ -275,6 +341,7 @@ Combinator<
         session.target = Some(executable);
 
         if session.errors.is_empty() {
+            Session::trace("emit:end");
             operation.set_resolve(Vec::new());
         } else {
             operation.set_reject();
@@ -296,6 +363,7 @@ Combinator<
         operator: &mut Operator<Arc<Lock<Session<'source>>>>,
         operation: &mut Operation<'source, Arc<Lock<Session<'source>>>>,
     ) {
+        Session::trace("run:start");
         let session = operator.store.write().unwrap();
         if session.get_directive(Str::from("Discard")).is_some() {
             if session.errors.is_empty() {
@@ -319,6 +387,7 @@ Combinator<
         }
 
         if session.errors.is_empty() {
+            Session::trace("run:end");
             operation.set_resolve(Vec::new());
         } else {
             operation.set_reject();

@@ -116,6 +116,7 @@ impl<'a> Initializer<'a> {
             Self::target(),
             Self::discard(),
             Self::bare(),
+            Self::cranelift(),
             Self::implicit(),
             Formation::anything().with_panic(|former: &mut Former<'a, 'source, Self, Token<'a>, Symbol<'a>, InitializeError<'a>>, formation| {
                 let form = former.forms.get_mut(formation.form).unwrap();
@@ -215,5 +216,32 @@ impl<'a> Initializer<'a> {
 
         self.output = directives;
         targets
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Initializer;
+    use crate::data::Str;
+
+    #[test]
+    fn positional_input_becomes_target() {
+        let mut initializer = Initializer::new(Str::from("./examples/calculator.axo"));
+        let targets = initializer.initialize();
+
+        assert!(
+            targets.iter().any(|(location, _)| location.to_string() == "./examples/calculator.axo")
+        );
+    }
+
+    #[test]
+    fn explicit_input_becomes_target() {
+        let mut initializer =
+            Initializer::new(Str::from("--input ./examples/calculator.axo"));
+        let targets = initializer.initialize();
+
+        assert!(
+            targets.iter().any(|(location, _)| location.to_string() == "./examples/calculator.axo")
+        );
     }
 }

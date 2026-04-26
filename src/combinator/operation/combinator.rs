@@ -290,13 +290,13 @@ for Cycle<Operation<'source, Store>>
 {
     #[inline]
     fn combinator(&self, operator: &mut Operator<Store>, operation: &mut Operation<'source, Store>) {
-        let mut local = Operator::new(operator.store.clone());
         let mut current_stack = take(&mut operation.stack);
         let mut current_payload = take(&mut operation.payload);
 
         loop {
+            let mut local = Operator::new(operator.store.clone());
             let mut child = Operation::create(
-                self.state.identity,
+                crate::combinator::next_identity(),
                 self.state.combinator.clone(),
                 Status::Pending,
                 operation.depth + 1,
