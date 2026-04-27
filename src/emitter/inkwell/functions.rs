@@ -1,6 +1,6 @@
 use {
     crate::{
-        analyzer::{Analysis, AnalysisKind},
+        analyzer::{Analysis, AnalysisKind, Target},
         data::*,
         generator::{
             inkwell::{
@@ -482,6 +482,85 @@ impl<'backend> Generator<'backend> {
             .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
 
         Ok(completed)
+    }
+
+    pub fn call(
+        &mut self,
+        target: Target<'backend>,
+        values: Vec<Analysis<'backend>>,
+        span: Span,
+    ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
+        let function = self
+            .get_entity(&target.name)
+            .and_then(|entity| match entity {
+                Entity::Function(function) => Some(self.linked(target.name, *function)),
+                _ => None,
+            })
+            .or_else(|| self.current_module().get_function(target.name.as_str().unwrap_or_default()));
+
+        if let Some(function) = function {
+            let mut arguments = vec![];
+            let params = function.get_type().get_param_types();
+
+            for (index, argument) in values.iter().enumerate() {
+                let mut value = self.analysis(argument.clone())?;
+
+                if let Some(layout) = params.get(index) {
+                    if let Ok(expected) = BasicTypeEnum::try_from(*layout) {
+                        if value.get_type() != expected && value.is_pointer_value() {
+                            let align = self.align(expected);
+                            value = self
+                                .builder
+                                .build_load(expected, value.into_pointer_value(), "load")
+                                .and_then(|inst| {
+                                    if let Some(instruction) = inst.as_instruction_value() {
+                                        instruction.set_alignment(align).ok();
+                                    }
+                                    Ok(inst)
+                                })
+                                .map_err(|error| {
+                                    GenerateError::new(ErrorKind::BuilderError(error.into()), span)
+                                })?;
+                        } else if value.get_type() != expected
+                            && value.is_int_value()
+                            && expected.is_int_type()
+                        {
+                            value = self
+                                .builder
+                                .build_int_cast(
+                                    value.into_int_value(),
+                                    expected.into_int_type(),
+                                    "cast",
+                                )
+                                .map_err(|error| {
+                                    GenerateError::new(ErrorKind::BuilderError(error.into()), span)
+                                })?
+                                .into();
+                        }
+                    }
+                }
+
+                arguments.push(value.into());
+            }
+
+            let result = self
+                .builder
+                .build_call(function, &arguments, "call")
+                .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
+
+            return if let Some(bound) = result.try_as_basic_value().basic() {
+                Ok(bound)
+            } else {
+                Ok(self.context.i64_type().const_zero().into())
+            };
+        }
+
+        Err(GenerateError::new(
+            ErrorKind::Function(FunctionError::Undefined {
+                name: target.name.to_string(),
+            }),
+            span,
+        ))
     }
 
     pub fn invoke(

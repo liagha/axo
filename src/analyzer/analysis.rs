@@ -17,6 +17,18 @@ impl<'analysis> Analysis<'analysis> {
     }
 }
 
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct Target<'analysis> {
+    pub id: Identity,
+    pub name: Str<'analysis>,
+}
+
+impl<'analysis> Target<'analysis> {
+    pub fn new(id: Identity, name: Str<'analysis>) -> Self {
+        Self { id, name }
+    }
+}
+
 #[derive(Clone, Debug)]
 pub enum AnalysisKind<'analysis> {
     Integer {
@@ -70,6 +82,7 @@ pub enum AnalysisKind<'analysis> {
 
     Index(Index<Box<Analysis<'analysis>>, Analysis<'analysis>>),
     Invoke(Invoke<Box<Analysis<'analysis>>, Analysis<'analysis>>),
+    Call(Target<'analysis>, Vec<Analysis<'analysis>>),
 
     Block(Vec<Analysis<'analysis>>),
     Conditional(
@@ -83,13 +96,18 @@ pub enum AnalysisKind<'analysis> {
     Continue(Option<Box<Analysis<'analysis>>>),
 
     Usage(Str<'analysis>),
+    Symbol(Target<'analysis>),
     Access(Box<Analysis<'analysis>>, Box<Analysis<'analysis>>),
+    Slot(Box<Analysis<'analysis>>, Scale),
     Constructor(Aggregate<Str<'analysis>, Analysis<'analysis>>),
+    Pack(Target<'analysis>, Vec<(Scale, Analysis<'analysis>)>),
     Assign(Str<'analysis>, Box<Analysis<'analysis>>),
+    Write(Target<'analysis>, Box<Analysis<'analysis>>),
     Store(Box<Analysis<'analysis>>, Box<Analysis<'analysis>>),
     Binding(Binding<Box<Analysis<'analysis>>, Box<Analysis<'analysis>>, Type<'analysis>>),
     Structure(Aggregate<Str<'analysis>, Analysis<'analysis>>),
     Union(Aggregate<Str<'analysis>, Analysis<'analysis>>),
+    Composite(Aggregate<Target<'analysis>, Analysis<'analysis>>),
     Function(
         Function<
             Str<'analysis>,

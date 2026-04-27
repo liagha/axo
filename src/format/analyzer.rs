@@ -1,7 +1,17 @@
 use crate::{
-    analyzer::{Analysis, AnalysisKind},
+    analyzer::{Analysis, AnalysisKind, Target},
     format::{Show, Stencil},
 };
+
+impl<'analysis> Show<'analysis> for Target<'analysis> {
+    fn format(&self, config: Stencil) -> Stencil {
+        config
+            .clone()
+            .new("Target")
+            .field("id", self.id.to_string())
+            .field("name", self.name.format(config.clone()))
+    }
+}
 
 impl<'analysis> Show<'analysis> for Analysis<'analysis> {
     fn format(&self, config: Stencil) -> Stencil {
@@ -125,6 +135,10 @@ impl<'analysis> Show<'analysis> for AnalysisKind<'analysis> {
             AnalysisKind::Invoke(invoke) => base
                 .variant("Invoke")
                 .field("value", invoke.format(config.clone())),
+            AnalysisKind::Call(target, values) => base
+                .variant("Call")
+                .field("target", target.format(config.clone()))
+                .field("members", values.format(config.clone())),
             AnalysisKind::Block(block) => base
                 .variant("Block")
                 .field("statements", block.format(config.clone())),
@@ -161,15 +175,37 @@ impl<'analysis> Show<'analysis> for AnalysisKind<'analysis> {
             AnalysisKind::Usage(target) => base
                 .variant("Usage")
                 .field("target", target.format(config.clone())),
+            AnalysisKind::Symbol(target) => base
+                .variant("Symbol")
+                .field("target", target.format(config.clone())),
             AnalysisKind::Access(target, value) => base
                 .variant("Access")
                 .field("target", target.format(config.clone()))
                 .field("value", value.format(config.clone())),
+            AnalysisKind::Slot(target, slot) => base
+                .variant("Slot")
+                .field("target", target.format(config.clone()))
+                .field("slot", slot.to_string()),
             AnalysisKind::Constructor(constructor) => base
                 .variant("Constructor")
                 .field("value", constructor.format(config.clone())),
+            AnalysisKind::Pack(target, values) => {
+                let mut members = config.clone().new("Slots");
+                for (slot, value) in values {
+                    members = members.field(&slot.to_string(), value.format(config.clone()));
+                }
+
+                base
+                    .variant("Pack")
+                    .field("target", target.format(config.clone()))
+                    .field("members", members)
+            }
             AnalysisKind::Assign(target, value) => base
                 .variant("Assign")
+                .field("target", target.format(config.clone()))
+                .field("value", value.format(config.clone())),
+            AnalysisKind::Write(target, value) => base
+                .variant("Write")
                 .field("target", target.format(config.clone()))
                 .field("value", value.format(config.clone())),
             AnalysisKind::Store(target, value) => base
@@ -185,6 +221,9 @@ impl<'analysis> Show<'analysis> for AnalysisKind<'analysis> {
             AnalysisKind::Union(union) => base
                 .variant("Union")
                 .field("value", union.format(config.clone())),
+            AnalysisKind::Composite(composite) => base
+                .variant("Composite")
+                .field("value", composite.format(config.clone())),
             AnalysisKind::Function(function) => base
                 .variant("Function")
                 .field("value", function.format(config.clone())),

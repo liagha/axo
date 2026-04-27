@@ -4,13 +4,12 @@ use crate::{
     internal::{
         platform::{read_dir, set_current_dir, stdin, stdout, IsTerminal, Write},
         session::{
-            ANALYZE_STAGE, INTERPRET_STAGE, PARSE_STAGE, RESOLVE_STAGE, SCAN_STAGE,
+            ANALYZE_STAGE, PARSE_STAGE, RESOLVE_STAGE, SCAN_STAGE,
         },
         time::Instant,
         Record, RecordKind, Session,
     },
-    interpreter,
-    interpreter::Interpreter,
+    generator::{CraneliftEngine, CraneliftValue},
     parser::{Parser, Symbol},
     resolver::Resolver,
     scanner::Scanner,
@@ -164,7 +163,7 @@ impl Dialog {
 
     pub fn refresh<'a>(
         session: &mut Session<'a>,
-        mut core: Option<&mut Interpreter<'a>>,
+        core: Option<&mut CraneliftEngine<'a>>,
         keys: &[Identity],
     ) {
         session.errors.clear();
@@ -230,15 +229,7 @@ impl Dialog {
                 changed |= before != after;
             }
 
-            let interpret = session.interpret_signature();
-            if let Some(core) = core.as_deref_mut() {
-                if session.stage_value(INTERPRET_STAGE, 0) != interpret {
-                    core.reset();
-                    Interpreter::process(session, core, &targets);
-                    session.set_stage(INTERPRET_STAGE, 0, interpret);
-                    changed = true;
-                }
-            }
+            let _ = core;
 
             if !changed || !session.errors.is_empty() {
                 break;
@@ -253,7 +244,7 @@ impl Dialog {
 
     pub fn start(directives: Vec<Symbol>, flag: Str) {
         let mut session = Session::create(directives, Vec::new(), flag);
-        let mut core = Interpreter::new(1024);
+        let mut core = CraneliftEngine::new();
 
         let mut keys: Vec<_> = session
             .records
@@ -262,7 +253,7 @@ impl Dialog {
             .collect();
         keys.sort();
 
-        Self::refresh(&mut session, Some(&mut core), &keys);
+        Self::refresh(&mut session, None, &keys);
 
         let mut terminal = Self::new();
         let mut timing = false;
@@ -370,11 +361,11 @@ impl Dialog {
 
             if session.errors.is_empty() {
                 let start = Instant::now();
-                let outcome = Interpreter::execute_line(&session, &mut core, identity);
+                let outcome = core.execute_line(&session, identity);
                 let elapsed = start.elapsed();
 
                 if let Ok(Some(result)) = outcome {
-                    if !matches!(result, interpreter::Value::Empty) {
+                    if !matches!(result, CraneliftValue::Empty) {
                         println!("{:?}", result);
                     }
                 }

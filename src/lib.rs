@@ -1,7 +1,9 @@
 #[cfg(feature = "combinator")]
 pub mod combinator;
 #[cfg(feature = "generator")]
-pub mod generator;
+pub mod emitter;
+#[cfg(feature = "generator")]
+pub use emitter as generator;
 #[cfg(feature = "initial")]
 pub mod initializer;
 #[cfg(feature = "parser")]
@@ -12,17 +14,12 @@ pub mod resolver;
 pub mod scanner;
 #[cfg(feature = "analyzer")]
 pub mod analyzer;
-#[cfg(feature = "interpreter")]
-pub mod interpreter;
-#[cfg(feature = "interpreter")]
+#[cfg(feature = "dialog")]
 pub mod dialog;
 
 pub mod internal;
 pub mod reporter;
-
-
 pub mod tracker;
-
 pub mod data;
 mod macros;
 mod format;

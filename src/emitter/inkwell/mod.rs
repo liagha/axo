@@ -225,8 +225,10 @@ impl<'backend> Generator<'backend> {
     pub fn symbol(&self, analysis: &Analysis<'backend>) -> Option<Str<'backend>> {
         match &analysis.kind {
             AnalysisKind::Usage(name) => Some(*name),
+            AnalysisKind::Symbol(target) => Some(target.name),
             AnalysisKind::Access(target, member) if self.namespace(target) => match &member.kind {
                 AnalysisKind::Usage(name) => Some(*name),
+                AnalysisKind::Symbol(target) => Some(target.name),
                 AnalysisKind::Access(_, _) => self.symbol(member),
                 _ => None,
             },
@@ -439,7 +441,18 @@ impl<'backend> Generator<'backend> {
                 }
                 _ => None,
             },
+            AnalysisKind::Symbol(target) => match self.get_entity(&target.name) {
+                Some(Entity::Variable { typing, .. }) => {
+                    if let TypeKind::Integer { signed, .. } = &typing.kind {
+                        Some(*signed)
+                    } else {
+                        None
+                    }
+                }
+                _ => None,
+            },
             AnalysisKind::Assign(_, value) => self.infer_signedness(value),
+            AnalysisKind::Write(_, value) => self.infer_signedness(value),
             AnalysisKind::Binding(binding) => binding
                 .value
                 .as_ref()
@@ -625,9 +638,13 @@ impl<'backend> Generator<'backend> {
             }
             AnalysisKind::Index(index) => self.index(index, span),
             AnalysisKind::Usage(identifier) => self.usage(identifier, span),
+            AnalysisKind::Symbol(target) => self.symbol_value(target, span),
             AnalysisKind::Access(target, member) => self.access(target, member, span),
+            AnalysisKind::Slot(target, slot) => self.slot(target, slot, span),
             AnalysisKind::Constructor(structure) => self.constructor(typing, structure, span),
+            AnalysisKind::Pack(target, values) => self.pack(typing, target, values, span),
             AnalysisKind::Assign(target, value) => self.assign(target, value, span),
+            AnalysisKind::Write(target, value) => self.write(target, value, span),
             AnalysisKind::Store(target, value) => self.store(target, value, span),
             AnalysisKind::Binding(binding) => self.binding(binding, span),
             AnalysisKind::Block(analyses) => self.block(analyses, span),
@@ -641,9 +658,11 @@ impl<'backend> Generator<'backend> {
             AnalysisKind::While(condition, body) => self.r#while(condition, body, span),
             AnalysisKind::Module(name, analyses) => self.module(name, analyses, span),
             AnalysisKind::Invoke(invoke) => self.invoke(invoke, span),
+            AnalysisKind::Call(target, values) => self.call(target, values, span),
             AnalysisKind::Return(value) => self.r#return(value, span),
             AnalysisKind::Break(value) => self.r#break(value, span),
             AnalysisKind::Continue(value) => self.r#continue(value, span),
+            AnalysisKind::Composite(composite) => self.composite(composite, span),
         }
     }
 }

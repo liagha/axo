@@ -1,7 +1,7 @@
 // src/generator/cranelift/functions.rs
 use {
     crate::{
-        analyzer::Analysis,
+        analyzer::{Analysis, Target},
         data::{Function, Invoke, Str},
         generator::{
             cranelift::CraneliftGenerator,
@@ -16,6 +16,20 @@ use {
 };
 
 impl<'backend> CraneliftGenerator<'backend> {
+    pub fn call(
+        &mut self,
+        target: Target<'backend>,
+        values: Vec<Analysis<'backend>>,
+        span: Span,
+    ) -> Result<Value, GenerateError<'backend>> {
+        let target = Analysis::new(
+            crate::analyzer::AnalysisKind::Usage(target.name),
+            span,
+            crate::resolver::Type::from(crate::resolver::TypeKind::Unknown),
+        );
+        self.invoke(Invoke::new(Box::new(target), values), span)
+    }
+
     fn truth(&mut self, value: Value, _span: Span) -> Result<Value, GenerateError<'backend>> {
         let typing = self.builder.func.dfg.value_type(value);
 

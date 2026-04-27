@@ -1,7 +1,7 @@
 use {
     crate::{
-        analyzer::{Analysis, AnalysisKind},
-        data::{Aggregate, Index, Str},
+        analyzer::{Analysis, AnalysisKind, Target},
+        data::{Aggregate, Index, Scale, Str},
         generator::{
             inkwell::{Entity, GenerateError, Generator},
             BuilderError, DataStructureError, ErrorKind,
@@ -11,7 +11,7 @@ use {
     },
     inkwell::{
         types::{BasicType, BasicTypeEnum},
-        values::{BasicValueEnum, IntValue},
+        values::{BasicValue, BasicValueEnum, IntValue},
         IntPredicate,
     },
 };
@@ -95,6 +95,91 @@ impl<'backend> Generator<'backend> {
         } else {
             None
         }
+    }
+
+    fn field_name(&self, typing: &Type<'backend>, index: Scale) -> Option<Str<'backend>> {
+        match &self.value_type(typing).kind {
+            TypeKind::Structure(aggregate) | TypeKind::Union(aggregate) => {
+                aggregate.members.get(index).and_then(|member| self.member_name(member))
+            }
+            _ => None,
+        }
+    }
+
+    pub fn slot(
+        &mut self,
+        target: Box<Analysis<'backend>>,
+        index: Scale,
+        span: Span,
+    ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
+        let analysis = Analysis::new(
+            AnalysisKind::Slot(target.clone(), index),
+            span,
+            target.typing.clone(),
+        );
+
+        if let Some((pointer, kind)) = self.lvalue(&analysis)? {
+            let load = self
+                .builder
+                .build_load(kind, pointer, "value")
+                .map_err(|error| {
+                    GenerateError::new(ErrorKind::BuilderError(error.into()), span)
+                })?;
+
+            if let Some(instruction) = load.as_instruction_value() {
+                instruction.set_alignment(self.align(kind)).ok();
+            }
+
+            return Ok(load);
+        }
+
+        Err(GenerateError::new(
+            ErrorKind::DataStructure(DataStructureError::NotAStructType {
+                name: String::new(),
+            }),
+            span,
+        ))
+    }
+
+    pub fn pack(
+        &mut self,
+        typing: Type<'backend>,
+        target: Target<'backend>,
+        values: Vec<(Scale, Analysis<'backend>)>,
+        span: Span,
+    ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
+        let mut members = Vec::with_capacity(values.len());
+
+        for (index, value) in values {
+            if let Some(field) = self.field_name(&typing, index) {
+                let assign = Analysis::new(
+                    AnalysisKind::Assign(field, Box::new(value)),
+                    span,
+                    typing.clone(),
+                );
+                members.push(assign);
+            } else {
+                members.push(value);
+            }
+        }
+
+        self.constructor(typing, Aggregate::new(target.name, members), span)
+    }
+
+    pub fn composite(
+        &mut self,
+        composite: Aggregate<Target<'backend>, Analysis<'backend>>,
+        span: Span,
+    ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
+        let target = composite.target.name;
+        let members = composite.members;
+
+        let mut fields = Vec::with_capacity(members.len());
+        for member in members {
+            fields.push(member);
+        }
+
+        self.define_structure(Aggregate::new(target, fields), span)
     }
 
     pub fn declare_structure(

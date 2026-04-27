@@ -17,7 +17,7 @@ use {
 };
 
 pub use {
-    cranelift::CraneliftGenerator,
+    cranelift::{CraneliftGenerator, Engine as CraneliftEngine, EvalValue as CraneliftValue},
     error::*,
     inkwell::{
         Context,

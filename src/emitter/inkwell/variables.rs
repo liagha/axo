@@ -1,6 +1,6 @@
 use {
     crate::{
-        analyzer::{Analysis, AnalysisKind},
+        analyzer::{Analysis, AnalysisKind, Target},
         data::Str,
         data::*,
         generator::{
@@ -17,6 +17,10 @@ use {
 };
 
 impl<'backend> Generator<'backend> {
+    fn target_name(target: &Target<'backend>) -> Str<'backend> {
+        target.name
+    }
+
     fn alias(&mut self, target: Str<'backend>, value: &Analysis<'backend>) -> bool {
         if let Some(entity) = self.entity(value) {
             self.insert_entity(target, entity);
@@ -38,12 +42,23 @@ impl<'backend> Generator<'backend> {
                 }
                 _ => None,
             },
+            AnalysisKind::Symbol(target) => match self.get_entity(&target.name) {
+                Some(Entity::Variable { typing, .. }) => {
+                    if let TypeKind::Pointer { target } = &typing.kind {
+                        self.to_basic_type(target, analysis.span).ok()
+                    } else {
+                        None
+                    }
+                }
+                _ => None,
+            },
             AnalysisKind::Dereference(operand) => self.pointee(operand),
+            AnalysisKind::Slot(target, _) => self.pointee(target),
             _ => None,
         }
     }
 
-    fn lvalue(
+    pub(crate) fn lvalue(
         &mut self,
         analysis: &Analysis<'backend>,
     ) -> Result<Option<(PointerValue<'backend>, BasicTypeEnum<'backend>)>, GenerateError<'backend>>
@@ -51,6 +66,23 @@ impl<'backend> Generator<'backend> {
         match &analysis.kind {
             AnalysisKind::Usage(identifier) => {
                 if let Some(entity) = self.get_entity(identifier) {
+                    match entity {
+                        Entity::Variable { pointer, typing } => {
+                            let kind = self.to_basic_type(typing, analysis.span)?;
+                            Ok(Some((*pointer, kind)))
+                        }
+                        Entity::Function(function) => {
+                            let pointer = function.as_global_value().as_pointer_value();
+                            Ok(Some((pointer, pointer.get_type().into())))
+                        }
+                        _ => Ok(None),
+                    }
+                } else {
+                    Ok(None)
+                }
+            }
+            AnalysisKind::Symbol(target) => {
+                if let Some(entity) = self.get_entity(&target.name) {
                     match entity {
                         Entity::Variable { pointer, typing } => {
                             let kind = self.to_basic_type(typing, analysis.span)?;
@@ -80,6 +112,80 @@ impl<'backend> Generator<'backend> {
                     }
                     _ => Ok(None),
                 }
+            }
+            AnalysisKind::Slot(target, index) => {
+                if let Some((base, kind)) = self.lvalue(target)? {
+                    let typing = self.value_type(&target.typing);
+
+                    if let TypeKind::Union(aggregate) = &typing.kind {
+                        if let Some(member) = aggregate.members.get(*index) {
+                            let resolved = self.to_basic_type(member, analysis.span)?;
+                            let space = base.get_type().get_address_space();
+                            let destination = self.context.ptr_type(space);
+                            let slot = self
+                                .builder
+                                .build_pointer_cast(base, destination, "pointer")
+                                .map_err(|error| {
+                                    GenerateError::new(
+                                        ErrorKind::BuilderError(error.into()),
+                                        analysis.span,
+                                    )
+                                })?;
+
+                            return Ok(Some((slot, resolved)));
+                        }
+                    }
+
+                    if kind.is_struct_type() {
+                        let shape = kind.into_struct_type();
+                        let slot = self
+                            .builder
+                            .build_struct_gep(shape, base, *index as u32, "pointer")
+                            .map_err(|error| {
+                                GenerateError::new(
+                                    ErrorKind::BuilderError(error.into()),
+                                    analysis.span,
+                                )
+                            })?;
+
+                        let resolved = shape.get_field_type_at_index(*index as u32).unwrap();
+                        return Ok(Some((slot, resolved)));
+                    } else if kind.is_pointer_type() {
+                        if let Some(resolved) = self.pointee(target) {
+                            if resolved.is_struct_type() {
+                                let shape = resolved.into_struct_type();
+                                let load = self.builder.build_load(kind, base, "load").map_err(
+                                    |error| {
+                                        GenerateError::new(
+                                            ErrorKind::BuilderError(error.into()),
+                                            analysis.span,
+                                        )
+                                    },
+                                )?;
+
+                                if let Some(instruction) = load.as_instruction_value() {
+                                    instruction.set_alignment(self.align(kind)).ok();
+                                }
+
+                                let loaded = load.into_pointer_value();
+                                let slot = self
+                                    .builder
+                                    .build_struct_gep(shape, loaded, *index as u32, "pointer")
+                                    .map_err(|error| {
+                                        GenerateError::new(
+                                            ErrorKind::BuilderError(error.into()),
+                                            analysis.span,
+                                        )
+                                    })?;
+
+                                let resolved = shape.get_field_type_at_index(*index as u32).unwrap();
+                                return Ok(Some((slot, resolved)));
+                            }
+                        }
+                    }
+                }
+
+                Ok(None)
             }
             AnalysisKind::Access(target, member) => {
                 let field = if let AnalysisKind::Usage(identifier) = &member.kind {
@@ -306,6 +412,14 @@ impl<'backend> Generator<'backend> {
         }
     }
 
+    pub fn symbol_value(
+        &self,
+        target: Target<'backend>,
+        span: Span,
+    ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
+        self.usage(Self::target_name(&target), span)
+    }
+
     pub fn usage(
         &self,
         identifier: Str<'backend>,
@@ -391,6 +505,15 @@ impl<'backend> Generator<'backend> {
             }),
             span,
         ))
+    }
+
+    pub fn write(
+        &mut self,
+        target: Target<'backend>,
+        value: Box<Analysis<'backend>>,
+        span: Span,
+    ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
+        self.assign(Self::target_name(&target), value, span)
     }
 
     pub fn assign(
@@ -536,6 +659,101 @@ impl<'backend> Generator<'backend> {
                                 .map_err(|error| {
                                     GenerateError::new(ErrorKind::BuilderError(error.into()), span)
                                 })?;
+                        store.set_alignment(self.align(declared)).ok();
+
+                        allocate
+                    };
+
+                    self.insert_entity(target.clone(), Entity::Variable { pointer, typing });
+
+                    Ok(result)
+                }
+            },
+
+            AnalysisKind::Symbol(target) => match binding.kind {
+                BindingKind::Static => {
+                    let target = target.name;
+                    let expression = binding.value.ok_or_else(|| {
+                        GenerateError::new(
+                            ErrorKind::Variable(VariableError::BindingWithoutInitializer {
+                                name: target.to_string(),
+                            }),
+                            span,
+                        )
+                    })?;
+
+                    if self.alias(target.clone(), &expression) {
+                        return Ok(self.context.i64_type().const_zero().into());
+                    }
+
+                    let result = self.analysis(*expression)?;
+                    let declared = result.get_type();
+                    let variable = self.current_module().add_global(declared, None, &target);
+                    variable.set_initializer(&result);
+                    variable.set_alignment(self.align(declared));
+                    let pointer = variable.as_pointer_value();
+                    let typing = binding.annotation.clone();
+                    self.insert_entity(target.clone(), Entity::Variable { pointer, typing });
+                    Ok(result)
+                }
+                _ => {
+                    let target = target.name;
+                    let expression = binding.value.ok_or_else(|| {
+                        GenerateError::new(
+                            ErrorKind::Variable(VariableError::BindingWithoutInitializer {
+                                name: target.to_string(),
+                            }),
+                            span,
+                        )
+                    })?;
+
+                    if self.alias(target.clone(), &expression) {
+                        return Ok(self.context.i64_type().const_zero().into());
+                    }
+
+                    let typing = binding.annotation.clone();
+                    let global = self.builder.get_insert_block().is_none();
+
+                    let scope = if global {
+                        let void = self.context.void_type();
+                        let signature = void.fn_type(&[], false);
+                        let function = self.current_module().add_function("init", signature, None);
+                        let block = self.context.append_basic_block(function, "entry");
+
+                        self.builder.position_at_end(block);
+                        Some(function)
+                    } else {
+                        None
+                    };
+
+                    let result = self.analysis(*expression)?;
+
+                    if let Some(function) = scope {
+                        self.builder.clear_insertion_position();
+                        unsafe {
+                            function.delete();
+                        }
+                    }
+
+                    let declared = result.get_type();
+
+                    let pointer = if global {
+                        let variable = self.current_module().add_global(declared, None, &target);
+                        variable.set_initializer(&result);
+                        variable.set_alignment(self.align(declared));
+                        variable.as_pointer_value()
+                    } else {
+                        let allocate = self.builder.build_alloca(declared, &target).map_err(|error| {
+                            GenerateError::new(ErrorKind::BuilderError(error.into()), span)
+                        })?;
+
+                        if let Some(instruction) = allocate.as_instruction_value() {
+                            instruction.set_alignment(self.align(declared)).ok();
+                        }
+
+                        let store = self.builder.build_store(allocate, result).map_err(|error| {
+                            GenerateError::new(ErrorKind::BuilderError(error.into()), span)
+                        })?;
                         store.set_alignment(self.align(declared)).ok();
 
                         allocate

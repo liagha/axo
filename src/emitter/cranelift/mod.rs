@@ -1,5 +1,6 @@
 // src/generator/cranelift/mod.rs
 mod arithmetic;
+pub mod evaluate;
 mod bitwise;
 mod comparison;
 mod composite;
@@ -9,11 +10,11 @@ mod logical;
 mod primitives;
 mod variables;
 
-pub use error::*;
+pub use {error::*, evaluate::{Engine, Value as EvalValue}};
 
 use {
     crate::{
-        analyzer::{Analysis, AnalysisKind},
+        analyzer::{Analysis, AnalysisKind, Target},
         data::Str,
         generator::GenerateError,
         internal::hash::Map,
@@ -117,9 +118,13 @@ impl<'backend> CraneliftGenerator<'backend> {
             AnalysisKind::GreaterOrEqual(left, right) => self.greater_or_equal(left, right, span),
             AnalysisKind::Index(index) => self.index(index, span),
             AnalysisKind::Usage(identifier) => self.usage(identifier, span),
+            AnalysisKind::Symbol(target) => self.symbol_value(target, span),
             AnalysisKind::Access(target, member) => self.access(target, member, span),
+            AnalysisKind::Slot(target, slot) => self.slot(target, slot, span),
             AnalysisKind::Constructor(structure) => self.constructor(typing, structure, span),
+            AnalysisKind::Pack(target, values) => self.pack(typing, target, values, span),
             AnalysisKind::Assign(target, value) => self.assign(target, value, span),
+            AnalysisKind::Write(target, value) => self.write(target, value, span),
             AnalysisKind::Store(target, value) => self.store(target, value, span),
             AnalysisKind::Binding(binding) => self.binding(binding, span),
             AnalysisKind::Block(analyses) => self.block(analyses, span),
@@ -129,9 +134,11 @@ impl<'backend> CraneliftGenerator<'backend> {
             AnalysisKind::While(condition, body) => self.r#while(condition, body, span),
             AnalysisKind::Module(name, analyses) => self.module(name, analyses, span),
             AnalysisKind::Invoke(invoke) => self.invoke(invoke, span),
+            AnalysisKind::Call(target, values) => self.call(target, values, span),
             AnalysisKind::Return(value) => self.r#return(value, span),
             AnalysisKind::Break(value) => self.r#break(value, span),
             AnalysisKind::Continue(value) => self.r#continue(value, span),
+            AnalysisKind::Composite(composite) => self.composite(composite, span),
         }
     }
 
@@ -149,6 +156,7 @@ impl<'backend> CraneliftGenerator<'backend> {
                 _ => None,
             },
             AnalysisKind::Assign(_, value) => self.infer_signedness(value),
+            AnalysisKind::Write(_, value) => self.infer_signedness(value),
             AnalysisKind::Binding(binding) => binding
                 .value
                 .as_ref()

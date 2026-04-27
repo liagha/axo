@@ -1,8 +1,8 @@
 // src/generator/cranelift/composite.rs
 use {
     crate::{
-        analyzer::Analysis,
-        data::{Aggregate, Index, Str},
+        analyzer::{Analysis, Target},
+        data::{Aggregate, Index, Scale, Str},
         generator::{cranelift::CraneliftGenerator, GenerateError},
         resolver::Type,
         tracker::Span,
@@ -11,6 +11,56 @@ use {
 };
 
 impl<'backend> CraneliftGenerator<'backend> {
+    pub fn slot(
+        &mut self,
+        target: Box<Analysis<'backend>>,
+        index: Scale,
+        span: Span,
+    ) -> Result<Value, GenerateError<'backend>> {
+        let value = Analysis::new(
+            crate::analyzer::AnalysisKind::Index(Index::new(
+                target,
+                vec![Analysis::new(
+                    crate::analyzer::AnalysisKind::Integer {
+                        value: index as isize,
+                        size: 64,
+                        signed: true,
+                    },
+                    span,
+                    crate::resolver::Type::from(crate::resolver::TypeKind::Integer {
+                        size: 64,
+                        signed: true,
+                    }),
+                )],
+            )),
+            span,
+            crate::resolver::Type::from(crate::resolver::TypeKind::Unknown),
+        );
+        self.analysis(value)
+    }
+
+    pub fn pack(
+        &mut self,
+        typing: Type<'backend>,
+        target: Target<'backend>,
+        values: Vec<(Scale, Analysis<'backend>)>,
+        span: Span,
+    ) -> Result<Value, GenerateError<'backend>> {
+        let mut members = Vec::with_capacity(values.len());
+        for (_, value) in values {
+            members.push(value);
+        }
+        self.constructor(typing, Aggregate::new(target.name, members), span)
+    }
+
+    pub fn composite(
+        &mut self,
+        composite: Aggregate<Target<'backend>, Analysis<'backend>>,
+        span: Span,
+    ) -> Result<Value, GenerateError<'backend>> {
+        self.define_structure(Aggregate::new(composite.target.name, composite.members), span)
+    }
+
     pub fn define_structure(
         &mut self,
         _structure: Aggregate<Str<'backend>, Analysis<'backend>>,

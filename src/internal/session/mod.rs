@@ -13,7 +13,7 @@ use {
         identifier,
         internal::{
             hash::{DefaultHasher, Hash, Hasher},
-            platform::{Lock, Command, var},
+            platform::{Lock, var},
             time::{Duration, Instant, UNIX_EPOCH},
         },
         literal, module,
@@ -23,11 +23,8 @@ use {
     },
 };
 
-#[cfg(feature = "interpreter")]
-use crate::{
-    internal::platform::{temp_dir, DLL_EXTENSION},
-    interpreter::Interpreter,
-};
+#[cfg(feature = "dialog")]
+use crate::{generator::CraneliftEngine, internal::SessionError};
 
 #[cfg(feature = "generator")]
 use crate::generator::{EmitCombinator, GenerateCombinator, RunCombinator};
@@ -55,10 +52,10 @@ pub struct Resolve<'source> {
 pub struct Analyze<'source> {
     pub phantom: PhantomData<&'source ()>,
 }
-#[cfg(feature = "interpreter")]
+#[cfg(feature = "dialog")]
 pub struct Interpret<'source> {
-    #[cfg(feature = "interpreter")]
-    pub engine: Option<Arc<Lock<Interpreter<'source>>>>,
+    #[cfg(feature = "dialog")]
+    pub engine: Option<Arc<Lock<CraneliftEngine<'source>>>>,
     pub phantom: PhantomData<&'source ()>,
 }
 
@@ -280,7 +277,7 @@ Combinator<
     }
 }
 
-#[cfg(feature = "interpreter")]
+#[cfg(feature = "dialog")]
 impl<'source>
 Combinator<
     'static,
@@ -304,7 +301,9 @@ Combinator<
             let mut core = engine.write().unwrap();
             core.reset();
             let targets = session.all_source_keys();
-            Interpreter::process(&mut session, &mut core, &targets);
+            if let Err(error) = core.process(&session, &targets) {
+                session.errors.push(SessionError::Generate(error));
+            }
             session.set_stage(INTERPRET_STAGE, 0, signature);
             changed = true;
         }
@@ -415,7 +414,7 @@ impl<'session> Session<'session> {
         hasher.finish() as usize
     }
 
-    #[cfg(feature = "interpreter")]
+    #[cfg(feature = "dialog")]
     pub fn interpret_signature(&self) -> usize {
         self.combine_signature(&self.all_source_keys(), 3)
     }
@@ -541,97 +540,6 @@ impl<'session> Session<'session> {
             }
         }
 
-        #[cfg(feature = "interpreter")]
-        {
-            use crate::{
-                internal::platform::{create_dir_all, write},
-            };
-
-            let mut sources = Vec::new();
-            let discard = self.get_directive(Str::from("Discard")).is_some();
-
-            let build = if discard {
-                temp_dir().join("axo").join("build")
-            } else {
-                self.base().join("build")
-            };
-
-            let mut dirty = false;
-
-            for key in &keys {
-                let record = self.records.get(key).unwrap();
-                if record.kind == RecordKind::C {
-                    if let Ok(path) = record.location.to_path() {
-                        if let Some(content) = &record.content {
-                            _ = create_dir_all(&build);
-                            if let Some(name) = path.file_name() {
-                                let build_path = build.join(name);
-                                let mut file_dirty = record.dirty;
-
-                                if build_path.exists() {
-                                    if let Ok(existing_content) = std::fs::read(&build_path) {
-                                        file_dirty = existing_content != content.as_bytes();
-                                    }
-                                } else {
-                                    file_dirty = true;
-                                }
-
-                                if file_dirty {
-                                    _ = write(build_path.clone(), content.as_bytes().to_vec());
-                                    dirty = true;
-                                }
-                                sources.push(build_path);
-                            }
-                        } else {
-                            sources.push(path);
-                            if record.dirty {
-                                dirty = true;
-                            }
-                        }
-                    }
-                }
-            }
-
-            if !sources.is_empty() {
-                let library = build.join(format!("lib_axo.{}", DLL_EXTENSION));
-                let recompile = dirty || !library.exists();
-
-                if recompile {
-                    let mut command = Command::new("clang");
-                    let mut is_msvc = cfg!(target_env = "msvc");
-
-                    if let Some(target) = self.get_target() {
-                        let target_str = target.as_str().unwrap();
-                        command.arg("-target").arg(target_str);
-                        is_msvc = target_str.contains("msvc");
-                    }
-
-                    if is_msvc {
-                        command.arg("/nologo").arg("/LD").arg(format!("/Fe{}", library.display()));
-                    } else {
-                        command.arg("-w").arg("-shared").arg("-fPIC").arg("-o").arg(&library);
-                    }
-
-                    for source in sources {
-                        command.arg(source);
-                    }
-
-                    if !command.status().expect("clang not found").success() {
-                        panic!("failed to compile dynamic library");
-                    }
-                }
-
-                if library.exists() {
-                    use crate::data::memory::forget;
-
-                    let loading = unsafe { libloading::Library::new(&library) };
-                    match loading {
-                        Ok(instance) => forget(instance),
-                        Err(error) => panic!("failed to open library: {} - {}", library.display(), error),
-                    }
-                }
-            }
-        }
 
         self.errors.is_empty()
     }
@@ -691,8 +599,8 @@ impl<'session> Session<'session> {
 
     pub fn pipeline(
         keys: Vec<Identity>,
-        #[cfg(feature = "interpreter")]
-        engine: Option<Arc<Lock<Interpreter<'session>>>>,
+        #[cfg(feature = "dialog")]
+        engine: Option<Arc<Lock<CraneliftEngine<'session>>>>,
     ) -> Operation<'session, Arc<Lock<Session<'session>>>> {
         #[cfg(feature = "generator")]
         let mut states = vec![
@@ -713,7 +621,7 @@ impl<'session> Session<'session> {
                 Operation::new(Arc::new(Analyze {
                     phantom: PhantomData,
                 })),
-                #[cfg(feature = "interpreter")]
+                #[cfg(feature = "dialog")]
                 Operation::new(Arc::new(Interpret {
                     engine: engine.clone(),
                     phantom: PhantomData,
@@ -763,7 +671,7 @@ impl<'session> Session<'session> {
                 Operation::new(Arc::new(Analyze {
                     phantom: PhantomData,
                 })),
-                #[cfg(feature = "interpreter")]
+                #[cfg(feature = "dialog")]
                 Operation::new(Arc::new(Interpret {
                     engine: engine.clone(),
                     phantom: PhantomData,
@@ -805,15 +713,15 @@ impl<'session> Session<'session> {
     }
 
     pub fn compile(self) -> Self {
-        #[cfg(feature = "interpreter")]
-        let engine = Arc::new(Lock::new(Interpreter::new(1024)));
+        #[cfg(feature = "dialog")]
+        let engine: Option<Arc<Lock<CraneliftEngine<'session>>>> = None;
         let mut keys: Vec<_> = self.records.keys().copied().collect();
         keys.sort();
 
         self.run(Self::pipeline(
             keys,
-            #[cfg(feature = "interpreter")]
-            Some(engine),
+            #[cfg(feature = "dialog")]
+            engine,
         ))
     }
 }

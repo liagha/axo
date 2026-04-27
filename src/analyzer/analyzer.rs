@@ -1,11 +1,9 @@
 use crate::{
     analyzer::{Analysis, AnalysisKind, AnalyzeError},
-    data::Str,
-    format::{Show, Stencil},
+    data::{Aggregate, Binding, Function, Identity, Str},
     internal::{Artifact, RecordKind, Session, SessionError},
     parser::{Element, Symbol, SymbolKind},
     resolver::Resolver,
-    data::{Identity, Binding, Aggregate, Function},
 };
 
 pub struct Analyzer<'analyzer> {
@@ -87,62 +85,60 @@ impl<'symbol> Analyzable<'symbol> for Symbol<'symbol> {
                 let value = binding
                     .value
                     .clone()
-                    .map(|v| v.analyze(resolver))
+                    .map(|value| value.analyze(resolver))
                     .transpose()?;
 
                 let head = binding.target.analyze(resolver)?;
 
-                let analyzed = Binding::new(
+                let binding = Binding::new(
                     Box::new(head),
                     value.map(Box::new),
                     self.typing.clone(),
                     binding.kind,
                 );
 
-                AnalysisKind::Binding(analyzed)
+                AnalysisKind::Binding(binding)
             }
             SymbolKind::Structure(structure) => {
-                let members: Result<Vec<Analysis<'symbol>>, AnalyzeError<'symbol>> = structure
+                let members = structure
                     .members
                     .iter()
-                    .map(|m| m.analyze(resolver))
-                    .collect();
+                    .map(|member| member.analyze(resolver))
+                    .collect::<Result<Vec<_>, _>>()?;
 
-                let name = Str::from(structure.target.target().unwrap().format(Stencil::default()));
-                let analyzed = Aggregate::new(name, members?);
-
-                AnalysisKind::Structure(analyzed)
+                AnalysisKind::Structure(Aggregate::new(
+                    Str::from(structure.target.target().unwrap_or_default().to_string()),
+                    members,
+                ))
             }
             SymbolKind::Union(union) => {
-                let members: Result<Vec<Analysis<'symbol>>, AnalyzeError<'symbol>> = union
+                let members = union
                     .members
                     .iter()
-                    .map(|m| m.analyze(resolver))
-                    .collect();
+                    .map(|member| member.analyze(resolver))
+                    .collect::<Result<Vec<_>, _>>()?;
 
-                let name = Str::from(union.target.target().unwrap().format(Stencil::default()));
-                let analyzed = Aggregate::new(name, members?);
-
-                AnalysisKind::Union(analyzed)
+                AnalysisKind::Union(Aggregate::new(
+                    Str::from(union.target.target().unwrap_or_default().to_string()),
+                    members,
+                ))
             }
             SymbolKind::Function(function) => {
-                let members: Result<Vec<Analysis<'symbol>>, AnalyzeError<'symbol>> = function
+                let members = function
                     .members
                     .iter()
-                    .map(|m| m.analyze(resolver))
-                    .collect();
+                    .map(|member| member.analyze(resolver))
+                    .collect::<Result<Vec<_>, _>>()?;
 
                 let body = function
                     .body
                     .clone()
-                    .and_then(|b| b.analyze(resolver).ok().map(Box::new));
+                    .and_then(|body| body.analyze(resolver).ok().map(Box::new));
 
-                let output = function.output.clone().map(|o| o.typing);
-                let name = Str::from(function.target.target().unwrap().format(Stencil::default()));
-
-                let analyzed = Function::new(
-                    name,
-                    members?,
+                let output = function.output.clone().map(|output| output.typing);
+                let function = Function::new(
+                    Str::from(function.target.target().unwrap_or_default().to_string()),
+                    members,
                     body,
                     output,
                     function.interface,
@@ -150,10 +146,10 @@ impl<'symbol> Analyzable<'symbol> for Symbol<'symbol> {
                     function.variadic,
                 );
 
-                AnalysisKind::Function(analyzed)
+                AnalysisKind::Function(function)
             }
-            SymbolKind::Module(_) => {
-                unimplemented!()
+            SymbolKind::Module(module) => {
+                AnalysisKind::Module(module.target.target().unwrap_or_default(), Vec::new())
             }
         };
 

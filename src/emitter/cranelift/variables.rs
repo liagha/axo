@@ -1,7 +1,7 @@
 // src/generator/cranelift/variables.rs
 use {
     crate::{
-        analyzer::Analysis,
+        analyzer::{Analysis, Target},
         data::{Binding, Str},
         generator::{cranelift::CraneliftGenerator, GenerateError},
         resolver::Type,
@@ -11,6 +11,14 @@ use {
 };
 
 impl<'backend> CraneliftGenerator<'backend> {
+    pub fn symbol_value(&mut self, target: Target<'backend>, span: Span) -> Result<Value, GenerateError<'backend>> {
+        self.usage(target.name, span)
+    }
+
+    pub fn write(&mut self, target: Target<'backend>, value: Box<Analysis<'backend>>, span: Span) -> Result<Value, GenerateError<'backend>> {
+        self.assign(target.name, value, span)
+    }
+
     pub fn address_of(&mut self, _operand: Box<Analysis<'backend>>, _span: Span) -> Result<Value, GenerateError<'backend>> {
         Ok(self.builder.ins().iconst(types::I64, 0))
     }

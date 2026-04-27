@@ -383,8 +383,6 @@ impl<'session> Session<'session> {
                 SessionError::Parse(error) => self.report_error(error),
                 SessionError::Resolve(error) => self.report_error(error),
                 SessionError::Analyze(error) => self.report_error(error),
-                #[cfg(feature = "interpreter")]
-                SessionError::Interpret(error) => self.report_error(error),
                 SessionError::Track(error) => self.report_error(error),
                 #[cfg(feature = "generator")]
                 SessionError::Generate(error) => self.report_error(error),
