@@ -1,6 +1,4 @@
-use crate::{
-    data::{Identity, Offset},
-};
+use crate::data::{Identity, Offset};
 
 #[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq, Ord, PartialOrd)]
 pub struct Position {
@@ -11,12 +9,18 @@ pub struct Position {
 impl Position {
     #[inline]
     pub fn new(identity: Identity) -> Self {
-        Self { identity, offset: 0 }
+        Self {
+            identity,
+            offset: 0,
+        }
     }
 
     #[inline]
     pub fn default(identity: Identity) -> Self {
-        Self { identity, offset: 0 }
+        Self {
+            identity,
+            offset: 0,
+        }
     }
 
     #[inline]

@@ -8,9 +8,15 @@ pub struct Plan<'source, Store = ()> {
     pub states: Vec<Operation<'source, Store>>,
 }
 
-impl<'source, Store: Clone + Send + Sync + 'source> Combinator<'static, Operator<Store>, Operation<'source, Store>> for Plan<'source, Store> {
+impl<'source, Store: Clone + Send + Sync + 'source>
+    Combinator<'static, Operator<Store>, Operation<'source, Store>> for Plan<'source, Store>
+{
     #[inline]
-    fn combinator(&self, operator: &mut Operator<Store>, operation: &mut Operation<'source, Store>) {
+    fn combinator(
+        &self,
+        operator: &mut Operator<Store>,
+        operation: &mut Operation<'source, Store>,
+    ) {
         let mut all_resolved = true;
         let mut any_rejected = false;
         let mut final_payload = take(&mut operation.payload);
@@ -54,9 +60,15 @@ pub struct Parallel<'source, Store = ()> {
     pub states: Vec<Operation<'source, Store>>,
 }
 
-impl<'source, Store: Clone + Send + Sync + 'source> Combinator<'static, Operator<Store>, Operation<'source, Store>> for Parallel<'source, Store> {
+impl<'source, Store: Clone + Send + Sync + 'source>
+    Combinator<'static, Operator<Store>, Operation<'source, Store>> for Parallel<'source, Store>
+{
     #[inline]
-    fn combinator(&self, operator: &mut Operator<Store>, operation: &mut Operation<'source, Store>) {
+    fn combinator(
+        &self,
+        operator: &mut Operator<Store>,
+        operation: &mut Operation<'source, Store>,
+    ) {
         let mut all_resolved = true;
         let mut any_rejected = false;
         let mut final_payload = take(&mut operation.payload);

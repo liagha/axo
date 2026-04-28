@@ -120,7 +120,9 @@ impl<'a> Resolvable<'a> for Symbol<'a> {
 
                 let annotation = binding.annotation.as_mut().map(|annotation| {
                     annotation.resolve(resolver);
-                    resolver.annotation(annotation).unwrap_or_else(|_| resolver.fresh())
+                    resolver
+                        .annotation(annotation)
+                        .unwrap_or_else(|_| resolver.fresh())
                 });
 
                 let value = annotation.clone().unwrap_or_else(|| resolver.fresh());
@@ -242,7 +244,8 @@ impl<'a> Resolvable<'a> for Symbol<'a> {
             SymbolKind::Structure(structure) => {
                 let target = structure.target.target().unwrap();
                 let scope = replace(&mut self.scope, Box::new(Scope::new(None)));
-                let (members, scope) = Self::resolve_scope(resolver, *scope, &mut structure.members);
+                let (members, scope) =
+                    Self::resolve_scope(resolver, *scope, &mut structure.members);
                 self.scope = Box::new(scope);
                 self.scope.parent = None;
                 Self::shape(self.identity, target, members, false)
@@ -314,9 +317,10 @@ impl<'a> Resolvable<'a> for Symbol<'a> {
                 self.scope.parent = None;
                 typing
             }
-            SymbolKind::Module(module) => {
-                Type::new(self.identity, TypeKind::Module(module.target.target().unwrap().into()))
-            }
+            SymbolKind::Module(module) => Type::new(
+                self.identity,
+                TypeKind::Module(module.target.target().unwrap().into()),
+            ),
         };
 
         self.typing = resolver.unify(self.span, &expected, &typing);

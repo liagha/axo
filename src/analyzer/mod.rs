@@ -15,11 +15,11 @@ use crate::{
 pub type AnalyzeError<'error> = Error<'error, ErrorKind<'error>>;
 
 impl<'source>
-Combinator<
-    'static,
-    Operator<Arc<Lock<Session<'source>>>>,
-    Operation<'source, Arc<Lock<Session<'source>>>>,
-> for Analyzer<'source>
+    Combinator<
+        'static,
+        Operator<Arc<Lock<Session<'source>>>>,
+        Operation<'source, Arc<Lock<Session<'source>>>>,
+    > for Analyzer<'source>
 {
     fn combinator(
         &self,

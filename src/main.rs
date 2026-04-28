@@ -1,6 +1,6 @@
 use axo::{
     internal::{Session, SessionError},
-    tracker::{TrackError, ErrorKind},
+    tracker::{ErrorKind, TrackError},
 };
 
 fn main() {
@@ -27,8 +27,12 @@ fn main() {
                 let mut hasher = axo::internal::hash::DefaultHasher::new();
                 axo::internal::hash::Hash::hash(&string, &mut hasher);
 
-                let identity = (axo::internal::hash::Hasher::finish(&hasher) as axo::data::Identity) | 0x40000000;
-                session.records.insert(identity, axo::internal::Record::new(kind, target.clone()));
+                let identity = (axo::internal::hash::Hasher::finish(&hasher)
+                    as axo::data::Identity)
+                    | 0x40000000;
+                session
+                    .records
+                    .insert(identity, axo::internal::Record::new(kind, target.clone()));
             } else {
                 session.errors.push(SessionError::Track(TrackError::new(
                     ErrorKind::UnSupportedInput(target.clone()),

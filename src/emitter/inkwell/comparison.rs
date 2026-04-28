@@ -76,9 +76,13 @@ impl<'backend> Generator<'backend> {
         right: Box<Analysis<'backend>>,
         span: Span,
     ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
-        if matches!(self.value_type(&left.typing).kind, crate::resolver::TypeKind::String)
-            && matches!(self.value_type(&right.typing).kind, crate::resolver::TypeKind::String)
-        {
+        if matches!(
+            self.value_type(&left.typing).kind,
+            crate::resolver::TypeKind::String
+        ) && matches!(
+            self.value_type(&right.typing).kind,
+            crate::resolver::TypeKind::String
+        ) {
             return self.string_equal(left, right, false, span);
         }
 
@@ -122,9 +126,13 @@ impl<'backend> Generator<'backend> {
         right: Box<Analysis<'backend>>,
         span: Span,
     ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
-        if matches!(self.value_type(&left.typing).kind, crate::resolver::TypeKind::String)
-            && matches!(self.value_type(&right.typing).kind, crate::resolver::TypeKind::String)
-        {
+        if matches!(
+            self.value_type(&left.typing).kind,
+            crate::resolver::TypeKind::String
+        ) && matches!(
+            self.value_type(&right.typing).kind,
+            crate::resolver::TypeKind::String
+        ) {
             return self.string_equal(left, right, true, span);
         }
 

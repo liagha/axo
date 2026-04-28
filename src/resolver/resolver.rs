@@ -1,4 +1,3 @@
-use broccli::Color;
 use crate::{
     data::{memory::replace, Identity, Module, Str},
     format::Show,
@@ -8,6 +7,7 @@ use crate::{
     scanner::{Token, TokenKind},
     tracker::Span,
 };
+use broccli::Color;
 
 pub struct Resolver<'a> {
     pub active: Identity,
@@ -93,7 +93,11 @@ impl<'a> Resolver<'a> {
         (value, self.scopes.remove(&active).unwrap())
     }
 
-    pub fn within<T>(&mut self, scope: Scope, combinator: impl FnOnce(&mut Self) -> T) -> (T, Scope) {
+    pub fn within<T>(
+        &mut self,
+        scope: Scope,
+        combinator: impl FnOnce(&mut Self) -> T,
+    ) -> (T, Scope) {
         self.enter_scope(scope);
         let value = combinator(self);
         let active = self.active;
@@ -123,7 +127,8 @@ impl<'a> Resolver<'a> {
     pub fn collect(&self) -> Vec<Symbol<'a>> {
         let mut symbols = self.walk(self.active, Vec::new(), |mut items, scope| {
             items.extend(
-                scope.symbols
+                scope
+                    .symbols
                     .iter()
                     .filter_map(|identity| self.registry.get(identity).cloned()),
             );
@@ -151,14 +156,12 @@ impl<'a> Resolver<'a> {
         };
 
         let mut symbols = self.walk(self.active, Vec::new(), |mut items, scope| {
-            items.extend(
-                scope.symbols.iter().filter_map(|identity| {
-                    self.registry
-                        .get(identity)
-                        .filter(|symbol| symbol.target() == Some(query.clone()))
-                        .cloned()
-                }),
-            );
+            items.extend(scope.symbols.iter().filter_map(|identity| {
+                self.registry
+                    .get(identity)
+                    .filter(|symbol| symbol.target() == Some(query.clone()))
+                    .cloned()
+            }));
             items
         });
 
@@ -186,13 +189,22 @@ impl<'a> Resolver<'a> {
         let mut source = keys
             .iter()
             .copied()
-            .filter(|key| session.records.get(key).is_some_and(|record| record.kind == RecordKind::Source))
+            .filter(|key| {
+                session
+                    .records
+                    .get(key)
+                    .is_some_and(|record| record.kind == RecordKind::Source)
+            })
             .collect::<Vec<_>>();
         source.sort();
 
         Self::prepare(session, &source);
-        Self::visit(session, &source, |element, resolver| element.declare(resolver));
-        Self::visit(session, &source, |element, resolver| element.resolve(resolver));
+        Self::visit(session, &source, |element, resolver| {
+            element.declare(resolver)
+        });
+        Self::visit(session, &source, |element, resolver| {
+            element.resolve(resolver)
+        });
 
         session
             .errors
@@ -229,15 +241,16 @@ impl<'a> Resolver<'a> {
                 let record = session.records.get_mut(&identity).unwrap();
                 let name = Self::module_name(record);
 
-                if let Some(target) = session
-                    .resolver
-                    .registry
-                    .iter()
-                    .find_map(|(&target, symbol)| {
-                        (matches!(symbol.kind, SymbolKind::Module(_))
-                            && symbol.target() == Some(name.clone()))
-                        .then_some(target)
-                    })
+                if let Some(target) =
+                    session
+                        .resolver
+                        .registry
+                        .iter()
+                        .find_map(|(&target, symbol)| {
+                            (matches!(symbol.kind, SymbolKind::Module(_))
+                                && symbol.target() == Some(name.clone()))
+                            .then_some(target)
+                        })
                 {
                     record.store(0, Artifact::Module(target));
                     return None;

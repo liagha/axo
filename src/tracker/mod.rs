@@ -1,18 +1,16 @@
 pub mod error;
+mod format;
 mod peekable;
 mod position;
 mod span;
-mod format;
 
-
-pub use {error::*, peekable::*, position::*, span::*};
-use {
-    crate::{
-        internal::platform::{read_to_string, Path, PathBuf},
-        format::Display, reporter::Error,
-        data::{Str, Scale}
-    }
+use crate::{
+    data::{Scale, Str},
+    format::Display,
+    internal::platform::{read_to_string, Path, PathBuf},
+    reporter::Error,
 };
+pub use {error::*, peekable::*, position::*, span::*};
 
 pub type Location<'a> = Str<'a>;
 
@@ -30,7 +28,10 @@ impl<'a> Location<'a> {
 
         match read_to_string(&path) {
             Ok(content) => Ok(content.into()),
-            Err(error) => Err(TrackError::new(ErrorKind::from_io(error, self.clone()), Span::void())),
+            Err(error) => Err(TrackError::new(
+                ErrorKind::from_io(error, self.clone()),
+                Span::void(),
+            )),
         }
     }
 

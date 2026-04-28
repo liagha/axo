@@ -2,25 +2,23 @@ mod core;
 
 pub use core::*;
 
-use {
-    crate::{
-        analyzer::Analyzer,
-        combinator::{Combinator, Operation, Operator},
-        data::{
-            memory::{Arc, PhantomData},
-            Identity, Module, Str,
-        },
-        identifier,
-        internal::{
-            hash::{DefaultHasher, Hash, Hasher},
-            platform::{Lock, var},
-            time::{Duration, Instant, UNIX_EPOCH},
-        },
-        literal, module,
-        parser::Parser,
-        resolver::Resolver,
-        scanner::Scanner,
+use crate::{
+    analyzer::Analyzer,
+    combinator::{Combinator, Operation, Operator},
+    data::{
+        memory::{Arc, PhantomData},
+        Identity, Module, Str,
     },
+    identifier,
+    internal::{
+        hash::{DefaultHasher, Hash, Hasher},
+        platform::{var, Lock},
+        time::{Duration, Instant, UNIX_EPOCH},
+    },
+    literal, module,
+    parser::Parser,
+    resolver::Resolver,
+    scanner::Scanner,
 };
 
 #[cfg(feature = "dialog")]
@@ -60,11 +58,11 @@ pub struct Interpret<'source> {
 }
 
 impl<'source>
-Combinator<
-    'static,
-    Operator<Arc<Lock<Session<'source>>>>,
-    Operation<'source, Arc<Lock<Session<'source>>>>,
-> for Bootstrap
+    Combinator<
+        'static,
+        Operator<Arc<Lock<Session<'source>>>>,
+        Operation<'source, Arc<Lock<Session<'source>>>>,
+    > for Bootstrap
 {
     fn combinator(
         &self,
@@ -81,11 +79,11 @@ Combinator<
 }
 
 impl<'source>
-Combinator<
-    'static,
-    Operator<Arc<Lock<Session<'source>>>>,
-    Operation<'source, Arc<Lock<Session<'source>>>>,
-> for Prepare
+    Combinator<
+        'static,
+        Operator<Arc<Lock<Session<'source>>>>,
+        Operation<'source, Arc<Lock<Session<'source>>>>,
+    > for Prepare
 {
     fn combinator(
         &self,
@@ -105,11 +103,11 @@ Combinator<
 }
 
 impl<'source>
-Combinator<
-    'static,
-    Operator<Arc<Lock<Session<'source>>>>,
-    Operation<'source, Arc<Lock<Session<'source>>>>,
-> for Report<'source>
+    Combinator<
+        'static,
+        Operator<Arc<Lock<Session<'source>>>>,
+        Operation<'source, Arc<Lock<Session<'source>>>>,
+    > for Report<'source>
 {
     fn combinator(
         &self,
@@ -130,11 +128,11 @@ Combinator<
 }
 
 impl<'source>
-Combinator<
-    'static,
-    Operator<Arc<Lock<Session<'source>>>>,
-    Operation<'source, Arc<Lock<Session<'source>>>>,
-> for Scan<'source>
+    Combinator<
+        'static,
+        Operator<Arc<Lock<Session<'source>>>>,
+        Operation<'source, Arc<Lock<Session<'source>>>>,
+    > for Scan<'source>
 {
     fn combinator(
         &self,
@@ -151,9 +149,17 @@ Combinator<
             {
                 continue;
             }
-            let before = session.records.get(&key).map(|record| record.artifact_version(1)).unwrap_or(0);
+            let before = session
+                .records
+                .get(&key)
+                .map(|record| record.artifact_version(1))
+                .unwrap_or(0);
             Scanner::execute(&mut session, &[key]);
-            let after = session.records.get(&key).map(|record| record.artifact_version(1)).unwrap_or(0);
+            let after = session
+                .records
+                .get(&key)
+                .map(|record| record.artifact_version(1))
+                .unwrap_or(0);
             session.set_stage(SCAN_STAGE, key, signature);
             changed |= before != after;
         }
@@ -167,11 +173,11 @@ Combinator<
 }
 
 impl<'source>
-Combinator<
-    'static,
-    Operator<Arc<Lock<Session<'source>>>>,
-    Operation<'source, Arc<Lock<Session<'source>>>>,
-> for Parse<'source>
+    Combinator<
+        'static,
+        Operator<Arc<Lock<Session<'source>>>>,
+        Operation<'source, Arc<Lock<Session<'source>>>>,
+    > for Parse<'source>
 {
     fn combinator(
         &self,
@@ -188,9 +194,17 @@ Combinator<
             {
                 continue;
             }
-            let before = session.records.get(&key).map(|record| record.artifact_version(2)).unwrap_or(0);
+            let before = session
+                .records
+                .get(&key)
+                .map(|record| record.artifact_version(2))
+                .unwrap_or(0);
             Parser::execute(&mut session, &[key]);
-            let after = session.records.get(&key).map(|record| record.artifact_version(2)).unwrap_or(0);
+            let after = session
+                .records
+                .get(&key)
+                .map(|record| record.artifact_version(2))
+                .unwrap_or(0);
             session.set_stage(PARSE_STAGE, key, signature);
             changed |= before != after;
         }
@@ -204,11 +218,11 @@ Combinator<
 }
 
 impl<'source>
-Combinator<
-    'static,
-    Operator<Arc<Lock<Session<'source>>>>,
-    Operation<'source, Arc<Lock<Session<'source>>>>,
-> for Resolve<'source>
+    Combinator<
+        'static,
+        Operator<Arc<Lock<Session<'source>>>>,
+        Operation<'source, Arc<Lock<Session<'source>>>>,
+    > for Resolve<'source>
 {
     fn combinator(
         &self,
@@ -237,11 +251,11 @@ Combinator<
 }
 
 impl<'source>
-Combinator<
-    'static,
-    Operator<Arc<Lock<Session<'source>>>>,
-    Operation<'source, Arc<Lock<Session<'source>>>>,
-> for Analyze<'source>
+    Combinator<
+        'static,
+        Operator<Arc<Lock<Session<'source>>>>,
+        Operation<'source, Arc<Lock<Session<'source>>>>,
+    > for Analyze<'source>
 {
     fn combinator(
         &self,
@@ -253,19 +267,33 @@ Combinator<
         let targets = session.all_source_keys();
         let signature = session.analyze_signature(&targets);
         if session.stage_value(ANALYZE_STAGE, 0) == signature
-            && targets.iter().all(|key| session.records.get(key).unwrap().fetch(3).is_some())
+            && targets
+                .iter()
+                .all(|key| session.records.get(key).unwrap().fetch(3).is_some())
         {
             operation.set_resolve(Vec::new());
             return;
         }
         let before = targets
             .iter()
-            .map(|key| session.records.get(key).map(|record| record.artifact_version(3)).unwrap_or(0))
+            .map(|key| {
+                session
+                    .records
+                    .get(key)
+                    .map(|record| record.artifact_version(3))
+                    .unwrap_or(0)
+            })
             .sum::<usize>();
         Analyzer::execute(&mut session, &targets);
         let after = targets
             .iter()
-            .map(|key| session.records.get(key).map(|record| record.artifact_version(3)).unwrap_or(0))
+            .map(|key| {
+                session
+                    .records
+                    .get(key)
+                    .map(|record| record.artifact_version(3))
+                    .unwrap_or(0)
+            })
             .sum::<usize>();
         session.set_stage(ANALYZE_STAGE, 0, signature);
         if session.errors.is_empty() {
@@ -279,11 +307,11 @@ Combinator<
 
 #[cfg(feature = "dialog")]
 impl<'source>
-Combinator<
-    'static,
-    Operator<Arc<Lock<Session<'source>>>>,
-    Operation<'source, Arc<Lock<Session<'source>>>>,
-> for Interpret<'source>
+    Combinator<
+        'static,
+        Operator<Arc<Lock<Session<'source>>>>,
+        Operation<'source, Arc<Lock<Session<'source>>>>,
+    > for Interpret<'source>
 {
     fn combinator(
         &self,
@@ -360,7 +388,10 @@ impl<'session> Session<'session> {
     }
 
     pub fn stage_value(&self, stage: u8, key: Identity) -> usize {
-        self.pipeline.get(&Self::stage_key(stage, key)).copied().unwrap_or(0)
+        self.pipeline
+            .get(&Self::stage_key(stage, key))
+            .copied()
+            .unwrap_or(0)
     }
 
     pub fn set_stage(&mut self, stage: u8, key: Identity, value: usize) {
@@ -449,7 +480,11 @@ impl<'session> Session<'session> {
             };
 
             if let Some(Artifact::Tokens(tokens)) = record.fetch(1) {
-                self.report_section("Tokens", Color::Cyan, tokens.format(stencil.clone()).to_string());
+                self.report_section(
+                    "Tokens",
+                    Color::Cyan,
+                    tokens.format(stencil.clone()).to_string(),
+                );
             }
         }
     }
@@ -468,7 +503,11 @@ impl<'session> Session<'session> {
             };
 
             if let Some(Artifact::Elements(elements)) = record.fetch(2) {
-                self.report_section("Elements", Color::Cyan, elements.format(stencil.clone()).to_string());
+                self.report_section(
+                    "Elements",
+                    Color::Cyan,
+                    elements.format(stencil.clone()).to_string(),
+                );
             }
         }
     }
@@ -487,15 +526,17 @@ impl<'session> Session<'session> {
             };
 
             if let Some(Artifact::Analyses(analyses)) = record.fetch(3) {
-                self.report_section("Analysis", Color::Blue, analyses.format(stencil.clone()).to_string());
+                self.report_section(
+                    "Analysis",
+                    Color::Blue,
+                    analyses.format(stencil.clone()).to_string(),
+                );
             }
         }
     }
 
     pub fn prepare(&mut self) -> bool {
-        use crate::{
-            internal::hash::{DefaultHasher, Hash, Hasher},
-        };
+        use crate::internal::hash::{DefaultHasher, Hash, Hasher};
 
         let mut keys: Vec<_> = self.records.keys().copied().collect();
         keys.sort();
@@ -539,7 +580,6 @@ impl<'session> Session<'session> {
                 }
             }
         }
-
 
         self.errors.is_empty()
     }
@@ -599,8 +639,7 @@ impl<'session> Session<'session> {
 
     pub fn pipeline(
         keys: Vec<Identity>,
-        #[cfg(feature = "dialog")]
-        engine: Option<Arc<Lock<CraneliftEngine<'session>>>>,
+        #[cfg(feature = "dialog")] engine: Option<Arc<Lock<CraneliftEngine<'session>>>>,
     ) -> Operation<'session, Arc<Lock<Session<'session>>>> {
         #[cfg(feature = "generator")]
         let mut states = vec![

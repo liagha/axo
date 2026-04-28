@@ -87,7 +87,7 @@ pub mod outcome {
 
 use crate::combinator::outcome::Outcome;
 use crate::{
-    combinator::{Combinator, Formation, Form, Formable},
+    combinator::{Combinator, Form, Formable, Formation},
     data::{
         memory::{replace, Arc},
         Identity, Offset,
@@ -100,10 +100,10 @@ pub type Stash<'a, 'source, Source, Input, Output, Failure> = Vec<(
     usize,
     Arc<
         dyn Combinator<
-            'a,
-            Former<'a, 'source, Source, Input, Output, Failure>,
-            Formation<'a, 'source, Source, Input, Output, Failure>,
-        > + Send
+                'a,
+                Former<'a, 'source, Source, Input, Output, Failure>,
+                Formation<'a, 'source, Source, Input, Output, Failure>,
+            > + Send
             + Sync
             + 'source,
     >,
@@ -148,7 +148,8 @@ where
     pub memo: Map<(usize, Offset), Memo<'a, Source, Input, Output, Failure>>,
 }
 
-impl<'a, 'source, Source, Input, Output, Failure> Former<'a, 'source, Source, Input, Output, Failure>
+impl<'a, 'source, Source, Input, Output, Failure>
+    Former<'a, 'source, Source, Input, Output, Failure>
 where
     Source: Peekable<'a, Input>,
     Source::State: Default,
@@ -168,7 +169,10 @@ where
     }
 
     #[inline(always)]
-    pub fn build(&mut self, formation: &mut Formation<'a, 'source, Source, Input, Output, Failure>) {
+    pub fn build(
+        &mut self,
+        formation: &mut Formation<'a, 'source, Source, Input, Output, Failure>,
+    ) {
         let combinator = formation.combinator.clone();
         combinator.combinator(self, formation);
     }

@@ -1,9 +1,12 @@
 use crate::{
-    boolean, character, delimited, function, identifier, integer, literal, punctuation, string,
+    boolean, character,
     data::{Delimited, Function, Interface},
+    delimited, function, identifier, integer, literal,
     parser::{Element, Symbol},
+    punctuation,
     resolver::Resolver,
     scanner::PunctuationKind,
+    string,
 };
 
 impl<'resolver> Resolver<'resolver> {
@@ -45,17 +48,15 @@ impl<'resolver> Resolver<'resolver> {
             punctuation!(PunctuationKind::RightBrace),
         ));
 
-        function!(
-            Function::new(
-                target,
-                Vec::new(),
-                Some(body),
-                None,
-                Interface::Compiler,
-                false,
-                false,
-            )
-        )
+        function!(Function::new(
+            target,
+            Vec::new(),
+            Some(body),
+            None,
+            Interface::Compiler,
+            false,
+            false,
+        ))
     }
 
     fn function(name: &'static str, output: &'static str) -> Symbol<'resolver> {
@@ -76,16 +77,14 @@ impl<'resolver> Resolver<'resolver> {
             )),
         };
 
-        function!(
-            Function::new(
-                target,
-                Vec::new(),
-                Some(body),
-                Some(annotation),
-                Interface::Compiler,
-                false,
-                false,
-            )
-        )
+        function!(Function::new(
+            target,
+            Vec::new(),
+            Some(body),
+            Some(annotation),
+            Interface::Compiler,
+            false,
+            false,
+        ))
     }
 }

@@ -27,7 +27,9 @@ impl<'a> Peekable<'a, Token<'a>> for Parser<'a> {
     }
 
     fn peek_behind(&self, n: Offset) -> Option<&Token<'a>> {
-        self.index.checked_sub(n).and_then(|current| self.get(current))
+        self.index
+            .checked_sub(n)
+            .and_then(|current| self.get(current))
     }
 
     fn origin(&self) -> Self::State {
@@ -85,8 +87,15 @@ impl<'a: 'source, 'source> Parser<'a> {
 
     #[inline]
     fn prefer(candidate: &ParseError<'a>, current: &ParseError<'a>) -> bool {
-        (candidate.span.end, candidate.span.start, Self::priority(candidate))
-            > (current.span.end, current.span.start, Self::priority(current))
+        (
+            candidate.span.end,
+            candidate.span.start,
+            Self::priority(candidate),
+        ) > (
+            current.span.end,
+            current.span.start,
+            Self::priority(current),
+        )
     }
 
     pub fn new() -> Self {
@@ -113,7 +122,7 @@ impl<'a: 'source, 'source> Parser<'a> {
                             | TokenKind::Comment(_)
                     )
                 })
-                    .with_ignore(),
+                .with_ignore(),
                 Formation::predicate(|token: &Token| {
                     !matches!(
                         token.kind,
@@ -196,12 +205,9 @@ impl<'a: 'source, 'source> Parser<'a> {
 
         parser.output.shrink_to_fit();
 
-        session.errors.extend(
-            parser
-                .errors
-                .into_iter()
-                .map(SessionError::Parse),
-        );
+        session
+            .errors
+            .extend(parser.errors.into_iter().map(SessionError::Parse));
 
         let record = session.records.get_mut(&key).unwrap();
         record.store(2, Artifact::Elements(parser.output));

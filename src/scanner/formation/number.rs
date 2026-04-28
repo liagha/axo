@@ -1,13 +1,12 @@
 use crate::{
-    combinator::{Formation, Form},
+    combinator::{Form, Formation},
     data::{Float, Str},
     scanner::{Character, ErrorKind, ScanError, Scanner, Token, TokenKind},
     tracker::Spanned,
 };
 
 impl<'a> Scanner<'a> {
-    pub fn number<'source>(
-    ) -> Formation<'a, 'source, Self, Character, Token<'a>, ScanError<'a>> {
+    pub fn number<'source>() -> Formation<'a, 'source, Self, Character, Token<'a>, ScanError<'a>> {
         Formation::alternative([
             Self::hexadecimal(),
             Self::binary(),
@@ -16,8 +15,7 @@ impl<'a> Scanner<'a> {
         ])
     }
 
-    fn hexadecimal<'source>(
-    ) -> Formation<'a, 'source, Self, Character, Token<'a>, ScanError<'a>> {
+    fn hexadecimal<'source>() -> Formation<'a, 'source, Self, Character, Token<'a>, ScanError<'a>> {
         Formation::with_transform(
             Formation::sequence([
                 Formation::literal('0'),
@@ -116,8 +114,7 @@ impl<'a> Scanner<'a> {
         )
     }
 
-    fn decimal<'source>() -> Formation<'a, 'source, Self, Character, Token<'a>, ScanError<'a>>
-    {
+    fn decimal<'source>() -> Formation<'a, 'source, Self, Character, Token<'a>, ScanError<'a>> {
         Formation::with_transform(
             Formation::sequence([
                 Formation::persistence(
@@ -126,7 +123,7 @@ impl<'a> Scanner<'a> {
                         Formation::literal('.'),
                         Formation::literal('_').with_ignore(),
                     ]),
-                    1, 
+                    1,
                     None,
                 ),
                 Formation::optional(Formation::sequence([
@@ -158,7 +155,9 @@ impl<'a> Scanner<'a> {
                             Ok(())
                         }
 
-                        Err(error) => Err(ScanError::new(ErrorKind::NumberParse(error.into()), span)),
+                        Err(error) => {
+                            Err(ScanError::new(ErrorKind::NumberParse(error.into()), span))
+                        }
                     }
                 } else {
                     match number.parse() {
@@ -168,7 +167,9 @@ impl<'a> Scanner<'a> {
                             Ok(())
                         }
 
-                        Err(error) => Err(ScanError::new(ErrorKind::NumberParse(error.into()), span)),
+                        Err(error) => {
+                            Err(ScanError::new(ErrorKind::NumberParse(error.into()), span))
+                        }
                     }
                 }
             },

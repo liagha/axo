@@ -1,5 +1,5 @@
 use crate::{
-    combinator::{Formation, Form},
+    combinator::{Form, Formation},
     data::{
         character::{from_u32, parse_radix},
         Str,
@@ -97,8 +97,8 @@ impl<'a> Scanner<'a> {
         })
     }
 
-    pub fn hex_escape<'source>(
-    ) -> Formation<'a, 'source, Self, Character, Token<'a>, ScanError<'a>> {
+    pub fn hex_escape<'source>() -> Formation<'a, 'source, Self, Character, Token<'a>, ScanError<'a>>
+    {
         Formation::sequence([
             Formation::literal('\\'),
             Formation::alternative([Formation::literal('x'), Formation::literal('X')]),

@@ -87,9 +87,10 @@ impl<'a> Element<'a> {
         operator: Token<'a>,
         operand: Type<'a>,
     ) -> Type<'a> {
-        resolver
-            .errors
-            .push(Error::new(ErrorKind::InvalidUnary(operator.clone(), operand), operator.span));
+        resolver.errors.push(Error::new(
+            ErrorKind::InvalidUnary(operator.clone(), operand),
+            operator.span,
+        ));
         resolver.fresh()
     }
 
@@ -122,7 +123,9 @@ impl<'a> Element<'a> {
             TokenKind::Boolean(_) => Type::from(TypeKind::Boolean),
             TokenKind::String(_) => Type::from(TypeKind::String),
             TokenKind::Character(_) => Type::from(TypeKind::Character),
-            TokenKind::Identifier(_) => match reference.and_then(|identity| resolver.get_symbol(identity).cloned()) {
+            TokenKind::Identifier(_) => match reference
+                .and_then(|identity| resolver.get_symbol(identity).cloned())
+            {
                 Some(symbol) => {
                     let typing = resolver.reify(&symbol.typing);
                     match typing.kind {
@@ -298,13 +301,16 @@ impl<'a> Element<'a> {
             .filter(|symbol| !symbol.is_instance())
             .map(|symbol| symbol.scope)
             .or_else(|| {
-                typing.kind.is_module().then(|| {
-                    resolver
-                        .get_symbol(typing.identity)
-                        .cloned()
-                        .map(|symbol| symbol.scope)
-                })
-                .flatten()
+                typing
+                    .kind
+                    .is_module()
+                    .then(|| {
+                        resolver
+                            .get_symbol(typing.identity)
+                            .cloned()
+                            .map(|symbol| symbol.scope)
+                    })
+                    .flatten()
             });
 
         if let Some(scope) = scope {
@@ -318,7 +324,11 @@ impl<'a> Element<'a> {
         match right.target() {
             Some(name) => {
                 let member = resolver.fresh();
-                let unified = resolver.unify(right.span, &typing, &Self::has(member.clone(), name.clone()));
+                let unified = resolver.unify(
+                    right.span,
+                    &typing,
+                    &Self::has(member.clone(), name.clone()),
+                );
                 left.typing = unified;
 
                 if let Some(symbol) = resolver.get_symbol(typing.identity).cloned() {
@@ -334,13 +344,7 @@ impl<'a> Element<'a> {
             }
             None => {
                 right.resolve(resolver);
-                Self::invalid_binary(
-                    resolver,
-                    operator,
-                    typing,
-                    right.typing.clone(),
-                    right.span,
-                )
+                Self::invalid_binary(resolver, operator, typing, right.typing.clone(), right.span)
             }
         }
     }
@@ -375,10 +379,7 @@ impl<'a> Element<'a> {
         span: crate::tracker::Span,
     ) -> Type<'a> {
         let valid = |kind: &TypeKind| {
-            kind.is_integer()
-                || kind.is_boolean()
-                || kind.is_variable()
-                || kind.is_unknown()
+            kind.is_integer() || kind.is_boolean() || kind.is_variable() || kind.is_unknown()
         };
 
         if valid(&left.kind) && valid(&right.kind) {
@@ -461,20 +462,38 @@ impl<'a> Element<'a> {
                     binary.right.resolve(resolver);
                     let left = resolver.reify(&binary.left.typing);
                     let right = resolver.reify(&binary.right.typing);
-                    Self::math(resolver, binary.operator.clone(), left, right, binary.right.span)
+                    Self::math(
+                        resolver,
+                        binary.operator.clone(),
+                        left,
+                        right,
+                        binary.right.span,
+                    )
                 }
                 [OperatorKind::LeftAngle, OperatorKind::LeftAngle]
                 | [OperatorKind::RightAngle, OperatorKind::RightAngle] => {
                     binary.right.resolve(resolver);
                     let left = resolver.reify(&binary.left.typing);
                     let right = resolver.reify(&binary.right.typing);
-                    Self::shifts(resolver, binary.operator.clone(), left, right, binary.right.span)
+                    Self::shifts(
+                        resolver,
+                        binary.operator.clone(),
+                        left,
+                        right,
+                        binary.right.span,
+                    )
                 }
                 [OperatorKind::Ampersand] | [OperatorKind::Pipe] | [OperatorKind::Caret] => {
                     binary.right.resolve(resolver);
                     let left = resolver.reify(&binary.left.typing);
                     let right = resolver.reify(&binary.right.typing);
-                    Self::bits(resolver, binary.operator.clone(), left, right, binary.right.span)
+                    Self::bits(
+                        resolver,
+                        binary.operator.clone(),
+                        left,
+                        right,
+                        binary.right.span,
+                    )
                 }
                 [OperatorKind::Ampersand, OperatorKind::Ampersand]
                 | [OperatorKind::Pipe, OperatorKind::Pipe] => {
@@ -529,7 +548,9 @@ impl<'a> Element<'a> {
         index: &mut crate::data::Index<Element<'a>, Element<'a>>,
     ) -> Type<'a> {
         if index.members.is_empty() {
-            resolver.errors.push(Error::new(ErrorKind::EmptyIndex, span));
+            resolver
+                .errors
+                .push(Error::new(ErrorKind::EmptyIndex, span));
             return resolver.fresh();
         }
 
@@ -643,10 +664,10 @@ impl<'a> Element<'a> {
                     invoke.members[0].resolve(resolver);
                 }
 
-                let value = invoke
-                    .members
-                    .first()
-                    .map_or_else(|| Type::from(TypeKind::Void), |member| member.typing.clone());
+                let value = invoke.members.first().map_or_else(
+                    || Type::from(TypeKind::Void),
+                    |member| member.typing.clone(),
+                );
 
                 if let Some(expect) = resolver.returns.last().cloned() {
                     resolver.unify(span, &expect, &value);
@@ -663,7 +684,11 @@ impl<'a> Element<'a> {
                 let output = resolver.fresh();
                 let expected = Type::from(TypeKind::Function(Box::new(Function::new(
                     Str::default(),
-                    invoke.members.iter().map(|member| member.typing.clone()).collect(),
+                    invoke
+                        .members
+                        .iter()
+                        .map(|member| member.typing.clone())
+                        .collect(),
                     resolver.fresh(),
                     Some(Box::new(output.clone())),
                     Interface::Axo,
@@ -755,21 +780,26 @@ impl<'a> Element<'a> {
             Self::combine(members)
         };
 
-        let selected = resolver.candidates(&construct.target).into_iter().find(|symbol| {
-            let layout = match &symbol.typing.kind {
-                TypeKind::Structure(aggregate) | TypeKind::Union(aggregate) => Some(&aggregate.members),
-                _ => None,
-            };
+        let selected = resolver
+            .candidates(&construct.target)
+            .into_iter()
+            .find(|symbol| {
+                let layout = match &symbol.typing.kind {
+                    TypeKind::Structure(aggregate) | TypeKind::Union(aggregate) => {
+                        Some(&aggregate.members)
+                    }
+                    _ => None,
+                };
 
-            let Some(expect) = build(layout) else {
-                return true;
-            };
+                let Some(expect) = build(layout) else {
+                    return true;
+                };
 
-            let mut trial = resolver.clone();
-            let before = trial.errors.len();
-            let _ = trial.unify(span, &expect, &symbol.typing);
-            trial.errors.len() == before
-        });
+                let mut trial = resolver.clone();
+                let before = trial.errors.len();
+                let _ = trial.unify(span, &expect, &symbol.typing);
+                trial.errors.len() == before
+            });
 
         if let Some(symbol) = selected {
             construct.target.reference = Some(symbol.identity);
@@ -831,12 +861,7 @@ impl<'a> Resolvable<'a> for Element<'a> {
 
     fn resolve(&mut self, resolver: &mut Resolver<'a>) {
         if self.kind.is_literal() {
-            Self::link(
-                resolver,
-                &self.kind,
-                self.span,
-                &mut self.reference,
-            );
+            Self::link(resolver, &self.kind, self.span, &mut self.reference);
         }
 
         self.typing = match &mut self.kind {

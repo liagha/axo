@@ -3,10 +3,10 @@ mod helper;
 mod string;
 
 pub use {
-    std::ffi::CString,
-    std::num::{NonZero, NonZeroU32, ParseIntError, IntErrorKind, ParseFloatError},
     float::Float,
     helper::{element::*, symbol::*},
+    std::ffi::CString,
+    std::num::{IntErrorKind, NonZero, NonZeroU32, ParseFloatError, ParseIntError},
     string::{from_utf8, FromStr, Str, Utf8Error},
 };
 
@@ -62,15 +62,15 @@ pub mod character {
 
 pub mod memory {
     pub use core::{
-        ptr::{null_mut},
         borrow::Borrow,
         iter::Copied,
         marker::PhantomData,
-        mem::{discriminant, replace, swap, take, transmute, zeroed, forget},
+        mem::{discriminant, forget, replace, swap, take, transmute, zeroed},
+        ptr::null_mut,
     };
     pub use std::{
-        sync::{Arc, Mutex},
         cell::RefCell,
+        sync::{Arc, Mutex},
     };
 }
 

@@ -2,7 +2,7 @@ mod escape;
 mod number;
 
 use crate::{
-    combinator::{Formation, Form},
+    combinator::{Form, Formation},
     data::Str,
     scanner::{
         Character, CharacterError, ErrorKind, Operator, Punctuation, PunctuationKind, ScanError,
@@ -25,20 +25,19 @@ impl<'a> Scanner<'a> {
             ),
             Formation::literal('"').with_ignore(),
         ])
-            .with_transform(move |former, formation| {
-                let form = former.forms.get_mut(formation.form).unwrap();
-                let inputs = form.collect_inputs();
-                let span = inputs.span().clone();
-                let content = inputs.into_iter().collect::<Str>();
+        .with_transform(move |former, formation| {
+            let form = former.forms.get_mut(formation.form).unwrap();
+            let inputs = form.collect_inputs();
+            let span = inputs.span().clone();
+            let content = inputs.into_iter().collect::<Str>();
 
-                *form = Form::output(Token::new(TokenKind::string(content), span));
+            *form = Form::output(Token::new(TokenKind::string(content), span));
 
-                Ok(())
-            })
+            Ok(())
+        })
     }
 
-    fn backtick<'source>() -> Formation<'a, 'source, Self, Character, Token<'a>, ScanError<'a>>
-    {
+    fn backtick<'source>() -> Formation<'a, 'source, Self, Character, Token<'a>, ScanError<'a>> {
         Formation::sequence([
             Formation::literal('`').with_ignore(),
             Formation::repetition(
@@ -51,20 +50,19 @@ impl<'a> Scanner<'a> {
             ),
             Formation::literal('`').with_ignore(),
         ])
-            .with_transform(move |former, formation| {
-                let form = former.forms.get_mut(formation.form).unwrap();
-                let inputs = form.collect_inputs();
-                let span = inputs.span().clone();
-                let content = inputs.into_iter().collect::<Str>();
+        .with_transform(move |former, formation| {
+            let form = former.forms.get_mut(formation.form).unwrap();
+            let inputs = form.collect_inputs();
+            let span = inputs.span().clone();
+            let content = inputs.into_iter().collect::<Str>();
 
-                *form = Form::output(Token::new(TokenKind::string(content), span));
+            *form = Form::output(Token::new(TokenKind::string(content), span));
 
-                Ok(())
-            })
+            Ok(())
+        })
     }
 
-    fn character<'source>() -> Formation<'a, 'source, Self, Character, Token<'a>, ScanError<'a>>
-    {
+    fn character<'source>() -> Formation<'a, 'source, Self, Character, Token<'a>, ScanError<'a>> {
         Formation::sequence([
             Formation::literal('\''),
             Formation::alternative([
@@ -73,22 +71,21 @@ impl<'a> Scanner<'a> {
             ]),
             Formation::literal('\''),
         ])
-            .with_transform(|former, formation| {
-                let form = former.forms.get_mut(formation.form).unwrap();
-                let inputs = form.collect_inputs();
-                let character = inputs[1];
+        .with_transform(|former, formation| {
+            let form = former.forms.get_mut(formation.form).unwrap();
+            let inputs = form.collect_inputs();
+            let character = inputs[1];
 
-                *form = Form::output(Token::new(
-                    TokenKind::character(character.value),
-                    character.span,
-                ));
+            *form = Form::output(Token::new(
+                TokenKind::character(character.value),
+                character.span,
+            ));
 
-                Ok(())
-            })
+            Ok(())
+        })
     }
 
-    fn identifier<'source>(
-    ) -> Formation<'a, 'source, Self, Character, Token<'a>, ScanError<'a>> {
+    fn identifier<'source>() -> Formation<'a, 'source, Self, Character, Token<'a>, ScanError<'a>> {
         Formation::with_transform(
             Formation::sequence([
                 Formation::predicate(|c: &Character| c.is_alphabetic() || *c == '_'),
@@ -117,8 +114,7 @@ impl<'a> Scanner<'a> {
         )
     }
 
-    fn operator<'source>() -> Formation<'a, 'source, Self, Character, Token<'a>, ScanError<'a>>
-    {
+    fn operator<'source>() -> Formation<'a, 'source, Self, Character, Token<'a>, ScanError<'a>> {
         Formation::with_transform(
             Formation::persistence(
                 Formation::predicate(|c: &Character| c.is_operator()),
@@ -138,8 +134,7 @@ impl<'a> Scanner<'a> {
         )
     }
 
-    fn punctuation<'source>(
-    ) -> Formation<'a, 'source, Self, Character, Token<'a>, ScanError<'a>> {
+    fn punctuation<'source>() -> Formation<'a, 'source, Self, Character, Token<'a>, ScanError<'a>> {
         Formation::with_transform(
             Formation::predicate(|c: &Character| c.is_punctuation()),
             |former, formation| {
@@ -158,8 +153,7 @@ impl<'a> Scanner<'a> {
         )
     }
 
-    fn whitespace<'source>(
-    ) -> Formation<'a, 'source, Self, Character, Token<'a>, ScanError<'a>> {
+    fn whitespace<'source>() -> Formation<'a, 'source, Self, Character, Token<'a>, ScanError<'a>> {
         Formation::with_transform(
             Formation::predicate(|c: &Character| c.is_whitespace() && *c != '\n'),
             |former, formation| {
@@ -167,15 +161,17 @@ impl<'a> Scanner<'a> {
                 let input = form.unwrap_input();
                 let span = input.span().clone();
 
-                *form = Form::output(Token::new(TokenKind::Punctuation(PunctuationKind::Space), span));
+                *form = Form::output(Token::new(
+                    TokenKind::Punctuation(PunctuationKind::Space),
+                    span,
+                ));
 
                 Ok(())
             },
         )
     }
 
-    fn comment<'source>() -> Formation<'a, 'source, Self, Character, Token<'a>, ScanError<'a>>
-    {
+    fn comment<'source>() -> Formation<'a, 'source, Self, Character, Token<'a>, ScanError<'a>> {
         Formation::with_transform(
             Formation::sequence([Formation::alternative([
                 Formation::sequence([
@@ -212,8 +208,7 @@ impl<'a> Scanner<'a> {
         )
     }
 
-    fn fallback<'source>() -> Formation<'a, 'source, Self, Character, Token<'a>, ScanError<'a>>
-    {
+    fn fallback<'source>() -> Formation<'a, 'source, Self, Character, Token<'a>, ScanError<'a>> {
         Formation::with_combinator(
             Formation::anything(),
             Formation::fail(|former, formation| {
@@ -228,8 +223,8 @@ impl<'a> Scanner<'a> {
         )
     }
 
-    pub fn formation<'source>(
-    ) -> Formation<'a, 'source, Self, Character, Token<'a>, ScanError<'a>> {
+    pub fn formation<'source>() -> Formation<'a, 'source, Self, Character, Token<'a>, ScanError<'a>>
+    {
         Formation::persistence(
             Formation::alternative([
                 Self::whitespace(),

@@ -1,6 +1,7 @@
 use crate::{
     analyzer::{Analysis, AnalysisKind, Analyzable, AnalyzeError, ErrorKind, Target},
     data::*,
+    parser::SymbolKind,
     parser::{Element, ElementKind},
     resolver::{Resolver, Type, TypeKind},
     scanner::{OperatorKind, PunctuationKind, Token, TokenKind},
@@ -232,7 +233,15 @@ impl<'element> Analyzable<'element> for Element<'element> {
 
                 let kind = match op_kind.as_slice() {
                     [OperatorKind::Dot] => {
-                        if binary.left.typing.kind.is_module() {
+                        if binary.left.typing.kind.is_module()
+                            || binary
+                                .left
+                                .reference
+                                .and_then(|reference| resolver.get_symbol(reference))
+                                .is_some_and(|symbol| {
+                                    !matches!(symbol.kind, SymbolKind::Binding(_))
+                                })
+                        {
                             return binary.right.analyze(resolver);
                         }
 
@@ -243,10 +252,7 @@ impl<'element> Analyzable<'element> for Element<'element> {
                             binary.right.target(),
                         )
                         .ok_or_else(|| {
-                            AnalyzeError::new(
-                                ErrorKind::InvalidTarget,
-                                binary.operator.span,
-                            )
+                            AnalyzeError::new(ErrorKind::InvalidTarget, binary.operator.span)
                         })?;
 
                         AnalysisKind::Slot(Box::new(target), slot)
@@ -369,7 +375,10 @@ impl<'element> Analyzable<'element> for Element<'element> {
                                         right.typing.clone(),
                                     );
                                     let scale = Analysis::new(
-                                        AnalysisKind::Multiply(Box::new(right.clone()), Box::new(size)),
+                                        AnalysisKind::Multiply(
+                                            Box::new(right.clone()),
+                                            Box::new(size),
+                                        ),
                                         right.span,
                                         right.typing.clone(),
                                     );
@@ -382,7 +391,10 @@ impl<'element> Analyzable<'element> for Element<'element> {
                                         left.typing.clone(),
                                     );
                                     let scale = Analysis::new(
-                                        AnalysisKind::Multiply(Box::new(left.clone()), Box::new(size)),
+                                        AnalysisKind::Multiply(
+                                            Box::new(left.clone()),
+                                            Box::new(size),
+                                        ),
                                         left.span,
                                         left.typing.clone(),
                                     );
@@ -390,52 +402,70 @@ impl<'element> Analyzable<'element> for Element<'element> {
                                 }
                                 _ => AnalysisKind::Add(Box::new(left), Box::new(right)),
                             },
-                            [OperatorKind::Minus] => match (&left.typing.kind, &right.typing.kind) {
-                                (
-                                    TypeKind::Pointer { target: left_target },
-                                    TypeKind::Pointer { target: right_target },
-                                ) => {
-                                    if left_target == right_target {
-                                        let size = Analysis::new(
-                                            AnalysisKind::SizeOf((**left_target).clone()),
-                                            self.span,
-                                            typing.clone(),
-                                        );
-                                        let value = Analysis::new(
-                                            AnalysisKind::Subtract(Box::new(left), Box::new(right)),
-                                            self.span,
-                                            typing.clone(),
-                                        );
-                                        AnalysisKind::Divide(Box::new(value), Box::new(size))
-                                    } else {
-                                        return Err(AnalyzeError::new(
-                                            ErrorKind::InvalidBinary(
-                                                binary.operator.clone(),
-                                                left.typing.clone(),
-                                                right.typing.clone(),
-                                            ),
-                                            binary.operator.span,
-                                        ));
+                            [OperatorKind::Minus] => {
+                                match (&left.typing.kind, &right.typing.kind) {
+                                    (
+                                        TypeKind::Pointer {
+                                            target: left_target,
+                                        },
+                                        TypeKind::Pointer {
+                                            target: right_target,
+                                        },
+                                    ) => {
+                                        if left_target == right_target {
+                                            let size = Analysis::new(
+                                                AnalysisKind::SizeOf((**left_target).clone()),
+                                                self.span,
+                                                typing.clone(),
+                                            );
+                                            let value = Analysis::new(
+                                                AnalysisKind::Subtract(
+                                                    Box::new(left),
+                                                    Box::new(right),
+                                                ),
+                                                self.span,
+                                                typing.clone(),
+                                            );
+                                            AnalysisKind::Divide(Box::new(value), Box::new(size))
+                                        } else {
+                                            return Err(AnalyzeError::new(
+                                                ErrorKind::InvalidBinary(
+                                                    binary.operator.clone(),
+                                                    left.typing.clone(),
+                                                    right.typing.clone(),
+                                                ),
+                                                binary.operator.span,
+                                            ));
+                                        }
                                     }
+                                    (TypeKind::Pointer { target }, _) => {
+                                        let size = Analysis::new(
+                                            AnalysisKind::SizeOf((**target).clone()),
+                                            right.span,
+                                            right.typing.clone(),
+                                        );
+                                        let scale = Analysis::new(
+                                            AnalysisKind::Multiply(
+                                                Box::new(right.clone()),
+                                                Box::new(size),
+                                            ),
+                                            right.span,
+                                            right.typing.clone(),
+                                        );
+                                        AnalysisKind::Subtract(Box::new(left), Box::new(scale))
+                                    }
+                                    _ => AnalysisKind::Subtract(Box::new(left), Box::new(right)),
                                 }
-                                (TypeKind::Pointer { target }, _) => {
-                                    let size = Analysis::new(
-                                        AnalysisKind::SizeOf((**target).clone()),
-                                        right.span,
-                                        right.typing.clone(),
-                                    );
-                                    let scale = Analysis::new(
-                                        AnalysisKind::Multiply(Box::new(right.clone()), Box::new(size)),
-                                        right.span,
-                                        right.typing.clone(),
-                                    );
-                                    AnalysisKind::Subtract(Box::new(left), Box::new(scale))
-                                }
-                                _ => AnalysisKind::Subtract(Box::new(left), Box::new(right)),
-                            },
-                            [OperatorKind::Star] => AnalysisKind::Multiply(Box::new(left), Box::new(right)),
-                            [OperatorKind::Slash] => AnalysisKind::Divide(Box::new(left), Box::new(right)),
-                            [OperatorKind::Percent] => AnalysisKind::Modulus(Box::new(left), Box::new(right)),
+                            }
+                            [OperatorKind::Star] => {
+                                AnalysisKind::Multiply(Box::new(left), Box::new(right))
+                            }
+                            [OperatorKind::Slash] => {
+                                AnalysisKind::Divide(Box::new(left), Box::new(right))
+                            }
+                            [OperatorKind::Percent] => {
+                                AnalysisKind::Modulus(Box::new(left), Box::new(right))
+                            }
                             [OperatorKind::Ampersand, OperatorKind::Ampersand] => {
                                 AnalysisKind::LogicalAnd(Box::new(left), Box::new(right))
                             }
@@ -576,12 +606,10 @@ impl<'element> Analyzable<'element> for Element<'element> {
                                     if operator.as_slice() == [OperatorKind::Equal]
                             ) =>
                         {
-                            let slot = slot(
-                                &typing,
-                                binary.left.reference,
-                                binary.left.target(),
-                            )
-                            .ok_or_else(|| AnalyzeError::new(ErrorKind::InvalidTarget, member.span))?;
+                            let slot = slot(&typing, binary.left.reference, binary.left.target())
+                                .ok_or_else(|| {
+                                AnalyzeError::new(ErrorKind::InvalidTarget, member.span)
+                            })?;
                             values.push((slot, binary.right.analyze(resolver)?));
                             next = slot + 1;
                         }

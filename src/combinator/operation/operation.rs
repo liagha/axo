@@ -1,12 +1,10 @@
-use {
-    crate::{
-        combinator::{
-            next_identity, Combinator, Alternative, Command, Condition, Cycle, Multiple, Operator,
-            Plan, Repetition, Sequence, Transform, Trigger,
-        },
-        data::{memory::Arc, memory::PhantomData, Identity, Scale},
-        internal::time::{Duration, SystemTime},
+use crate::{
+    combinator::{
+        next_identity, Alternative, Combinator, Command, Condition, Cycle, Multiple, Operator,
+        Plan, Repetition, Sequence, Transform, Trigger,
     },
+    data::{memory::Arc, memory::PhantomData, Identity, Scale},
+    internal::time::{Duration, SystemTime},
 };
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -177,7 +175,9 @@ impl<'source, Store: Clone + Send + Sync + 'source> Operation<'source, Store> {
 
     #[inline]
     pub fn multiple(
-        combinators: Vec<Arc<dyn Combinator<'static, Operator<Store>, Self> + Send + Sync + 'source>>,
+        combinators: Vec<
+            Arc<dyn Combinator<'static, Operator<Store>, Self> + Send + Sync + 'source>,
+        >,
     ) -> Self {
         Self::new(Arc::new(Multiple { combinators }))
     }

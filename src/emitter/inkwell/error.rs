@@ -1,13 +1,6 @@
 pub use crate::generator::{
-    AlignmentError,
-    BitwiseError,
-    BuilderError,
-    ControlFlowError,
-    DataStructureError,
-    ErrorKind,
-    FunctionError,
-    OrderingError,
-    VariableError,
+    AlignmentError, BitwiseError, BuilderError, ControlFlowError, DataStructureError, ErrorKind,
+    FunctionError, OrderingError, VariableError,
 };
 
 impl From<inkwell::builder::BuilderError> for BuilderError {
@@ -80,8 +73,12 @@ impl From<inkwell::values::AtomicError> for OrderingError {
             inkwell::values::AtomicError::ReleaseOnLoad => OrderingError::ReleaseOnLoad,
             inkwell::values::AtomicError::AcquireRelease => OrderingError::AcquireRelease,
             inkwell::values::AtomicError::AcquireOnStore => OrderingError::AcquireOnStore,
-            inkwell::values::AtomicError::InvalidOrderingOnFence => OrderingError::InvalidOrderingOnFence,
-            inkwell::values::AtomicError::InvalidOrderingOnAtomicRMW => OrderingError::InvalidOrderingOnAtomicRMW,
+            inkwell::values::AtomicError::InvalidOrderingOnFence => {
+                OrderingError::InvalidOrderingOnFence
+            }
+            inkwell::values::AtomicError::InvalidOrderingOnAtomicRMW => {
+                OrderingError::InvalidOrderingOnAtomicRMW
+            }
         }
     }
 }

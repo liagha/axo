@@ -26,14 +26,26 @@ impl<'typing> From<TypeKind<'typing>> for Type<'typing> {
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum TypeKind<'typing> {
-    Integer { size: Scale, signed: Boolean },
-    Float { size: Scale },
+    Integer {
+        size: Scale,
+        signed: Boolean,
+    },
+    Float {
+        size: Scale,
+    },
     Boolean,
     String,
     Character,
-    Pointer { target: Box<Type<'typing>> },
-    Array { member: Box<Type<'typing>>, size: Scale },
-    Tuple { members: Box<Vec<Type<'typing>>> },
+    Pointer {
+        target: Box<Type<'typing>>,
+    },
+    Array {
+        member: Box<Type<'typing>>,
+        size: Scale,
+    },
+    Tuple {
+        members: Box<Vec<Type<'typing>>>,
+    },
     Void,
     Variable(Identity),
     Unknown,
@@ -259,8 +271,9 @@ impl<'typing> TypeKind<'typing> {
 
     #[inline]
     #[track_caller]
-    pub fn unwrap_binding(self) -> Box<Binding<Str<'typing>, Box<Type<'typing>>, Option<Box<Type<'typing>>>>>
-    {
+    pub fn unwrap_binding(
+        self,
+    ) -> Box<Binding<Str<'typing>, Box<Type<'typing>>, Option<Box<Type<'typing>>>>> {
         match self {
             Self::Binding(binding) => binding,
             _ => panic!("expected binding"),
@@ -269,7 +282,9 @@ impl<'typing> TypeKind<'typing> {
 
     #[inline]
     #[track_caller]
-    pub fn unwrap_function(self) -> Box<Function<Str<'typing>, Type<'typing>, Type<'typing>, Option<Box<Type<'typing>>>>> {
+    pub fn unwrap_function(
+        self,
+    ) -> Box<Function<Str<'typing>, Type<'typing>, Type<'typing>, Option<Box<Type<'typing>>>>> {
         match self {
             Self::Function(function) => function,
             _ => panic!("expected function"),
@@ -375,8 +390,7 @@ impl<'typing> TypeKind<'typing> {
     #[inline(always)]
     pub fn try_unwrap_binding(
         &self,
-    ) -> Option<&Box<Binding<Str<'typing>, Box<Type<'typing>>, Option<Box<Type<'typing>>>>>> 
-    {
+    ) -> Option<&Box<Binding<Str<'typing>, Box<Type<'typing>>, Option<Box<Type<'typing>>>>>> {
         match self {
             Self::Binding(binding) => Some(binding),
             _ => None,
@@ -384,7 +398,11 @@ impl<'typing> TypeKind<'typing> {
     }
 
     #[inline(always)]
-    pub fn try_unwrap_function(&self) -> Option<&Box<Function<Str<'typing>, Type<'typing>, Type<'typing>, Option<Box<Type<'typing>>>>>> {
+    pub fn try_unwrap_function(
+        &self,
+    ) -> Option<
+        &Box<Function<Str<'typing>, Type<'typing>, Type<'typing>, Option<Box<Type<'typing>>>>>,
+    > {
         match self {
             Self::Function(function) => Some(function),
             _ => None,
@@ -456,7 +474,9 @@ impl<'typing> TypeKind<'typing> {
     }
 
     #[inline(always)]
-    pub fn try_unwrap_and_mut(&mut self) -> Option<(&mut Box<Type<'typing>>, &mut Box<Type<'typing>>)> {
+    pub fn try_unwrap_and_mut(
+        &mut self,
+    ) -> Option<(&mut Box<Type<'typing>>, &mut Box<Type<'typing>>)> {
         match self {
             Self::And(left, right) => Some((left, right)),
             _ => None,
@@ -464,7 +484,9 @@ impl<'typing> TypeKind<'typing> {
     }
 
     #[inline(always)]
-    pub fn try_unwrap_or_mut(&mut self) -> Option<(&mut Box<Type<'typing>>, &mut Box<Type<'typing>>)> {
+    pub fn try_unwrap_or_mut(
+        &mut self,
+    ) -> Option<(&mut Box<Type<'typing>>, &mut Box<Type<'typing>>)> {
         match self {
             Self::Or(left, right) => Some((left, right)),
             _ => None,
@@ -472,7 +494,9 @@ impl<'typing> TypeKind<'typing> {
     }
 
     #[inline(always)]
-    pub fn try_unwrap_structure_mut(&mut self) -> Option<&mut Box<Aggregate<Str<'typing>, Type<'typing>>>> {
+    pub fn try_unwrap_structure_mut(
+        &mut self,
+    ) -> Option<&mut Box<Aggregate<Str<'typing>, Type<'typing>>>> {
         match self {
             Self::Structure(structure) => Some(structure),
             _ => None,
@@ -480,7 +504,9 @@ impl<'typing> TypeKind<'typing> {
     }
 
     #[inline(always)]
-    pub fn try_unwrap_union_mut(&mut self) -> Option<&mut Box<Aggregate<Str<'typing>, Type<'typing>>>> {
+    pub fn try_unwrap_union_mut(
+        &mut self,
+    ) -> Option<&mut Box<Aggregate<Str<'typing>, Type<'typing>>>> {
         match self {
             Self::Union(union) => Some(union),
             _ => None,
@@ -490,7 +516,7 @@ impl<'typing> TypeKind<'typing> {
     #[inline(always)]
     pub fn try_unwrap_binding_mut(
         &mut self,
-    ) -> Option<&mut Box<Binding<Str<'typing>, Box<Type<'typing>>, Option<Box<Type<'typing>>>>>> 
+    ) -> Option<&mut Box<Binding<Str<'typing>, Box<Type<'typing>>, Option<Box<Type<'typing>>>>>>
     {
         match self {
             Self::Binding(binding) => Some(binding),
@@ -499,7 +525,11 @@ impl<'typing> TypeKind<'typing> {
     }
 
     #[inline(always)]
-    pub fn try_unwrap_function_mut(&mut self) -> Option<&mut Box<Function<Str<'typing>, Type<'typing>, Type<'typing>, Option<Box<Type<'typing>>>>>> {
+    pub fn try_unwrap_function_mut(
+        &mut self,
+    ) -> Option<
+        &mut Box<Function<Str<'typing>, Type<'typing>, Type<'typing>, Option<Box<Type<'typing>>>>>,
+    > {
         match self {
             Self::Function(function) => Some(function),
             _ => None,
@@ -570,7 +600,11 @@ impl<'resolver> Resolver<'resolver> {
                 self.occurs(identity, left) || self.occurs(identity, right)
             }
             TypeKind::Function(function) => {
-                if function.members.iter().any(|item| self.occurs(identity, item)) {
+                if function
+                    .members
+                    .iter()
+                    .any(|item| self.occurs(identity, item))
+                {
                     return true;
                 }
                 if let Some(kind) = &function.output {
@@ -627,31 +661,55 @@ impl<'resolver> Resolver<'resolver> {
             (TypeKind::Character, TypeKind::Integer { size: 8, .. }) => left.clone(),
 
             (
-                TypeKind::Integer { size: left_size, signed: left_signed },
-                TypeKind::Integer { size: right_size, signed: right_signed },
+                TypeKind::Integer {
+                    size: left_size,
+                    signed: left_signed,
+                },
+                TypeKind::Integer {
+                    size: right_size,
+                    signed: right_signed,
+                },
             ) if left_size == right_size && left_signed == right_signed => left,
 
             (TypeKind::Float { size: left_size }, TypeKind::Float { size: right_size })
-            if left_size == right_size => left,
+                if left_size == right_size =>
+            {
+                left
+            }
 
             (
-                TypeKind::Array { member: left_item, size: left_size },
-                TypeKind::Array { member: right_item, size: right_size },
-            ) if left_size == right_size => {
-                Type::from(TypeKind::Array {
-                    member: Box::new(self.unify(span, &left_item, &right_item)),
+                TypeKind::Array {
+                    member: left_item,
                     size: left_size,
-                })
-            }
+                },
+                TypeKind::Array {
+                    member: right_item,
+                    size: right_size,
+                },
+            ) if left_size == right_size => Type::from(TypeKind::Array {
+                member: Box::new(self.unify(span, &left_item, &right_item)),
+                size: left_size,
+            }),
 
-            (TypeKind::Pointer { target: left_target }, TypeKind::Pointer { target: right_target }) => {
-                Type::from(TypeKind::Pointer {
-                    target: Box::new(self.unify(span, &left_target, &right_target)),
-                })
-            }
+            (
+                TypeKind::Pointer {
+                    target: left_target,
+                },
+                TypeKind::Pointer {
+                    target: right_target,
+                },
+            ) => Type::from(TypeKind::Pointer {
+                target: Box::new(self.unify(span, &left_target, &right_target)),
+            }),
 
-            (TypeKind::Tuple { members: left_items }, TypeKind::Tuple { members: right_items })
-            if left_items.len() == right_items.len() => {
+            (
+                TypeKind::Tuple {
+                    members: left_items,
+                },
+                TypeKind::Tuple {
+                    members: right_items,
+                },
+            ) if left_items.len() == right_items.len() => {
                 let mut members = Vec::with_capacity(left_items.len());
                 for (left, right) in left_items.iter().zip(right_items.iter()) {
                     members.push(self.unify(span, left, right));
@@ -693,8 +751,7 @@ impl<'resolver> Resolver<'resolver> {
                 )
             }
 
-            (TypeKind::Module(_), TypeKind::Module(_))
-            if left.identity == right.identity => left,
+            (TypeKind::Module(_), TypeKind::Module(_)) if left.identity == right.identity => left,
 
             (TypeKind::Binding(left_binding), TypeKind::Binding(right_binding))
                 if left_binding.target == right_binding.target =>
@@ -742,8 +799,8 @@ impl<'resolver> Resolver<'resolver> {
                 }
             }
 
-            (TypeKind::Has(target), TypeKind::Structure(aggr)) |
-            (TypeKind::Has(target), TypeKind::Union(aggr)) => {
+            (TypeKind::Has(target), TypeKind::Structure(aggr))
+            | (TypeKind::Has(target), TypeKind::Union(aggr)) => {
                 let name = self.member_name(&target);
                 let mut found = false;
 
@@ -768,8 +825,8 @@ impl<'resolver> Resolver<'resolver> {
                 right.clone()
             }
 
-            (TypeKind::Structure(aggr), TypeKind::Has(target)) |
-            (TypeKind::Union(aggr), TypeKind::Has(target)) => {
+            (TypeKind::Structure(aggr), TypeKind::Has(target))
+            | (TypeKind::Union(aggr), TypeKind::Has(target)) => {
                 let name = self.member_name(&target);
                 let mut found = false;
 
@@ -799,7 +856,10 @@ impl<'resolver> Resolver<'resolver> {
                     let unified = self.unify(span, &left_target, &right_target);
                     Type::from(TypeKind::Has(Box::new(unified)))
                 } else {
-                    Type::from(TypeKind::And(Box::new(left.clone()), Box::new(right.clone())))
+                    Type::from(TypeKind::And(
+                        Box::new(left.clone()),
+                        Box::new(right.clone()),
+                    ))
                 }
             }
 
@@ -828,7 +888,8 @@ impl<'resolver> Resolver<'resolver> {
             }
 
             (TypeKind::Function(left_func), TypeKind::Function(right_func))
-            if left_func.members.len() == right_func.members.len() => {
+                if left_func.members.len() == right_func.members.len() =>
+            {
                 let mut members = Vec::with_capacity(left_func.members.len());
                 for (left, right) in left_func.members.iter().zip(right_func.members.iter()) {
                     members.push(self.unify(span, left, right));
@@ -889,9 +950,13 @@ impl<'resolver> Resolver<'resolver> {
             }),
             TypeKind::Tuple { members } => {
                 let items = members.iter().map(|item| self.reify(item)).collect();
-                Type::from(TypeKind::Tuple { members: Box::new(items) })
+                Type::from(TypeKind::Tuple {
+                    members: Box::new(items),
+                })
             }
-            TypeKind::Structure(aggregate) if aggregate.members.is_empty() && typing.identity != 0 => {
+            TypeKind::Structure(aggregate)
+                if aggregate.members.is_empty() && typing.identity != 0 =>
+            {
                 if let Some(symbol) = self.registry.get(&typing.identity).cloned() {
                     if symbol.typing != *typing {
                         return self.reify(&symbol.typing);
@@ -907,11 +972,12 @@ impl<'resolver> Resolver<'resolver> {
                 }
                 typing.clone()
             }
-            TypeKind::Has(target) => {
-                Type::from(TypeKind::Has(Box::new(self.reify(target))))
-            }
+            TypeKind::Has(target) => Type::from(TypeKind::Has(Box::new(self.reify(target)))),
             TypeKind::Binding(binding) => {
-                let value = binding.value.as_ref().map(|value| Box::new(self.reify(value)));
+                let value = binding
+                    .value
+                    .as_ref()
+                    .map(|value| Box::new(self.reify(value)));
                 let annotation = binding
                     .annotation
                     .as_ref()
@@ -923,19 +989,36 @@ impl<'resolver> Resolver<'resolver> {
                     binding.kind,
                 ))))
             }
-            TypeKind::And(left, right) => {
-                Type::from(TypeKind::And(Box::new(self.reify(left)), Box::new(self.reify(right))))
-            }
-            TypeKind::Or(left, right) => {
-                Type::from(TypeKind::Or(Box::new(self.reify(left)), Box::new(self.reify(right))))
-            }
+            TypeKind::And(left, right) => Type::from(TypeKind::And(
+                Box::new(self.reify(left)),
+                Box::new(self.reify(right)),
+            )),
+            TypeKind::Or(left, right) => Type::from(TypeKind::Or(
+                Box::new(self.reify(left)),
+                Box::new(self.reify(right)),
+            )),
             TypeKind::Function(function) => {
-                let members = function.members.iter().map(|item| self.reify(item)).collect();
-                let returnable = function.output.as_ref().map(|kind| Box::new(self.reify(kind)));
+                let members = function
+                    .members
+                    .iter()
+                    .map(|item| self.reify(item))
+                    .collect();
+                let returnable = function
+                    .output
+                    .as_ref()
+                    .map(|kind| Box::new(self.reify(kind)));
                 let body = self.reify(&function.body);
                 Type::new(
                     typing.identity,
-                    TypeKind::Function(Box::new(Function::new(function.target.clone(), members, body, returnable, Interface::Axo, false, false))),
+                    TypeKind::Function(Box::new(Function::new(
+                        function.target.clone(),
+                        members,
+                        body,
+                        returnable,
+                        Interface::Axo,
+                        false,
+                        false,
+                    ))),
                 )
             }
             _ => typing.clone(),
@@ -989,14 +1072,38 @@ impl<'resolver> Resolver<'resolver> {
                 TokenKind::Identifier(name) => {
                     let text = name.as_str().unwrap();
                     let kind = match text {
-                        "Int8" => TypeKind::Integer { size: 8, signed: true },
-                        "Int16" => TypeKind::Integer { size: 16, signed: true },
-                        "Int32" => TypeKind::Integer { size: 32, signed: true },
-                        "Int64" | "Integer" => TypeKind::Integer { size: 64, signed: true },
-                        "UInt8" => TypeKind::Integer { size: 8, signed: false },
-                        "UInt16" => TypeKind::Integer { size: 16, signed: false },
-                        "UInt32" => TypeKind::Integer { size: 32, signed: false },
-                        "UInt64" => TypeKind::Integer { size: 64, signed: false },
+                        "Int8" => TypeKind::Integer {
+                            size: 8,
+                            signed: true,
+                        },
+                        "Int16" => TypeKind::Integer {
+                            size: 16,
+                            signed: true,
+                        },
+                        "Int32" => TypeKind::Integer {
+                            size: 32,
+                            signed: true,
+                        },
+                        "Int64" | "Integer" => TypeKind::Integer {
+                            size: 64,
+                            signed: true,
+                        },
+                        "UInt8" => TypeKind::Integer {
+                            size: 8,
+                            signed: false,
+                        },
+                        "UInt16" => TypeKind::Integer {
+                            size: 16,
+                            signed: false,
+                        },
+                        "UInt32" => TypeKind::Integer {
+                            size: 32,
+                            signed: false,
+                        },
+                        "UInt64" => TypeKind::Integer {
+                            size: 64,
+                            signed: false,
+                        },
                         "Float32" => TypeKind::Float { size: 32 },
                         "Float64" | "Float" => TypeKind::Float { size: 64 },
                         "Boolean" => TypeKind::Boolean,
@@ -1028,8 +1135,12 @@ impl<'resolver> Resolver<'resolver> {
                 let right = self.annotation(&binary.right)?;
                 if let TokenKind::Operator(operator) = &binary.operator.kind {
                     match operator.as_slice() {
-                        [OperatorKind::Ampersand] => Ok(Type::from(TypeKind::And(Box::new(left), Box::new(right)))),
-                        [OperatorKind::Pipe] => Ok(Type::from(TypeKind::Or(Box::new(left), Box::new(right)))),
+                        [OperatorKind::Ampersand] => {
+                            Ok(Type::from(TypeKind::And(Box::new(left), Box::new(right))))
+                        }
+                        [OperatorKind::Pipe] => {
+                            Ok(Type::from(TypeKind::Or(Box::new(left), Box::new(right))))
+                        }
                         _ => Err(ResolveError::new(
                             ErrorKind::InvalidAnnotation(element.clone()),
                             element.span,
@@ -1061,7 +1172,10 @@ impl<'resolver> Resolver<'resolver> {
                     }
                     let member = self.annotation(&delimited.members[0])?;
                     let size = self.evaluate(&delimited.members[1])?;
-                    Ok(Type::from(TypeKind::Array { member: Box::new(member), size }))
+                    Ok(Type::from(TypeKind::Array {
+                        member: Box::new(member),
+                        size,
+                    }))
                 }
 
                 (
@@ -1070,7 +1184,9 @@ impl<'resolver> Resolver<'resolver> {
                     TokenKind::Punctuation(PunctuationKind::RightParenthesis),
                 ) => {
                     if delimited.members.is_empty() {
-                        Ok(Type::from(TypeKind::Tuple { members: Box::new(Vec::new()) }))
+                        Ok(Type::from(TypeKind::Tuple {
+                            members: Box::new(Vec::new()),
+                        }))
                     } else if delimited.separator.is_none() && delimited.members.len() == 1 {
                         self.annotation(&delimited.members[0])
                     } else {
@@ -1093,11 +1209,14 @@ impl<'resolver> Resolver<'resolver> {
             },
 
             ElementKind::Unary(unary) => {
-                if matches!(&unary.operator.kind, TokenKind::Operator(operator) if **operator == OperatorKind::Star) {
+                if matches!(&unary.operator.kind, TokenKind::Operator(operator) if **operator == OperatorKind::Star)
+                {
                     let item = self.annotation(&unary.operand)?;
                     Ok(Type::new(
                         item.identity,
-                        TypeKind::Pointer { target: Box::from(item) },
+                        TypeKind::Pointer {
+                            target: Box::from(item),
+                        },
                     ))
                 } else {
                     Err(ResolveError::new(

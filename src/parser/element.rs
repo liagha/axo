@@ -215,7 +215,9 @@ impl<'element> ElementKind<'element> {
     }
 
     #[inline(always)]
-    pub fn try_unwrap_binary(&self) -> Option<&Binary<Element<'element>, Token<'element>, Element<'element>>> {
+    pub fn try_unwrap_binary(
+        &self,
+    ) -> Option<&Binary<Element<'element>, Token<'element>, Element<'element>>> {
         match self {
             Self::Binary(binary) => Some(binary),
             _ => None,
@@ -263,7 +265,9 @@ impl<'element> ElementKind<'element> {
     }
 
     #[inline(always)]
-    pub fn try_unwrap_delimited_mut(&mut self) -> Option<&mut Delimited<Token<'element>, Element<'element>>> {
+    pub fn try_unwrap_delimited_mut(
+        &mut self,
+    ) -> Option<&mut Delimited<Token<'element>, Element<'element>>> {
         match self {
             Self::Delimited(delimited) => Some(delimited),
             _ => None,
@@ -271,7 +275,9 @@ impl<'element> ElementKind<'element> {
     }
 
     #[inline(always)]
-    pub fn try_unwrap_unary_mut(&mut self) -> Option<&mut Unary<Token<'element>, Element<'element>>> {
+    pub fn try_unwrap_unary_mut(
+        &mut self,
+    ) -> Option<&mut Unary<Token<'element>, Element<'element>>> {
         match self {
             Self::Unary(unary) => Some(unary),
             _ => None,
@@ -279,7 +285,9 @@ impl<'element> ElementKind<'element> {
     }
 
     #[inline(always)]
-    pub fn try_unwrap_binary_mut(&mut self) -> Option<&mut Binary<Element<'element>, Token<'element>, Element<'element>>> {
+    pub fn try_unwrap_binary_mut(
+        &mut self,
+    ) -> Option<&mut Binary<Element<'element>, Token<'element>, Element<'element>>> {
         match self {
             Self::Binary(binary) => Some(binary),
             _ => None,
@@ -287,7 +295,9 @@ impl<'element> ElementKind<'element> {
     }
 
     #[inline(always)]
-    pub fn try_unwrap_index_mut(&mut self) -> Option<&mut Index<Element<'element>, Element<'element>>> {
+    pub fn try_unwrap_index_mut(
+        &mut self,
+    ) -> Option<&mut Index<Element<'element>, Element<'element>>> {
         match self {
             Self::Index(index) => Some(index),
             _ => None,
@@ -295,7 +305,9 @@ impl<'element> ElementKind<'element> {
     }
 
     #[inline(always)]
-    pub fn try_unwrap_invoke_mut(&mut self) -> Option<&mut Invoke<Element<'element>, Element<'element>>> {
+    pub fn try_unwrap_invoke_mut(
+        &mut self,
+    ) -> Option<&mut Invoke<Element<'element>, Element<'element>>> {
         match self {
             Self::Invoke(invoke) => Some(invoke),
             _ => None,
@@ -303,7 +315,9 @@ impl<'element> ElementKind<'element> {
     }
 
     #[inline(always)]
-    pub fn try_unwrap_construct_mut(&mut self) -> Option<&mut Aggregate<Element<'element>, Element<'element>>> {
+    pub fn try_unwrap_construct_mut(
+        &mut self,
+    ) -> Option<&mut Aggregate<Element<'element>, Element<'element>>> {
         match self {
             Self::Construct(construct) => Some(construct),
             _ => None,

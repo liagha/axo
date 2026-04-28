@@ -24,4 +24,3 @@ impl<'token> Spanned<'token> for Token<'token> {
         self.span
     }
 }
-

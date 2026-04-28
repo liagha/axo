@@ -30,7 +30,9 @@ impl<'a> Peekable<'a, Token<'a>> for Initializer<'a> {
     }
 
     fn peek_behind(&self, n: Offset) -> Option<&Token<'a>> {
-        self.index.checked_sub(n).and_then(|current| self.get(current))
+        self.index
+            .checked_sub(n)
+            .and_then(|current| self.get(current))
     }
 
     fn origin(&self) -> Self::State {
@@ -118,13 +120,23 @@ impl<'a> Initializer<'a> {
             Self::bare(),
             Self::cranelift(),
             Self::implicit(),
-            Formation::anything().with_panic(|former: &mut Former<'a, 'source, Self, Token<'a>, Symbol<'a>, InitializeError<'a>>, formation| {
-                let form = former.forms.get_mut(formation.form).unwrap();
-                let input = form.collect_inputs()[0].clone();
-                let span = input.span;
+            Formation::anything().with_panic(
+                |former: &mut Former<
+                    'a,
+                    'source,
+                    Self,
+                    Token<'a>,
+                    Symbol<'a>,
+                    InitializeError<'a>,
+                >,
+                 formation| {
+                    let form = former.forms.get_mut(formation.form).unwrap();
+                    let input = form.collect_inputs()[0].clone();
+                    let span = input.span;
 
-                Error::new(ErrorKind::Argument(input), span)
-            }),
+                    Error::new(ErrorKind::Argument(input), span)
+                },
+            ),
         ])
     }
 
@@ -229,19 +241,18 @@ mod tests {
         let mut initializer = Initializer::new(Str::from("./examples/calculator.axo"));
         let targets = initializer.initialize();
 
-        assert!(
-            targets.iter().any(|(location, _)| location.to_string() == "./examples/calculator.axo")
-        );
+        assert!(targets
+            .iter()
+            .any(|(location, _)| location.to_string() == "./examples/calculator.axo"));
     }
 
     #[test]
     fn explicit_input_becomes_target() {
-        let mut initializer =
-            Initializer::new(Str::from("--input ./examples/calculator.axo"));
+        let mut initializer = Initializer::new(Str::from("--input ./examples/calculator.axo"));
         let targets = initializer.initialize();
 
-        assert!(
-            targets.iter().any(|(location, _)| location.to_string() == "./examples/calculator.axo")
-        );
+        assert!(targets
+            .iter()
+            .any(|(location, _)| location.to_string() == "./examples/calculator.axo"));
     }
 }

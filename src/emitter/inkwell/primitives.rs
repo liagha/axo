@@ -1,6 +1,6 @@
 use {
     crate::{
-        data::{Boolean, Char, Float, Integer, Scale, Str, NonZeroU32},
+        data::{Boolean, Char, Float, Integer, NonZeroU32, Scale, Str},
         generator::{ErrorKind, GenerateError, Generator},
         tracker::Span,
     },
@@ -19,7 +19,10 @@ impl<'backend> Generator<'backend> {
             16 => self.context.i16_type(),
             32 => self.context.i32_type(),
             64 => self.context.i64_type(),
-            bits => self.context.custom_width_int_type(NonZeroU32::new(bits as u32).unwrap()).unwrap(),
+            bits => self
+                .context
+                .custom_width_int_type(NonZeroU32::new(bits as u32).unwrap())
+                .unwrap(),
         };
 
         let bits = number as u64;

@@ -76,7 +76,6 @@ impl Stencil {
             fold: false,
             text: None,
         }
-
     }
 
     pub fn simple() -> Self {

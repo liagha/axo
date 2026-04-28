@@ -13,14 +13,14 @@ pub use {
     inkwell::{
         context::{Context, ContextRef},
         targets::TargetMachine,
-    }
+    },
 };
 
 use {
     crate::{
         analyzer::{Analysis, AnalysisKind},
-        data::{Str, NonZeroU32},
-        generator::{GenerateError},
+        data::{NonZeroU32, Str},
+        generator::GenerateError,
         internal::hash::Map,
         resolver::{Type, TypeKind},
         tracker::Span,
@@ -144,7 +144,10 @@ impl<'backend> Generator<'backend> {
                 Entity::Function(function) => Some(*function),
                 _ => None,
             })
-            .or_else(|| self.current_module().get_function(target.as_str().unwrap_or_default()))
+            .or_else(|| {
+                self.current_module()
+                    .get_function(target.as_str().unwrap_or_default())
+            })
     }
 
     pub fn get_entity(&self, name: &Str<'backend>) -> Option<&Entity<'backend>> {
@@ -264,7 +267,11 @@ impl<'backend> Generator<'backend> {
                 32 => self.context.i32_type().into(),
                 64 => self.context.i64_type().into(),
                 128 => self.context.i128_type().into(),
-                size => self.context.custom_width_int_type(NonZeroU32::new(*size as u32).unwrap()).unwrap().into(),
+                size => self
+                    .context
+                    .custom_width_int_type(NonZeroU32::new(*size as u32).unwrap())
+                    .unwrap()
+                    .into(),
             },
             TypeKind::Float { size: bits } => match bits {
                 16 => self.context.f16_type().into(),
@@ -629,13 +636,9 @@ impl<'backend> Generator<'backend> {
             AnalysisKind::Equal(left, right) => self.equal(left, right, span),
             AnalysisKind::NotEqual(left, right) => self.not_equal(left, right, span),
             AnalysisKind::Less(left, right) => self.less(left, right, span),
-            AnalysisKind::LessOrEqual(left, right) => {
-                self.less_or_equal(left, right, span)
-            }
+            AnalysisKind::LessOrEqual(left, right) => self.less_or_equal(left, right, span),
             AnalysisKind::Greater(left, right) => self.greater(left, right, span),
-            AnalysisKind::GreaterOrEqual(left, right) => {
-                self.greater_or_equal(left, right, span)
-            }
+            AnalysisKind::GreaterOrEqual(left, right) => self.greater_or_equal(left, right, span),
             AnalysisKind::Index(index) => self.index(index, span),
             AnalysisKind::Usage(identifier) => self.usage(identifier, span),
             AnalysisKind::Symbol(target) => self.symbol_value(target, span),

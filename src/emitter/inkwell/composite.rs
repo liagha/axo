@@ -17,6 +17,14 @@ use {
 };
 
 impl<'backend> Generator<'backend> {
+    fn member(target: &Analysis<'backend>) -> Option<Str<'backend>> {
+        match &target.kind {
+            AnalysisKind::Usage(name) => Some(*name),
+            AnalysisKind::Symbol(target) => Some(target.name),
+            _ => None,
+        }
+    }
+
     pub fn size(&self, typing: BasicTypeEnum<'backend>) -> u64 {
         typing
             .size_of()
@@ -99,9 +107,10 @@ impl<'backend> Generator<'backend> {
 
     fn field_name(&self, typing: &Type<'backend>, index: Scale) -> Option<Str<'backend>> {
         match &self.value_type(typing).kind {
-            TypeKind::Structure(aggregate) | TypeKind::Union(aggregate) => {
-                aggregate.members.get(index).and_then(|member| self.member_name(member))
-            }
+            TypeKind::Structure(aggregate) | TypeKind::Union(aggregate) => aggregate
+                .members
+                .get(index)
+                .and_then(|member| self.member_name(member)),
             _ => None,
         }
     }
@@ -122,9 +131,7 @@ impl<'backend> Generator<'backend> {
             let load = self
                 .builder
                 .build_load(kind, pointer, "value")
-                .map_err(|error| {
-                    GenerateError::new(ErrorKind::BuilderError(error.into()), span)
-                })?;
+                .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
 
             if let Some(instruction) = load.as_instruction_value() {
                 instruction.set_alignment(self.align(kind)).ok();
@@ -221,9 +228,7 @@ impl<'backend> Generator<'backend> {
 
         for member in &structure.members {
             if let AnalysisKind::Binding(binding) = &member.kind {
-                if let AnalysisKind::Usage(target) = &binding.target.kind {
-                    let field = target.clone();
-
+                if let Some(field) = Self::member(&binding.target) {
                     members.push(field.clone());
                     types.push(self.to_basic_type(&binding.annotation, member.span.clone())?);
                 }
@@ -285,8 +290,7 @@ impl<'backend> Generator<'backend> {
 
         for member in &union.members {
             if let AnalysisKind::Binding(binding) = &member.kind {
-                if let AnalysisKind::Usage(target) = &binding.target.kind {
-                    let field = target.clone();
+                if let Some(field) = Self::member(&binding.target) {
                     let typing = self.to_basic_type(&binding.annotation, member.span.clone())?;
 
                     members.push((field.clone(), typing));
@@ -375,7 +379,9 @@ impl<'backend> Generator<'backend> {
                         }
                     };
 
-                    let kind = self.member_type(&typing, &Str::from(name.clone()), span)?.unwrap();
+                    let kind = self
+                        .member_type(&typing, &Str::from(name.clone()), span)?
+                        .unwrap();
                     let value = self.analysis(assign)?;
 
                     let cast = self.convert(value, kind).ok_or_else(|| {

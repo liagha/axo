@@ -1,5 +1,5 @@
 use crate::{
-    combinator::{Formation, Form},
+    combinator::{Form, Formation},
     data::*,
     parser::{Element, ElementKind, ErrorKind, ParseError, Parser},
     scanner::{PunctuationKind, Token, TokenKind},

@@ -22,11 +22,11 @@ use crate::{
 pub type ParseError<'error> = Error<'error, ErrorKind<'error>>;
 
 impl<'source>
-Combinator<
-    'static,
-    Operator<Arc<Lock<Session<'source>>>>,
-    Operation<'source, Arc<Lock<Session<'source>>>>,
-> for Parser<'source>
+    Combinator<
+        'static,
+        Operator<Arc<Lock<Session<'source>>>>,
+        Operation<'source, Arc<Lock<Session<'source>>>>,
+    > for Parser<'source>
 {
     fn combinator(
         &self,

@@ -45,7 +45,7 @@ impl<'error> Display for ErrorKind<'error> {
                 left.format(Stencil::default()),
                 right.format(Stencil::default())
             )
-                .into(),
+            .into(),
             ErrorKind::EmptyIndex => write!(f, "empty index.").into(),
             ErrorKind::IndexBounds(index, len) => {
                 write!(f, "index `{}` out of bounds for length `{}`.", index, len).into()
@@ -57,7 +57,7 @@ impl<'error> Display for ErrorKind<'error> {
                 operator.format(Stencil::default()),
                 operand.format(Stencil::default())
             )
-                .into(),
+            .into(),
             ErrorKind::InvalidBinary(operator, left, right) => write!(
                 f,
                 "cannot apply `{}` to `{}` and `{}`.",
@@ -65,44 +65,47 @@ impl<'error> Display for ErrorKind<'error> {
                 left.format(Stencil::default()),
                 right.format(Stencil::default())
             )
-                .into(),
+            .into(),
             ErrorKind::InvalidAnnotation(element) => write!(
                 f,
                 "invalid type annotation `{}`.",
                 element.format(Stencil::default())
             )
-                .into(),
-            ErrorKind::UndefinedSymbol { query } => {
-                write!(f, "undefined symbol `{}`.", query.format(Stencil::default())).into()
-            }
+            .into(),
+            ErrorKind::UndefinedSymbol { query } => write!(
+                f,
+                "undefined symbol `{}`.",
+                query.format(Stencil::default())
+            )
+            .into(),
             ErrorKind::MissingMember { target, member } => write!(
                 f,
                 "member `{}` missing from `{}`.",
                 member.format(Stencil::default()),
                 target.format(Stencil::default())
             )
-                .into(),
+            .into(),
             ErrorKind::UndefinedMember { target, member } => write!(
                 f,
                 "member `{}` undefined in `{}`.",
                 member.format(Stencil::default()),
                 target.format(Stencil::default())
             )
-                .into(),
+            .into(),
             ErrorKind::DefinedMember { target, member } => write!(
                 f,
                 "member `{}` already defined in `{}`.",
                 member.format(Stencil::default()),
                 target.format(Stencil::default())
             )
-                .into(),
+            .into(),
             ErrorKind::ExcessiveMembers { target, members } => write!(
                 f,
                 "union `{}` requires 1 initialized member but {} were provided.",
                 target.format(Stencil::default()),
                 members.len()
             )
-                .into(),
+            .into(),
         }
     }
 }

@@ -1,12 +1,12 @@
 mod combinator;
 mod command;
-mod plan;
 mod operation;
 mod operator;
+mod plan;
 mod trigger;
 
 pub use command::*;
-pub use plan::*;
 pub use operation::*;
 pub use operator::*;
+pub use plan::*;
 pub use trigger::*;

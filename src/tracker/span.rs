@@ -22,7 +22,11 @@ impl Span {
 
     #[inline]
     pub fn range(identity: Identity, start: Offset, end: Offset) -> Self {
-        Self { identity, start, end }
+        Self {
+            identity,
+            start,
+            end,
+        }
     }
 
     #[inline]
@@ -56,7 +60,11 @@ impl Span {
         match items.len() {
             0 => Span::void(),
             1 => items[0].span(),
-            _ => items.first().unwrap().span().merge(&items.last().unwrap().span()),
+            _ => items
+                .first()
+                .unwrap()
+                .span()
+                .merge(&items.last().unwrap().span()),
         }
     }
 

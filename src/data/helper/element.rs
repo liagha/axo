@@ -1,8 +1,4 @@
-use {
-    crate::internal::{
-        hash::{Hash, Hasher},
-    }
-};
+use crate::internal::hash::{Hash, Hasher};
 
 #[derive(Debug, Eq)]
 pub struct Delimited<Delimiter, Item> {

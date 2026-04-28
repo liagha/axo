@@ -2,7 +2,7 @@ mod delimited;
 mod symbol;
 
 use crate::{
-    combinator::{Formation, Form, Former},
+    combinator::{Form, Formation, Former},
     data::*,
     parser::{Element, ElementKind, ErrorKind, ParseError, Parser},
     scanner::{PunctuationKind, Token, TokenKind},
@@ -80,8 +80,8 @@ impl<'a> Parser<'a> {
         }
     }
 
-    pub fn literal<'source>(
-    ) -> Formation<'a, 'source, Self, Token<'a>, Element<'a>, ParseError<'a>> {
+    pub fn literal<'source>() -> Formation<'a, 'source, Self, Token<'a>, Element<'a>, ParseError<'a>>
+    {
         Formation::predicate(|token: &Token| match &token.kind {
             TokenKind::String(_)
             | TokenKind::Character(_)
@@ -106,8 +106,8 @@ impl<'a> Parser<'a> {
         })
     }
 
-    pub fn primary<'source>(
-    ) -> Formation<'a, 'source, Self, Token<'a>, Element<'a>, ParseError<'a>> {
+    pub fn primary<'source>() -> Formation<'a, 'source, Self, Token<'a>, Element<'a>, ParseError<'a>>
+    {
         Self::alternative([
             Formation::deferred(Self::delimited),
             Formation::deferred(Self::literal),
@@ -134,10 +134,7 @@ impl<'a> Parser<'a> {
 
             for prefix in prefixes {
                 let span = Span::merge(&prefix.span(), &unary.span());
-                unary = Element::new(
-                    ElementKind::unary(Unary::new(prefix, unary)),
-                    span,
-                );
+                unary = Element::new(ElementKind::unary(Unary::new(prefix, unary)), span);
             }
 
             *form = Form::output(unary);
@@ -176,8 +173,7 @@ impl<'a> Parser<'a> {
             for suffix in suffixes {
                 if let Some(token) = suffix.get_input() {
                     let span = Span::merge(&unary.span(), &token.span());
-                    unary =
-                        Element::new(ElementKind::unary(Unary::new(token, unary)), span);
+                    unary = Element::new(ElementKind::unary(Unary::new(token, unary)), span);
                 } else if let Some(element) = suffix.get_output() {
                     let span = Span::merge(&unary.span(), &element.span());
                     unary = Self::apply_suffix(unary, element, span);
@@ -335,8 +331,8 @@ impl<'a> Parser<'a> {
         ])
     }
 
-    pub fn element<'source>(
-    ) -> Formation<'a, 'source, Self, Token<'a>, Element<'a>, ParseError<'a>> {
+    pub fn element<'source>() -> Formation<'a, 'source, Self, Token<'a>, Element<'a>, ParseError<'a>>
+    {
         Self::alternative([
             Formation::deferred(Self::symbolization),
             Formation::deferred(Self::expression),
@@ -359,10 +355,8 @@ impl<'a> Parser<'a> {
     pub fn parser<'source>() -> Formation<'a, 'source, Self, Token<'a>, Element<'a>, ParseError<'a>>
     {
         Formation::repetition(
-            Self::alternative([Formation::deferred(Self::element).with_recover(
-                Self::recover_sync,
-                Self::recover_emit,
-            )]),
+            Self::alternative([Formation::deferred(Self::element)
+                .with_recover(Self::recover_sync, Self::recover_emit)]),
             0,
             None,
         )

@@ -1,5 +1,5 @@
 use crate::{
-    combinator::{formation::formation::Formation, formation::form::Form, Formable},
+    combinator::{formation::form::Form, formation::formation::Formation, Formable},
     tracker::{Peekable, Span, Spanned},
 };
 

@@ -1,8 +1,6 @@
 use crate::{
     data::Boolean,
-    internal::{
-        hash::{Hash, Hasher},
-    },
+    internal::hash::{Hash, Hasher},
 };
 
 #[derive(Debug, Eq)]

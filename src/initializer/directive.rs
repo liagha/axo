@@ -35,7 +35,8 @@ impl<'a> Initializer<'a> {
     fn separator<'source>(
     ) -> Formation<'a, 'source, Self, Token<'a>, Symbol<'a>, InitializeError<'a>> {
         Formation::predicate(|token: &Token| {
-            token.kind
+            token
+                .kind
                 .try_unwrap_operator()
                 .map(|operator| {
                     operator.as_slice().iter().all(|operator| {
@@ -52,15 +53,15 @@ impl<'a> Initializer<'a> {
         })
     }
 
-    fn segment<'source>(
-    ) -> Formation<'a, 'source, Self, Token<'a>, Symbol<'a>, InitializeError<'a>> {
+    fn segment<'source>() -> Formation<'a, 'source, Self, Token<'a>, Symbol<'a>, InitializeError<'a>>
+    {
         Formation::predicate(|token: &Token| {
             token.kind.is_identifier() || token.kind.is_string() || token.kind.is_integer()
         })
     }
 
-    fn value<'source>(
-    ) -> Formation<'a, 'source, Self, Token<'a>, Symbol<'a>, InitializeError<'a>> {
+    fn value<'source>() -> Formation<'a, 'source, Self, Token<'a>, Symbol<'a>, InitializeError<'a>>
+    {
         Formation::sequence([
             Formation::repetition(Self::separator(), 0, None),
             Formation::repetition(
@@ -90,14 +91,14 @@ impl<'a> Initializer<'a> {
                         1,
                         Some(2),
                     )
-                        .with_ignore(),
+                    .with_ignore(),
                     Formation::predicate(|token: &Token| {
                         matches!(
                             token.kind.try_unwrap_operator(),
                             Some(op) if op.as_slice() == [OperatorKind::Minus, OperatorKind::Minus]
                         )
                     })
-                        .with_ignore(),
+                    .with_ignore(),
                 ]),
                 Formation::predicate(move |token: &Token| {
                     if let Some(identifier) = token.kind.try_unwrap_identifier() {
@@ -106,14 +107,14 @@ impl<'a> Initializer<'a> {
                         false
                     }
                 })
-                    .with_transform(move |former, formation| {
-                        let form = former.forms.get_mut(formation.form).unwrap();
-                        let identifier = form.collect_inputs()[0].clone();
-                        let span = identifier.span();
+                .with_transform(move |former, formation| {
+                    let form = former.forms.get_mut(formation.form).unwrap();
+                    let identifier = form.collect_inputs()[0].clone();
+                    let span = identifier.span();
 
-                        *form = Form::Input(Token::new(TokenKind::identifier(name.clone()), span));
-                        Ok(())
-                    }),
+                    *form = Form::Input(Token::new(TokenKind::identifier(name.clone()), span));
+                    Ok(())
+                }),
                 Self::value(),
             ]),
             move |former, formation| {
@@ -166,14 +167,14 @@ impl<'a> Initializer<'a> {
                     1,
                     Some(2),
                 )
-                    .with_ignore(),
+                .with_ignore(),
                 Formation::predicate(|token: &Token| {
                     matches!(
                         token.kind.try_unwrap_operator(),
                         Some(op) if op.as_slice() == [OperatorKind::Minus, OperatorKind::Minus]
                     )
                 })
-                    .with_ignore(),
+                .with_ignore(),
             ]),
             Formation::predicate(move |token: &Token| {
                 if let Some(identifier) = token.kind.try_unwrap_identifier() {
@@ -183,27 +184,27 @@ impl<'a> Initializer<'a> {
                 }
             }),
         ])
-            .with_transform(move |former, formation| {
-                let form = former.forms.get_mut(formation.form).unwrap();
-                let identifier = form.collect_inputs()[0].clone();
-                let span = identifier.span;
+        .with_transform(move |former, formation| {
+            let form = former.forms.get_mut(formation.form).unwrap();
+            let identifier = form.collect_inputs()[0].clone();
+            let span = identifier.span;
 
-                let target = Element::new(
-                    ElementKind::literal(Token::new(TokenKind::identifier(name.clone()), span)),
-                    span,
-                );
+            let target = Element::new(
+                ElementKind::literal(Token::new(TokenKind::identifier(name.clone()), span)),
+                span,
+            );
 
-                let value = Element::new(
-                    ElementKind::literal(Token::new(TokenKind::identifier(Str::from("true")), span)),
-                    span,
-                );
+            let value = Element::new(
+                ElementKind::literal(Token::new(TokenKind::identifier(Str::from("true")), span)),
+                span,
+            );
 
-                *form = Form::Output(Symbol::new(
-                    SymbolKind::binding(Binding::new(target, Some(value), None, BindingKind::Static)),
-                    span,
-                ));
-                Ok(())
-            })
+            *form = Form::Output(Symbol::new(
+                SymbolKind::binding(Binding::new(target, Some(value), None, BindingKind::Static)),
+                span,
+            ));
+            Ok(())
+        })
     }
 
     pub fn verbosity<'source>(
@@ -216,7 +217,7 @@ impl<'a> Initializer<'a> {
                 1,
                 Some(2),
             )
-                .with_ignore(),
+            .with_ignore(),
             Formation::predicate(|token: &Token| {
                 if let Some(identifier) = token.kind.try_unwrap_identifier() {
                     *identifier == "v" || *identifier == "verbosity"
@@ -224,34 +225,34 @@ impl<'a> Initializer<'a> {
                     false
                 }
             })
-                .with_transform(|former, formation| {
-                    let form = former.forms.get_mut(formation.form).unwrap();
-                    let identifier = form.collect_inputs()[0].clone();
-                    let span = identifier.span();
-
-                    *form = Form::Input(Token::new(
-                        TokenKind::identifier(Str::from("Verbosity")),
-                        span,
-                    ));
-                    Ok(())
-                }),
-            Formation::predicate(|token: &Token| token.kind.is_integer()),
-        ])
             .with_transform(|former, formation| {
                 let form = former.forms.get_mut(formation.form).unwrap();
                 let identifier = form.collect_inputs()[0].clone();
-                let value = form.collect_inputs()[1].clone();
-                let span = identifier.span.merge(&value.span);
+                let span = identifier.span();
 
-                let target = Element::new(ElementKind::literal(identifier.clone()), identifier.span);
-                let value = Element::new(ElementKind::literal(value.clone()), value.span);
-
-                *form = Form::Output(Symbol::new(
-                    SymbolKind::binding(Binding::new(target, Some(value), None, BindingKind::Static)),
+                *form = Form::Input(Token::new(
+                    TokenKind::identifier(Str::from("Verbosity")),
                     span,
                 ));
                 Ok(())
-            })
+            }),
+            Formation::predicate(|token: &Token| token.kind.is_integer()),
+        ])
+        .with_transform(|former, formation| {
+            let form = former.forms.get_mut(formation.form).unwrap();
+            let identifier = form.collect_inputs()[0].clone();
+            let value = form.collect_inputs()[1].clone();
+            let span = identifier.span.merge(&value.span);
+
+            let target = Element::new(ElementKind::literal(identifier.clone()), identifier.span);
+            let value = Element::new(ElementKind::literal(value.clone()), value.span);
+
+            *form = Form::Output(Symbol::new(
+                SymbolKind::binding(Binding::new(target, Some(value), None, BindingKind::Static)),
+                span,
+            ));
+            Ok(())
+        })
     }
 
     pub fn target<'source>(
@@ -287,7 +288,9 @@ impl<'a> Initializer<'a> {
 
     pub fn cranelift<'source>(
     ) -> Formation<'a, 'source, Self, Token<'a>, Symbol<'a>, InitializeError<'a>> {
-        Self::flag(Str::from("Cranelift"), |identifier| *identifier == "cranelift")
+        Self::flag(Str::from("Cranelift"), |identifier| {
+            *identifier == "cranelift"
+        })
     }
 
     pub fn implicit<'source>(

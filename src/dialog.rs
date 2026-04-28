@@ -1,15 +1,13 @@
 use crate::{
     analyzer::Analyzer,
     data::{Identity, Str},
+    generator::{CraneliftEngine, CraneliftValue},
     internal::{
         platform::{read_dir, set_current_dir, stdin, stdout, IsTerminal, Write},
-        session::{
-            ANALYZE_STAGE, PARSE_STAGE, RESOLVE_STAGE, SCAN_STAGE,
-        },
+        session::{ANALYZE_STAGE, PARSE_STAGE, RESOLVE_STAGE, SCAN_STAGE},
         time::Instant,
         Record, RecordKind, Session,
     },
-    generator::{CraneliftEngine, CraneliftValue},
     parser::{Parser, Symbol},
     resolver::Resolver,
     scanner::Scanner,
@@ -67,10 +65,15 @@ impl Dialog {
         render(&buffer, cursor);
 
         loop {
-            if let Ok(Event::Key(KeyEvent { code, modifiers, .. })) = read() {
+            if let Ok(Event::Key(KeyEvent {
+                code, modifiers, ..
+            })) = read()
+            {
                 match code {
                     KeyCode::Enter => break,
-                    KeyCode::Char('c') | KeyCode::Char('d') if modifiers.contains(KeyModifiers::CONTROL) => {
+                    KeyCode::Char('c') | KeyCode::Char('d')
+                        if modifiers.contains(KeyModifiers::CONTROL) =>
+                    {
                         let _ = disable_raw_mode();
                         println!();
                         return None;
@@ -181,9 +184,17 @@ impl Dialog {
                 if session.stage_value(SCAN_STAGE, key) != signature
                     || session.records.get(&key).unwrap().fetch(1).is_none()
                 {
-                    let before = session.records.get(&key).map(|record| record.artifact_version(1)).unwrap_or(0);
+                    let before = session
+                        .records
+                        .get(&key)
+                        .map(|record| record.artifact_version(1))
+                        .unwrap_or(0);
                     Scanner::execute(session, &[key]);
-                    let after = session.records.get(&key).map(|record| record.artifact_version(1)).unwrap_or(0);
+                    let after = session
+                        .records
+                        .get(&key)
+                        .map(|record| record.artifact_version(1))
+                        .unwrap_or(0);
                     session.set_stage(SCAN_STAGE, key, signature);
                     changed |= before != after;
                 }
@@ -194,9 +205,17 @@ impl Dialog {
                 if session.stage_value(PARSE_STAGE, key) != signature
                     || session.records.get(&key).unwrap().fetch(2).is_none()
                 {
-                    let before = session.records.get(&key).map(|record| record.artifact_version(2)).unwrap_or(0);
+                    let before = session
+                        .records
+                        .get(&key)
+                        .map(|record| record.artifact_version(2))
+                        .unwrap_or(0);
                     Parser::execute(session, &[key]);
-                    let after = session.records.get(&key).map(|record| record.artifact_version(2)).unwrap_or(0);
+                    let after = session
+                        .records
+                        .get(&key)
+                        .map(|record| record.artifact_version(2))
+                        .unwrap_or(0);
                     session.set_stage(PARSE_STAGE, key, signature);
                     changed |= before != after;
                 }
@@ -214,16 +233,30 @@ impl Dialog {
 
             let analyze = session.analyze_signature(&targets);
             if session.stage_value(ANALYZE_STAGE, 0) != analyze
-                || targets.iter().any(|key| session.records.get(key).unwrap().fetch(3).is_none())
+                || targets
+                    .iter()
+                    .any(|key| session.records.get(key).unwrap().fetch(3).is_none())
             {
                 let before = targets
                     .iter()
-                    .map(|key| session.records.get(key).map(|record| record.artifact_version(3)).unwrap_or(0))
+                    .map(|key| {
+                        session
+                            .records
+                            .get(key)
+                            .map(|record| record.artifact_version(3))
+                            .unwrap_or(0)
+                    })
                     .sum::<usize>();
                 Analyzer::execute(session, &targets);
                 let after = targets
                     .iter()
-                    .map(|key| session.records.get(key).map(|record| record.artifact_version(3)).unwrap_or(0))
+                    .map(|key| {
+                        session
+                            .records
+                            .get(key)
+                            .map(|record| record.artifact_version(3))
+                            .unwrap_or(0)
+                    })
                     .sum::<usize>();
                 session.set_stage(ANALYZE_STAGE, 0, analyze);
                 changed |= before != after;

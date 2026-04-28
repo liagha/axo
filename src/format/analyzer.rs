@@ -195,8 +195,7 @@ impl<'analysis> Show<'analysis> for AnalysisKind<'analysis> {
                     members = members.field(&slot.to_string(), value.format(config.clone()));
                 }
 
-                base
-                    .variant("Pack")
+                base.variant("Pack")
                     .field("target", target.format(config.clone()))
                     .field("members", members)
             }

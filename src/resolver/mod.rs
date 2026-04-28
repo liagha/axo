@@ -29,11 +29,11 @@ pub fn next_identity() -> Identity {
 pub type ResolveError<'error> = Error<'error, ErrorKind<'error>>;
 
 impl<'source>
-Combinator<
-    'static,
-    Operator<Arc<Lock<Session<'source>>>>,
-    Operation<'source, Arc<Lock<Session<'source>>>>,
-> for Resolver<'source>
+    Combinator<
+        'static,
+        Operator<Arc<Lock<Session<'source>>>>,
+        Operation<'source, Arc<Lock<Session<'source>>>>,
+    > for Resolver<'source>
 {
     fn combinator(
         &self,

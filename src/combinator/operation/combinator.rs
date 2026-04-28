@@ -1,20 +1,24 @@
-use {
-    crate::{
-        combinator::{
-            Combinator, Alternative, Command, Condition, Cycle, Multiple, Operation, Operator,
-            Repetition, Sequence, Status, Transform, Trigger,
-        },
-        data::{memory::take, Identity, Scale},
-        internal::{
-            time::SystemTime,
-            platform::{metadata, Write, Stdio, Command as Terminal},
-        },
+use crate::{
+    combinator::{
+        Alternative, Combinator, Command, Condition, Cycle, Multiple, Operation, Operator,
+        Repetition, Sequence, Status, Transform, Trigger,
+    },
+    data::{memory::take, Identity, Scale},
+    internal::{
+        platform::{metadata, Command as Terminal, Stdio, Write},
+        time::SystemTime,
     },
 };
 
-impl<'source, Store: Clone + Send + Sync + 'source> Combinator<'static, Operator<Store>, Operation<'source, Store>> for Command {
+impl<'source, Store: Clone + Send + Sync + 'source>
+    Combinator<'static, Operator<Store>, Operation<'source, Store>> for Command
+{
     #[inline]
-    fn combinator(&self, _operator: &mut Operator<Store>, operation: &mut Operation<'source, Store>) {
+    fn combinator(
+        &self,
+        _operator: &mut Operator<Store>,
+        operation: &mut Operation<'source, Store>,
+    ) {
         let mut terminal = Terminal::new(&self.program);
         terminal.args(&self.arguments);
 
@@ -47,9 +51,15 @@ impl<'source, Store: Clone + Send + Sync + 'source> Combinator<'static, Operator
     }
 }
 
-impl<'source, Store: Clone + Send + Sync + 'source> Combinator<'static, Operator<Store>, Operation<'source, Store>> for Trigger<'source, Store> {
+impl<'source, Store: Clone + Send + Sync + 'source>
+    Combinator<'static, Operator<Store>, Operation<'source, Store>> for Trigger<'source, Store>
+{
     #[inline]
-    fn combinator(&self, operator: &mut Operator<Store>, operation: &mut Operation<'source, Store>) {
+    fn combinator(
+        &self,
+        operator: &mut Operator<Store>,
+        operation: &mut Operation<'source, Store>,
+    ) {
         match &self.condition {
             Condition::Always => {}
             Condition::Time(time) => {
@@ -93,22 +103,32 @@ impl<'source, Store: Clone + Send + Sync + 'source> Combinator<'static, Operator
     }
 }
 
-impl<'source, Store: Clone + Send + Sync + 'source> Combinator<'static, Operator<Store>, Operation<'source, Store>>
-for Multiple<'static, 'source, Operator<Store>, Operation<'source, Store>>
+impl<'source, Store: Clone + Send + Sync + 'source>
+    Combinator<'static, Operator<Store>, Operation<'source, Store>>
+    for Multiple<'static, 'source, Operator<Store>, Operation<'source, Store>>
 {
     #[inline]
-    fn combinator(&self, operator: &mut Operator<Store>, operation: &mut Operation<'source, Store>) {
+    fn combinator(
+        &self,
+        operator: &mut Operator<Store>,
+        operation: &mut Operation<'source, Store>,
+    ) {
         for step in self.combinators.iter() {
             step.combinator(operator, operation);
         }
     }
 }
 
-impl<'source, Store: Clone + Send + Sync + 'source, const SIZE: Scale> Combinator<'static, Operator<Store>, Operation<'source, Store>>
-for Sequence<Operation<'source, Store>, SIZE>
+impl<'source, Store: Clone + Send + Sync + 'source, const SIZE: Scale>
+    Combinator<'static, Operator<Store>, Operation<'source, Store>>
+    for Sequence<Operation<'source, Store>, SIZE>
 {
     #[inline]
-    fn combinator(&self, operator: &mut Operator<Store>, operation: &mut Operation<'source, Store>) {
+    fn combinator(
+        &self,
+        operator: &mut Operator<Store>,
+        operation: &mut Operation<'source, Store>,
+    ) {
         let mut current_stack = take(&mut operation.stack);
         let mut current_payload = take(&mut operation.payload);
         let base_stack = current_stack.len();
@@ -155,11 +175,16 @@ for Sequence<Operation<'source, Store>, SIZE>
     }
 }
 
-impl<'source, Store: Clone + Send + Sync + 'source, const SIZE: Scale> Combinator<'static, Operator<Store>, Operation<'source, Store>>
-for Alternative<Operation<'source, Store>, SIZE>
+impl<'source, Store: Clone + Send + Sync + 'source, const SIZE: Scale>
+    Combinator<'static, Operator<Store>, Operation<'source, Store>>
+    for Alternative<Operation<'source, Store>, SIZE>
 {
     #[inline]
-    fn combinator(&self, operator: &mut Operator<Store>, operation: &mut Operation<'source, Store>) {
+    fn combinator(
+        &self,
+        operator: &mut Operator<Store>,
+        operation: &mut Operation<'source, Store>,
+    ) {
         let mut best: Option<Operation<'source, Store>> = None;
         let current_stack = take(&mut operation.stack);
         let current_payload = take(&mut operation.payload);
@@ -213,9 +238,16 @@ for Alternative<Operation<'source, Store>, SIZE>
     }
 }
 
-impl<'source, Store: Clone + Send + Sync + 'source> Combinator<'static, Operator<Store>, Operation<'source, Store>> for Repetition<Operation<'source, Store>> {
+impl<'source, Store: Clone + Send + Sync + 'source>
+    Combinator<'static, Operator<Store>, Operation<'source, Store>>
+    for Repetition<Operation<'source, Store>>
+{
     #[inline]
-    fn combinator(&self, operator: &mut Operator<Store>, operation: &mut Operation<'source, Store>) {
+    fn combinator(
+        &self,
+        operator: &mut Operator<Store>,
+        operation: &mut Operation<'source, Store>,
+    ) {
         let mut current_stack = take(&mut operation.stack);
         let mut current_payload = take(&mut operation.payload);
         let base_stack = current_stack.len();
@@ -285,11 +317,16 @@ impl<'source, Store: Clone + Send + Sync + 'source> Combinator<'static, Operator
     }
 }
 
-impl<'source, Store: Clone + Send + Sync + 'source> Combinator<'static, Operator<Store>, Operation<'source, Store>>
-for Cycle<Operation<'source, Store>>
+impl<'source, Store: Clone + Send + Sync + 'source>
+    Combinator<'static, Operator<Store>, Operation<'source, Store>>
+    for Cycle<Operation<'source, Store>>
 {
     #[inline]
-    fn combinator(&self, operator: &mut Operator<Store>, operation: &mut Operation<'source, Store>) {
+    fn combinator(
+        &self,
+        operator: &mut Operator<Store>,
+        operation: &mut Operation<'source, Store>,
+    ) {
         let mut current_stack = take(&mut operation.stack);
         let mut current_payload = take(&mut operation.payload);
 
@@ -321,11 +358,16 @@ for Cycle<Operation<'source, Store>>
     }
 }
 
-impl<'source, Store: Clone + Send + Sync + 'source, Failure> Combinator<'static, Operator<Store>, Operation<'source, Store>>
-for Transform<'static, 'source, Operator<Store>, Operation<'source, Store>, Failure>
+impl<'source, Store: Clone + Send + Sync + 'source, Failure>
+    Combinator<'static, Operator<Store>, Operation<'source, Store>>
+    for Transform<'static, 'source, Operator<Store>, Operation<'source, Store>, Failure>
 {
     #[inline]
-    fn combinator(&self, operator: &mut Operator<Store>, operation: &mut Operation<'source, Store>) {
+    fn combinator(
+        &self,
+        operator: &mut Operator<Store>,
+        operation: &mut Operation<'source, Store>,
+    ) {
         let _ = (self.transformer)(operator, operation);
     }
 }

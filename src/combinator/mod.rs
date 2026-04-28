@@ -37,7 +37,8 @@ pub struct Ignore;
 pub struct Skip;
 
 pub struct Transform<'a, 'source, Host, State, Failure> {
-    pub transformer: Arc<dyn Fn(&mut Host, &mut State) -> Result<(), Failure> + Send + Sync + 'source>,
+    pub transformer:
+        Arc<dyn Fn(&mut Host, &mut State) -> Result<(), Failure> + Send + Sync + 'source>,
     pub phantom: PhantomData<&'a ()>,
 }
 

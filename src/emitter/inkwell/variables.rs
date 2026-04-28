@@ -178,7 +178,8 @@ impl<'backend> Generator<'backend> {
                                         )
                                     })?;
 
-                                let resolved = shape.get_field_type_at_index(*index as u32).unwrap();
+                                let resolved =
+                                    shape.get_field_type_at_index(*index as u32).unwrap();
                                 return Ok(Some((slot, resolved)));
                             }
                         }
@@ -234,12 +235,7 @@ impl<'backend> Generator<'backend> {
                                 if let Some(index) = self.field(&typing, &field) {
                                     let slot = self
                                         .builder
-                                        .build_struct_gep(
-                                            shape,
-                                            loaded,
-                                            index as u32,
-                                            "pointer",
-                                        )
+                                        .build_struct_gep(shape, loaded, index as u32, "pointer")
                                         .map_err(|error| {
                                             GenerateError::new(
                                                 ErrorKind::BuilderError(error.into()),
@@ -428,7 +424,9 @@ impl<'backend> Generator<'backend> {
         if let Some(entity) = self.get_entity(&identifier) {
             return match entity {
                 Entity::Function(function) => Ok(BasicValueEnum::from(
-                    self.linked(identifier, *function).as_global_value().as_pointer_value(),
+                    self.linked(identifier, *function)
+                        .as_global_value()
+                        .as_pointer_value(),
                 )),
                 Entity::Variable { pointer, typing } => {
                     let kind = self.to_basic_type(typing, span)?;
@@ -743,17 +741,23 @@ impl<'backend> Generator<'backend> {
                         variable.set_alignment(self.align(declared));
                         variable.as_pointer_value()
                     } else {
-                        let allocate = self.builder.build_alloca(declared, &target).map_err(|error| {
-                            GenerateError::new(ErrorKind::BuilderError(error.into()), span)
-                        })?;
+                        let allocate =
+                            self.builder
+                                .build_alloca(declared, &target)
+                                .map_err(|error| {
+                                    GenerateError::new(ErrorKind::BuilderError(error.into()), span)
+                                })?;
 
                         if let Some(instruction) = allocate.as_instruction_value() {
                             instruction.set_alignment(self.align(declared)).ok();
                         }
 
-                        let store = self.builder.build_store(allocate, result).map_err(|error| {
-                            GenerateError::new(ErrorKind::BuilderError(error.into()), span)
-                        })?;
+                        let store =
+                            self.builder
+                                .build_store(allocate, result)
+                                .map_err(|error| {
+                                    GenerateError::new(ErrorKind::BuilderError(error.into()), span)
+                                })?;
                         store.set_alignment(self.align(declared)).ok();
 
                         allocate

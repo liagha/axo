@@ -1,9 +1,9 @@
 mod combinator;
-mod formation;
 mod form;
+mod formation;
 mod former;
 mod traits;
 
-pub use formation::*;
 pub use form::*;
+pub use formation::*;
 pub use former::*;

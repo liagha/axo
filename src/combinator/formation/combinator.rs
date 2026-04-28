@@ -1,5 +1,5 @@
 use crate::combinator::{
-    outcome::Outcome, Combinator, Alternative, Deferred, Fail, Form, Formable, Formation, Former,
+    outcome::Outcome, Alternative, Combinator, Deferred, Fail, Form, Formable, Formation, Former,
     Ignore, Literal, Memo, Multiple, Optional, Panic, Predicate, Record, Recover, Repetition,
     Sequence, Skip, Transform,
 };
@@ -20,7 +20,9 @@ fn push_input<'a, 'source, Source, Input, Output, Failure>(
     Output: Formable<'a>,
     Failure: Formable<'a>,
 {
-    former.source.next(&mut formation.marker, &mut formation.state);
+    former
+        .source
+        .next(&mut formation.marker, &mut formation.state);
 
     let consumed = former.consumed.len();
     let form = former.forms.len();
@@ -34,17 +36,17 @@ fn push_input<'a, 'source, Source, Input, Output, Failure>(
 }
 
 impl<'a, 'source, Source, Input, Output, Failure>
-Combinator<
-    'a,
-    Former<'a, 'source, Source, Input, Output, Failure>,
-    Formation<'a, 'source, Source, Input, Output, Failure>,
->
-for Multiple<
-    'a,
-    'source,
-    Former<'a, 'source, Source, Input, Output, Failure>,
-    Formation<'a, 'source, Source, Input, Output, Failure>,
->
+    Combinator<
+        'a,
+        Former<'a, 'source, Source, Input, Output, Failure>,
+        Formation<'a, 'source, Source, Input, Output, Failure>,
+    >
+    for Multiple<
+        'a,
+        'source,
+        Former<'a, 'source, Source, Input, Output, Failure>,
+        Formation<'a, 'source, Source, Input, Output, Failure>,
+    >
 where
     Source: Peekable<'a, Input>,
     Source::State: Default,
@@ -65,11 +67,11 @@ where
 }
 
 impl<'a, 'source, Source, Input, Output, Failure>
-Combinator<
-    'a,
-    Former<'a, 'source, Source, Input, Output, Failure>,
-    Formation<'a, 'source, Source, Input, Output, Failure>,
-> for Literal<'a, 'source, Input>
+    Combinator<
+        'a,
+        Former<'a, 'source, Source, Input, Output, Failure>,
+        Formation<'a, 'source, Source, Input, Output, Failure>,
+    > for Literal<'a, 'source, Input>
 where
     Source: Peekable<'a, Input>,
     Source::State: Default,
@@ -97,11 +99,11 @@ where
 }
 
 impl<'a, 'source, Source, Input, Output, Failure>
-Combinator<
-    'a,
-    Former<'a, 'source, Source, Input, Output, Failure>,
-    Formation<'a, 'source, Source, Input, Output, Failure>,
-> for Predicate<'a, 'source, Input>
+    Combinator<
+        'a,
+        Former<'a, 'source, Source, Input, Output, Failure>,
+        Formation<'a, 'source, Source, Input, Output, Failure>,
+    > for Predicate<'a, 'source, Input>
 where
     Source: Peekable<'a, Input>,
     Source::State: Default,
@@ -129,11 +131,11 @@ where
 }
 
 impl<'a, 'source, Source, Input, Output, Failure, const SIZE: Scale>
-Combinator<
-    'a,
-    Former<'a, 'source, Source, Input, Output, Failure>,
-    Formation<'a, 'source, Source, Input, Output, Failure>,
-> for Alternative<Formation<'a, 'source, Source, Input, Output, Failure>, SIZE>
+    Combinator<
+        'a,
+        Former<'a, 'source, Source, Input, Output, Failure>,
+        Formation<'a, 'source, Source, Input, Output, Failure>,
+    > for Alternative<Formation<'a, 'source, Source, Input, Output, Failure>, SIZE>
 where
     Source: Peekable<'a, Input>,
     Source::State: Default,
@@ -234,7 +236,7 @@ where
 }
 
 impl<'a, 'source, Source, Input, Output, Failure> Clone
-for Deferred<Formation<'a, 'source, Source, Input, Output, Failure>>
+    for Deferred<Formation<'a, 'source, Source, Input, Output, Failure>>
 where
     Source: Peekable<'a, Input>,
     Source::State: Default,
@@ -243,16 +245,18 @@ where
     Failure: Formable<'a>,
 {
     fn clone(&self) -> Self {
-        Self { factory: self.factory }
+        Self {
+            factory: self.factory,
+        }
     }
 }
 
 impl<'a, 'source, Source, Input, Output, Failure>
-Combinator<
-    'a,
-    Former<'a, 'source, Source, Input, Output, Failure>,
-    Formation<'a, 'source, Source, Input, Output, Failure>,
-> for Deferred<Formation<'a, 'source, Source, Input, Output, Failure>>
+    Combinator<
+        'a,
+        Former<'a, 'source, Source, Input, Output, Failure>,
+        Formation<'a, 'source, Source, Input, Output, Failure>,
+    > for Deferred<Formation<'a, 'source, Source, Input, Output, Failure>>
 where
     Source: Peekable<'a, Input>,
     Source::State: Default,
@@ -279,9 +283,12 @@ where
                 former.forms.extend(record.forms.iter().cloned());
                 former.consumed.extend(record.inputs.iter().cloned());
 
-                formation
-                    .consumed
-                    .extend(record.consumed.iter().map(|&id| (id as isize + delta.1) as Identity));
+                formation.consumed.extend(
+                    record
+                        .consumed
+                        .iter()
+                        .map(|&id| (id as isize + delta.1) as Identity),
+                );
 
                 formation.stack.extend(record.stack.iter().map(|&id| {
                     if id == 0 {
@@ -347,7 +354,9 @@ where
         {
             Some(Box::new(Record {
                 forms: former.forms[base.2 as usize..].to_vec().into_boxed_slice(),
-                inputs: former.consumed[base.3 as usize..].to_vec().into_boxed_slice(),
+                inputs: former.consumed[base.3 as usize..]
+                    .to_vec()
+                    .into_boxed_slice(),
                 consumed: child.consumed[base.0..].to_vec().into_boxed_slice(),
                 stack: child.stack[base.1..].to_vec().into_boxed_slice(),
                 form: child.form,
@@ -382,11 +391,11 @@ where
 }
 
 impl<'a, 'source, Source, Input, Output, Failure>
-Combinator<
-    'a,
-    Former<'a, 'source, Source, Input, Output, Failure>,
-    Formation<'a, 'source, Source, Input, Output, Failure>,
-> for Optional<Formation<'a, 'source, Source, Input, Output, Failure>>
+    Combinator<
+        'a,
+        Former<'a, 'source, Source, Input, Output, Failure>,
+        Formation<'a, 'source, Source, Input, Output, Failure>,
+    > for Optional<Formation<'a, 'source, Source, Input, Output, Failure>>
 where
     Source: Peekable<'a, Input>,
     Source::State: Default,
@@ -437,11 +446,11 @@ where
 }
 
 impl<'a, 'source, Source, Input, Output, Failure, const SIZE: Scale>
-Combinator<
-    'a,
-    Former<'a, 'source, Source, Input, Output, Failure>,
-    Formation<'a, 'source, Source, Input, Output, Failure>,
-> for Sequence<Formation<'a, 'source, Source, Input, Output, Failure>, SIZE>
+    Combinator<
+        'a,
+        Former<'a, 'source, Source, Input, Output, Failure>,
+        Formation<'a, 'source, Source, Input, Output, Failure>,
+    > for Sequence<Formation<'a, 'source, Source, Input, Output, Failure>, SIZE>
 where
     Source: Peekable<'a, Input>,
     Source::State: Default,
@@ -543,11 +552,11 @@ where
 }
 
 impl<'a, 'source, Source, Input, Output, Failure>
-Combinator<
-    'a,
-    Former<'a, 'source, Source, Input, Output, Failure>,
-    Formation<'a, 'source, Source, Input, Output, Failure>,
-> for Repetition<Formation<'a, 'source, Source, Input, Output, Failure>>
+    Combinator<
+        'a,
+        Former<'a, 'source, Source, Input, Output, Failure>,
+        Formation<'a, 'source, Source, Input, Output, Failure>,
+    > for Repetition<Formation<'a, 'source, Source, Input, Output, Failure>>
 where
     Source: Peekable<'a, Input>,
     Source::State: Default,
@@ -680,19 +689,19 @@ where
 }
 
 impl<'a, 'source, Source, Input, Output, Failure>
-Combinator<
-    'a,
-    Former<'a, 'source, Source, Input, Output, Failure>,
-    Formation<'a, 'source, Source, Input, Output, Failure>,
->
-for Recover<
-    'a,
-    'source,
-    Former<'a, 'source, Source, Input, Output, Failure>,
-    Formation<'a, 'source, Source, Input, Output, Failure>,
-    Input,
-    Failure,
->
+    Combinator<
+        'a,
+        Former<'a, 'source, Source, Input, Output, Failure>,
+        Formation<'a, 'source, Source, Input, Output, Failure>,
+    >
+    for Recover<
+        'a,
+        'source,
+        Former<'a, 'source, Source, Input, Output, Failure>,
+        Formation<'a, 'source, Source, Input, Output, Failure>,
+        Input,
+        Failure,
+    >
 where
     Source: Peekable<'a, Input>,
     Source::State: Default,
@@ -758,11 +767,11 @@ where
 }
 
 impl<'a, 'source, Source, Input, Output, Failure>
-Combinator<
-    'a,
-    Former<'a, 'source, Source, Input, Output, Failure>,
-    Formation<'a, 'source, Source, Input, Output, Failure>,
-> for Ignore
+    Combinator<
+        'a,
+        Former<'a, 'source, Source, Input, Output, Failure>,
+        Formation<'a, 'source, Source, Input, Output, Failure>,
+    > for Ignore
 where
     Source: Peekable<'a, Input>,
     Source::State: Default,
@@ -784,11 +793,11 @@ where
 }
 
 impl<'a, 'source, Source, Input, Output, Failure>
-Combinator<
-    'a,
-    Former<'a, 'source, Source, Input, Output, Failure>,
-    Formation<'a, 'source, Source, Input, Output, Failure>,
-> for Skip
+    Combinator<
+        'a,
+        Former<'a, 'source, Source, Input, Output, Failure>,
+        Formation<'a, 'source, Source, Input, Output, Failure>,
+    > for Skip
 where
     Source: Peekable<'a, Input>,
     Source::State: Default,
@@ -810,18 +819,18 @@ where
 }
 
 impl<'a, 'source, Source, Input, Output, Failure>
-Combinator<
-    'a,
-    Former<'a, 'source, Source, Input, Output, Failure>,
-    Formation<'a, 'source, Source, Input, Output, Failure>,
->
-for Transform<
-    'a,
-    'source,
-    Former<'a, 'source, Source, Input, Output, Failure>,
-    Formation<'a, 'source, Source, Input, Output, Failure>,
-    Failure,
->
+    Combinator<
+        'a,
+        Former<'a, 'source, Source, Input, Output, Failure>,
+        Formation<'a, 'source, Source, Input, Output, Failure>,
+    >
+    for Transform<
+        'a,
+        'source,
+        Former<'a, 'source, Source, Input, Output, Failure>,
+        Formation<'a, 'source, Source, Input, Output, Failure>,
+        Failure,
+    >
 where
     Source: Peekable<'a, Input>,
     Source::State: Default,
@@ -848,18 +857,18 @@ where
 }
 
 impl<'a, 'source, Source, Input, Output, Failure>
-Combinator<
-    'a,
-    Former<'a, 'source, Source, Input, Output, Failure>,
-    Formation<'a, 'source, Source, Input, Output, Failure>,
->
-for Fail<
-    'a,
-    'source,
-    Former<'a, 'source, Source, Input, Output, Failure>,
-    Formation<'a, 'source, Source, Input, Output, Failure>,
-    Failure,
->
+    Combinator<
+        'a,
+        Former<'a, 'source, Source, Input, Output, Failure>,
+        Formation<'a, 'source, Source, Input, Output, Failure>,
+    >
+    for Fail<
+        'a,
+        'source,
+        Former<'a, 'source, Source, Input, Output, Failure>,
+        Formation<'a, 'source, Source, Input, Output, Failure>,
+        Failure,
+    >
 where
     Source: Peekable<'a, Input>,
     Source::State: Default,
@@ -886,18 +895,18 @@ where
 }
 
 impl<'a, 'source, Source, Input, Output, Failure>
-Combinator<
-    'a,
-    Former<'a, 'source, Source, Input, Output, Failure>,
-    Formation<'a, 'source, Source, Input, Output, Failure>,
->
-for Panic<
-    'a,
-    'source,
-    Former<'a, 'source, Source, Input, Output, Failure>,
-    Formation<'a, 'source, Source, Input, Output, Failure>,
-    Failure,
->
+    Combinator<
+        'a,
+        Former<'a, 'source, Source, Input, Output, Failure>,
+        Formation<'a, 'source, Source, Input, Output, Failure>,
+    >
+    for Panic<
+        'a,
+        'source,
+        Former<'a, 'source, Source, Input, Output, Failure>,
+        Formation<'a, 'source, Source, Input, Output, Failure>,
+        Failure,
+    >
 where
     Source: Peekable<'a, Input>,
     Source::State: Default,

@@ -1,3 +1,4 @@
+use crate::format::Show;
 use {
     crate::{
         analyzer::Analysis,
@@ -6,7 +7,7 @@ use {
         identifier,
         internal::{
             hash::{DefaultHasher, Hash, Hasher, Map},
-            platform::{args, OS, ARCH, PathBuf},
+            platform::{args, PathBuf, ARCH, OS},
             time::{Duration, Instant},
             SessionError,
         },
@@ -19,24 +20,35 @@ use {
     },
     broccli::{xprintln, Color, TextStyle},
 };
-use crate::format::Show;
 
 pub const BASE: &[(&str, &str)] = &[
     ("./base/cast.axo", include_str!("../../../base/cast.axo")),
     ("./base/cast.c", include_str!("../../../base/cast.c")),
     ("./base/file.axo", include_str!("../../../base/file.axo")),
     ("./base/file.c", include_str!("../../../base/file.c")),
-    ("./base/memory.axo", include_str!("../../../base/memory.axo")),
+    (
+        "./base/memory.axo",
+        include_str!("../../../base/memory.axo"),
+    ),
     ("./base/memory.c", include_str!("../../../base/memory.c")),
     ("./base/print.axo", include_str!("../../../base/print.axo")),
     ("./base/print.c", include_str!("../../../base/print.c")),
-    ("./base/process.axo", include_str!("../../../base/process.axo")),
+    (
+        "./base/process.axo",
+        include_str!("../../../base/process.axo"),
+    ),
     ("./base/process.c", include_str!("../../../base/process.c")),
-    ("./base/string.axo", include_str!("../../../base/string.axo")),
+    (
+        "./base/string.axo",
+        include_str!("../../../base/string.axo"),
+    ),
     ("./base/string.c", include_str!("../../../base/string.c")),
     ("./base/input.axo", include_str!("../../../base/input.axo")),
     ("./base/input.c", include_str!("../../../base/input.c")),
-    ("./base/vector.axo", include_str!("../../../base/vector.axo")),
+    (
+        "./base/vector.axo",
+        include_str!("../../../base/vector.axo"),
+    ),
     ("./base/vector.c", include_str!("../../../base/vector.c")),
 ];
 
@@ -160,7 +172,11 @@ impl<'session> Record<'session> {
     }
 
     pub fn span(&self, identity: Identity) -> Span {
-        let end = self.content.as_ref().map(|value| value.len() as Offset).unwrap_or(0);
+        let end = self
+            .content
+            .as_ref()
+            .map(|value| value.len() as Offset)
+            .unwrap_or(0);
         Span::range(identity, 0, end)
     }
 }
@@ -263,9 +279,9 @@ impl<'session> Session<'session> {
     pub fn get_stencil(&self) -> Option<Stencil> {
         match self.get_directive(Str::from("Verbosity")) {
             Some(Token {
-                     kind: TokenKind::Integer(_),
-                     ..
-                 }) => Some(Stencil::default()),
+                kind: TokenKind::Integer(_),
+                ..
+            }) => Some(Stencil::default()),
             _ => None,
         }
     }
@@ -285,13 +301,13 @@ impl<'session> Session<'session> {
     pub fn get_target(&self) -> Option<Str<'session>> {
         match self.get_directive(Str::from("Target")) {
             Some(Token {
-                     kind: TokenKind::Identifier(value),
-                     ..
-                 }) => Some(*value),
+                kind: TokenKind::Identifier(value),
+                ..
+            }) => Some(*value),
             Some(Token {
-                     kind: TokenKind::String(value),
-                     ..
-                 }) => Some(*value),
+                kind: TokenKind::String(value),
+                ..
+            }) => Some(*value),
             _ => None,
         }
     }

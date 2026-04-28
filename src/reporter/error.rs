@@ -4,7 +4,7 @@ use {
         data::{Number, Str},
         format::Display,
         internal::Record,
-        reporter::{Failure},
+        reporter::Failure,
         tracker::Span,
     },
     broccli::{Color, TextStyle},
@@ -20,11 +20,7 @@ where
     pub phantom: PhantomData<&'error ()>,
 }
 
-impl<'error, K> Failure for Error<'error, K>
-where
-    K: Clone + Display,
-{
-}
+impl<'error, K> Failure for Error<'error, K> where K: Clone + Display {}
 
 impl<'error, K> Error<'error, K>
 where
@@ -67,11 +63,8 @@ where
         let max = (rows.len().digit_count() + 2) as usize;
 
         details.push_str(
-            &format!(
-                " --> {}:{}:{}\n",
-                record.location, start_line, start_column
-            )
-            .colorize(Color::Blue),
+            &format!(" --> {}:{}:{}\n", record.location, start_line, start_column)
+                .colorize(Color::Blue),
         );
 
         for number in first..=last {
@@ -81,7 +74,11 @@ where
 
             let mark = highlight(line, number, start_line, start_column, end_line, end_column);
             if !mark.is_empty() {
-                details.push_str(&format!("{}|  {}\n", " ".repeat(max), mark.colorize(Color::Red)));
+                details.push_str(&format!(
+                    "{}|  {}\n",
+                    " ".repeat(max),
+                    mark.colorize(Color::Red)
+                ));
             }
         }
 
@@ -90,7 +87,9 @@ where
 }
 
 fn locate(content: &str, rows: &[u32], offset: usize) -> (usize, usize, usize, usize) {
-    let line = rows.partition_point(|value| *value as usize <= offset).saturating_sub(1);
+    let line = rows
+        .partition_point(|value| *value as usize <= offset)
+        .saturating_sub(1);
     let start = rows[line] as usize;
     let end = if line + 1 < rows.len() {
         rows[line + 1] as usize - 1
@@ -127,7 +126,11 @@ fn highlight(
 
     if start_line == end_line {
         let count = (end_column.saturating_sub(start_column)).max(1);
-        return format!("{}{}", " ".repeat(start_column.saturating_sub(1)), "^".repeat(count));
+        return format!(
+            "{}{}",
+            " ".repeat(start_column.saturating_sub(1)),
+            "^".repeat(count)
+        );
     }
 
     if number == start_line {

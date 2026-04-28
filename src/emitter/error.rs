@@ -137,7 +137,11 @@ impl<'error> Display for ErrorKind<'error> {
     fn fmt(&self, f: &mut Formatter) -> Result {
         match self {
             ErrorKind::InvalidType(typing) => {
-                write!(f, "invalid LLinterpreter type {}", typing.format(Stencil::default()))
+                write!(
+                    f,
+                    "invalid LLinterpreter type {}",
+                    typing.format(Stencil::default())
+                )
             }
             ErrorKind::UnsupportedFloatWidth(width) => {
                 write!(f, "invalid LLinterpreter float width: {}", width)

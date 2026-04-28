@@ -1,8 +1,8 @@
 use crate::{
+    data::{IntErrorKind, ParseFloatError, ParseIntError},
     format::{Debug, Display, Formatter, Result},
     scanner::Character,
     tracker::TrackError,
-    data::{ParseIntError, ParseFloatError, IntErrorKind}
 };
 
 #[derive(Clone, Eq, Hash, PartialEq)]
@@ -109,4 +109,3 @@ impl Into<ParseError> for ParseFloatError {
         ParseError::Empty
     }
 }
-

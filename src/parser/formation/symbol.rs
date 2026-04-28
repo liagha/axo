@@ -1,5 +1,5 @@
 use crate::{
-    combinator::{Formation, Form},
+    combinator::{Form, Formation},
     data::*,
     parser::{Element, ElementKind, ErrorKind, ParseError, Parser, Symbol, SymbolKind},
     scanner::{OperatorKind, Token, TokenKind},
@@ -17,8 +17,8 @@ impl<'a> Parser<'a> {
         ])
     }
 
-    pub fn binding<'source>(
-    ) -> Formation<'a, 'source, Self, Token<'a>, Element<'a>, ParseError<'a>> {
+    pub fn binding<'source>() -> Formation<'a, 'source, Self, Token<'a>, Element<'a>, ParseError<'a>>
+    {
         Formation::sequence([
             Formation::predicate(|token: &Token| {
                 if let Some(id) = token.kind.try_unwrap_identifier() {
@@ -38,79 +38,86 @@ impl<'a> Parser<'a> {
                 ParseError::new(ErrorKind::ExpectedBody, span)
             }),
         ])
-            .with_transform(|former, formation| {
-                let form = former.forms.get_mut(formation.form).unwrap();
-                let sequence = form.as_forms();
-                let keyword = sequence[0].unwrap_input();
+        .with_transform(|former, formation| {
+            let form = former.forms.get_mut(formation.form).unwrap();
+            let sequence = form.as_forms();
+            let keyword = sequence[0].unwrap_input();
 
-                let kind = if let Some(identifier) = keyword.kind.try_unwrap_identifier() {
-                    match identifier.as_str().unwrap() {
-                        "static" => BindingKind::Static,
-                        "let" => BindingKind::Let,
-                        _ => BindingKind::Let,
-                    }
-                } else {
-                    BindingKind::Let
-                };
+            let kind = if let Some(identifier) = keyword.kind.try_unwrap_identifier() {
+                match identifier.as_str().unwrap() {
+                    "static" => BindingKind::Static,
+                    "let" => BindingKind::Let,
+                    _ => BindingKind::Let,
+                }
+            } else {
+                BindingKind::Let
+            };
 
-                let mut body = sequence[1].unwrap_output().clone();
-                let span = Span::merge(&keyword.span(), &body.span());
+            let mut body = sequence[1].unwrap_output().clone();
+            let span = Span::merge(&keyword.span(), &body.span());
 
-                let mut value = None;
-                let mut annotation = None;
+            let mut value = None;
+            let mut annotation = None;
 
-                if let ElementKind::Binary(binary) = &body.kind.clone() {
-                    if let Some(OperatorKind::Equal) = binary.operator.kind.try_unwrap_operator() {
-                        if let ElementKind::Binary(inner_binary) = &binary.left.kind {
-                            value = Some(binary.right.clone());
-                            if let Some(OperatorKind::Colon) = inner_binary.operator.kind.try_unwrap_operator() {
-                                body = inner_binary.left.clone();
-                                annotation = Some(inner_binary.right.clone());
-                            }
-                        } else {
-                            body = binary.left.clone();
-                            value = Some(binary.right.clone());
+            if let ElementKind::Binary(binary) = &body.kind.clone() {
+                if let Some(OperatorKind::Equal) = binary.operator.kind.try_unwrap_operator() {
+                    if let ElementKind::Binary(inner_binary) = &binary.left.kind {
+                        value = Some(binary.right.clone());
+                        if let Some(OperatorKind::Colon) =
+                            inner_binary.operator.kind.try_unwrap_operator()
+                        {
+                            body = inner_binary.left.clone();
+                            annotation = Some(inner_binary.right.clone());
                         }
-                    } else if let Some(OperatorKind::Colon) = binary.operator.kind.try_unwrap_operator() {
-                        body = binary.left.clone();
-                        annotation = Some(binary.right.clone());
                     } else {
-                        if let ElementKind::Binary(assigned) = &binary.left.kind {
-                            if let Some(OperatorKind::Equal) = assigned.operator.kind.try_unwrap_operator() {
-                                let merged_span =
-                                    Span::merge(&assigned.right.span(), &binary.right.span());
-                                let merged_value = Element::new(
-                                    ElementKind::binary(Binary::new(
-                                        assigned.right.clone(),
-                                        binary.operator.clone(),
-                                        binary.right.clone(),
-                                    )),
-                                    merged_span,
-                                );
-                                value = Some(merged_value);
+                        body = binary.left.clone();
+                        value = Some(binary.right.clone());
+                    }
+                } else if let Some(OperatorKind::Colon) = binary.operator.kind.try_unwrap_operator()
+                {
+                    body = binary.left.clone();
+                    annotation = Some(binary.right.clone());
+                } else {
+                    if let ElementKind::Binary(assigned) = &binary.left.kind {
+                        if let Some(OperatorKind::Equal) =
+                            assigned.operator.kind.try_unwrap_operator()
+                        {
+                            let merged_span =
+                                Span::merge(&assigned.right.span(), &binary.right.span());
+                            let merged_value = Element::new(
+                                ElementKind::binary(Binary::new(
+                                    assigned.right.clone(),
+                                    binary.operator.clone(),
+                                    binary.right.clone(),
+                                )),
+                                merged_span,
+                            );
+                            value = Some(merged_value);
 
-                                body = assigned.left.clone();
-                                if let ElementKind::Binary(annotation_pair) = &body.kind.clone() {
-                                    if let Some(OperatorKind::Colon) = annotation_pair.operator.kind.try_unwrap_operator() {
-                                        body = annotation_pair.left.clone();
-                                        annotation = Some(annotation_pair.right.clone());
-                                    }
+                            body = assigned.left.clone();
+                            if let ElementKind::Binary(annotation_pair) = &body.kind.clone() {
+                                if let Some(OperatorKind::Colon) =
+                                    annotation_pair.operator.kind.try_unwrap_operator()
+                                {
+                                    body = annotation_pair.left.clone();
+                                    annotation = Some(annotation_pair.right.clone());
                                 }
                             }
                         }
                     }
                 }
+            }
 
-                *form = Form::output(Element::new(
-                    ElementKind::Symbolize(Box::from(Symbol::new(
-                        SymbolKind::binding(Binding::new(body, value, annotation, kind)),
-                        span,
-                    ))),
+            *form = Form::output(Element::new(
+                ElementKind::Symbolize(Box::from(Symbol::new(
+                    SymbolKind::binding(Binding::new(body, value, annotation, kind)),
                     span,
-                ));
+                ))),
+                span,
+            ));
 
-                Ok(())
-            })
+            Ok(())
+        })
     }
 
     pub fn structure<'source>(
@@ -146,36 +153,36 @@ impl<'a> Parser<'a> {
                 ParseError::new(ErrorKind::ExpectedBody, span)
             }),
         ])
-            .with_transform(|former, formation| {
-                let form = former.forms.get_mut(formation.form).unwrap();
-                let sequence = form.as_forms();
-                let head = sequence[0].as_forms();
+        .with_transform(|former, formation| {
+            let form = former.forms.get_mut(formation.form).unwrap();
+            let sequence = form.as_forms();
+            let head = sequence[0].as_forms();
 
-                let keyword = head[0].unwrap_input();
-                let name = head[1].unwrap_output().clone();
+            let keyword = head[0].unwrap_input();
+            let name = head[1].unwrap_output().clone();
 
-                let body = sequence[1].unwrap_output().clone();
+            let body = sequence[1].unwrap_output().clone();
 
-                let members: Vec<_> = Self::get_body(body.clone())
-                    .into_iter()
-                    .filter_map(|element| match element.kind {
-                        ElementKind::Symbolize(symbol) => Some(*symbol),
-                        _ => None,
-                    })
-                    .collect();
+            let members: Vec<_> = Self::get_body(body.clone())
+                .into_iter()
+                .filter_map(|element| match element.kind {
+                    ElementKind::Symbolize(symbol) => Some(*symbol),
+                    _ => None,
+                })
+                .collect();
 
-                let span = Span::merge(&keyword.span(), &body.span());
+            let span = Span::merge(&keyword.span(), &body.span());
 
-                *form = Form::output(Element::new(
-                    ElementKind::Symbolize(Box::new(Symbol::new(
-                        SymbolKind::structure(Aggregate::new(name, members)),
-                        span,
-                    ))),
+            *form = Form::output(Element::new(
+                ElementKind::Symbolize(Box::new(Symbol::new(
+                    SymbolKind::structure(Aggregate::new(name, members)),
                     span,
-                ));
+                ))),
+                span,
+            ));
 
-                Ok(())
-            })
+            Ok(())
+        })
     }
 
     pub fn union<'source>() -> Formation<'a, 'source, Self, Token<'a>, Element<'a>, ParseError<'a>>
@@ -211,36 +218,36 @@ impl<'a> Parser<'a> {
                 ParseError::new(ErrorKind::ExpectedBody, span)
             }),
         ])
-            .with_transform(|former, formation| {
-                let form = former.forms.get_mut(formation.form).unwrap();
-                let sequence = form.as_forms();
-                let head = sequence[0].as_forms();
+        .with_transform(|former, formation| {
+            let form = former.forms.get_mut(formation.form).unwrap();
+            let sequence = form.as_forms();
+            let head = sequence[0].as_forms();
 
-                let keyword = head[0].unwrap_input();
-                let name = head[1].unwrap_output().clone();
+            let keyword = head[0].unwrap_input();
+            let name = head[1].unwrap_output().clone();
 
-                let body = sequence[1].unwrap_output().clone();
+            let body = sequence[1].unwrap_output().clone();
 
-                let members: Vec<_> = Self::get_body(body.clone())
-                    .into_iter()
-                    .filter_map(|element| match element.kind {
-                        ElementKind::Symbolize(symbol) => Some(*symbol),
-                        _ => None,
-                    })
-                    .collect();
+            let members: Vec<_> = Self::get_body(body.clone())
+                .into_iter()
+                .filter_map(|element| match element.kind {
+                    ElementKind::Symbolize(symbol) => Some(*symbol),
+                    _ => None,
+                })
+                .collect();
 
-                let span = Span::merge(&keyword.span(), &body.span());
+            let span = Span::merge(&keyword.span(), &body.span());
 
-                *form = Form::output(Element::new(
-                    ElementKind::Symbolize(Box::from(Symbol::new(
-                        SymbolKind::union(Aggregate::new(name, members)),
-                        span,
-                    ))),
+            *form = Form::output(Element::new(
+                ElementKind::Symbolize(Box::from(Symbol::new(
+                    SymbolKind::union(Aggregate::new(name, members)),
                     span,
-                ));
+                ))),
+                span,
+            ));
 
-                Ok(())
-            })
+            Ok(())
+        })
     }
 
     pub fn function<'source>(
@@ -267,22 +274,24 @@ impl<'a> Parser<'a> {
                 Self::group(Self::alternative([
                     Formation::deferred(Self::symbolization),
                     Formation::predicate(|token: &Token| {
-                        if let Some(OperatorKind::Composite(operator)) = token.kind.try_unwrap_operator() {
-                            operator.as_slice() == [OperatorKind::Dot, OperatorKind::Dot, OperatorKind::Dot]
+                        if let Some(OperatorKind::Composite(operator)) =
+                            token.kind.try_unwrap_operator()
+                        {
+                            operator.as_slice()
+                                == [OperatorKind::Dot, OperatorKind::Dot, OperatorKind::Dot]
                         } else {
                             false
                         }
-                    }).with_transform(|former, formation| {
+                    })
+                    .with_transform(|former, formation| {
                         let form = former.forms.get_mut(formation.form).unwrap();
                         let span = form.unwrap_input().span();
 
                         *form = Form::output(Element::new(
-                            ElementKind::literal(
-                                Token::new(
-                                    TokenKind::identifier(Str::from("Variadic")),
-                                    span
-                                )
-                            ),
+                            ElementKind::literal(Token::new(
+                                TokenKind::identifier(Str::from("Variadic")),
+                                span,
+                            )),
                             span,
                         ));
 
@@ -299,16 +308,16 @@ impl<'a> Parser<'a> {
                             Ok(())
                         }),
                 ]))
-                    .with_panic(|former, formation| {
-                        let stack = formation
-                            .stack
-                            .iter()
-                            .map(|index| former.forms.get(*index).unwrap().clone())
-                            .collect::<Vec<_>>();
-                        let span = stack.span();
+                .with_panic(|former, formation| {
+                    let stack = formation
+                        .stack
+                        .iter()
+                        .map(|index| former.forms.get(*index).unwrap().clone())
+                        .collect::<Vec<_>>();
+                    let span = stack.span();
 
-                        ParseError::new(ErrorKind::ExpectedHead, span)
-                    }),
+                    ParseError::new(ErrorKind::ExpectedHead, span)
+                }),
                 Formation::sequence([
                     Formation::predicate(|token: &Token| {
                         if let Some(OperatorKind::Colon) = token.kind.try_unwrap_operator() {
@@ -317,108 +326,103 @@ impl<'a> Parser<'a> {
                             false
                         }
                     })
-                        .with_ignore(),
+                    .with_ignore(),
                     Self::alternative([
                         Formation::deferred(Self::prefixed),
                         Formation::deferred(Self::primary),
                     ])
-                        .with_panic(|former, formation| {
-                            let stack = formation
-                                .stack
-                                .iter()
-                                .map(|index| former.forms.get(*index).unwrap().clone())
-                                .collect::<Vec<_>>();
-                            let span = stack.span();
+                    .with_panic(|former, formation| {
+                        let stack = formation
+                            .stack
+                            .iter()
+                            .map(|index| former.forms.get(*index).unwrap().clone())
+                            .collect::<Vec<_>>();
+                        let span = stack.span();
 
-                            ParseError::new(ErrorKind::ExpectedAnnotation, span)
-                        }),
-                ]).into_optional()
-                    .with_transform(|former, formation| {
-                        let form = former.forms.get_mut(formation.form).unwrap();
-                        let output = form.as_forms();
-                        *form = output[0].clone();
-
-                        Ok(())
+                        ParseError::new(ErrorKind::ExpectedAnnotation, span)
                     }),
-                Formation::deferred(Self::expression).into_optional(),
-            ])
+                ])
+                .into_optional()
                 .with_transform(|former, formation| {
                     let form = former.forms.get_mut(formation.form).unwrap();
-                    let sequence = form.as_forms();
-                    let keyword = sequence[0].unwrap_input().clone();
-                    let name = sequence[1].unwrap_output().clone();
-                    let invoke = sequence[2].unwrap_output().clone();
-                    let output = if sequence.len() > 3 {
-                        Some(sequence[3].unwrap_output().clone())
-                    } else {
-                        None
-                    };
+                    let output = form.as_forms();
+                    *form = output[0].clone();
 
-                    let body = if sequence.len() > 4 {
-                        Some(sequence[4].unwrap_output().clone())
-                    } else {
-                        None
-                    };
-
-                    let entry = if let ElementKind::Literal(token) = &name.kind {
-                        if let Some(identifier) = token.kind.try_unwrap_identifier() {
-                            *identifier == Str::from("main")
-                        } else {
-                            false
-                        }
-                    } else {
-                        false
-                    };
-
-                    let mut interface = Interface::Axo;
-                    let mut variadic = false;
-
-                    let members: Vec<_> = Self::get_body(invoke.clone())
-                        .into_iter()
-                        .filter_map(|element| match element.kind {
-                            ElementKind::Symbolize(symbol) => Some(*symbol),
-                            ElementKind::Literal(token) => {
-                                if let Some(identifier) = token.kind.try_unwrap_identifier() {
-                                    match identifier.as_str().unwrap() {
-                                        "C" => interface = Interface::C,
-                                        "Axo" => interface = Interface::Axo,
-                                        "Compiler" => interface = Interface::Compiler,
-                                        "Variadic" => variadic = true,
-                                        _ => {}
-                                    }
-                                }
-
-                                None
-                            }
-                            _ => None,
-                        })
-                        .collect();
-
-                    let span = if let Some(ref b) = body {
-                        Span::merge(&keyword.span(), &b.span())
-                    } else if let Some(ref output) = output {
-                        Span::merge(&keyword.span(), &output.span())
-                    } else {
-                        keyword.span()
-                    };
-
-                    *form = Form::output(Element::new(
-                        ElementKind::Symbolize(Box::from(Symbol::new(
-                            SymbolKind::function(Function::new(
-                                name,
-                                members,
-                                body,
-                                output,
-                                interface,
-                                entry,
-                                variadic,
-                            )),
-                            span,
-                        ))),
-                        span,
-                    ));
                     Ok(())
                 }),
+                Formation::deferred(Self::expression).into_optional(),
+            ])
+            .with_transform(|former, formation| {
+                let form = former.forms.get_mut(formation.form).unwrap();
+                let sequence = form.as_forms();
+                let keyword = sequence[0].unwrap_input().clone();
+                let name = sequence[1].unwrap_output().clone();
+                let invoke = sequence[2].unwrap_output().clone();
+                let output = if sequence.len() > 3 {
+                    Some(sequence[3].unwrap_output().clone())
+                } else {
+                    None
+                };
+
+                let body = if sequence.len() > 4 {
+                    Some(sequence[4].unwrap_output().clone())
+                } else {
+                    None
+                };
+
+                let entry = if let ElementKind::Literal(token) = &name.kind {
+                    if let Some(identifier) = token.kind.try_unwrap_identifier() {
+                        *identifier == Str::from("main")
+                    } else {
+                        false
+                    }
+                } else {
+                    false
+                };
+
+                let mut interface = Interface::Axo;
+                let mut variadic = false;
+
+                let members: Vec<_> = Self::get_body(invoke.clone())
+                    .into_iter()
+                    .filter_map(|element| match element.kind {
+                        ElementKind::Symbolize(symbol) => Some(*symbol),
+                        ElementKind::Literal(token) => {
+                            if let Some(identifier) = token.kind.try_unwrap_identifier() {
+                                match identifier.as_str().unwrap() {
+                                    "C" => interface = Interface::C,
+                                    "Axo" => interface = Interface::Axo,
+                                    "Compiler" => interface = Interface::Compiler,
+                                    "Variadic" => variadic = true,
+                                    _ => {}
+                                }
+                            }
+
+                            None
+                        }
+                        _ => None,
+                    })
+                    .collect();
+
+                let span = if let Some(ref b) = body {
+                    Span::merge(&keyword.span(), &b.span())
+                } else if let Some(ref output) = output {
+                    Span::merge(&keyword.span(), &output.span())
+                } else {
+                    keyword.span()
+                };
+
+                *form = Form::output(Element::new(
+                    ElementKind::Symbolize(Box::from(Symbol::new(
+                        SymbolKind::function(Function::new(
+                            name, members, body, output, interface, entry, variadic,
+                        )),
+                        span,
+                    ))),
+                    span,
+                ));
+                Ok(())
+            }),
             Formation::sequence([
                 Formation::predicate(|token: &Token| {
                     if let Some(id) = token.kind.try_unwrap_identifier() {
@@ -431,22 +435,24 @@ impl<'a> Parser<'a> {
                 Self::group(Self::alternative([
                     Formation::deferred(Self::symbolization),
                     Formation::predicate(|token: &Token| {
-                        if let Some(OperatorKind::Composite(operator)) = token.kind.try_unwrap_operator() {
-                            operator.as_slice() == [OperatorKind::Dot, OperatorKind::Dot, OperatorKind::Dot]
+                        if let Some(OperatorKind::Composite(operator)) =
+                            token.kind.try_unwrap_operator()
+                        {
+                            operator.as_slice()
+                                == [OperatorKind::Dot, OperatorKind::Dot, OperatorKind::Dot]
                         } else {
                             false
                         }
-                    }).with_transform(|former, formation| {
+                    })
+                    .with_transform(|former, formation| {
                         let form = former.forms.get_mut(formation.form).unwrap();
                         let span = form.unwrap_input().span();
 
                         *form = Form::output(Element::new(
-                            ElementKind::literal(
-                                Token::new(
-                                    TokenKind::identifier(Str::from("Variadic")),
-                                    span
-                                )
-                            ),
+                            ElementKind::literal(Token::new(
+                                TokenKind::identifier(Str::from("Variadic")),
+                                span,
+                            )),
                             span,
                         ));
 
@@ -467,76 +473,70 @@ impl<'a> Parser<'a> {
                 ])),
                 Formation::deferred(Self::expression).into_optional(),
             ])
-                .with_transform(|former, formation| {
-                    let form = former.forms.get_mut(formation.form).unwrap();
-                    let sequence = form.as_forms();
-                    let keyword = sequence[0].unwrap_input().clone();
-                    let name = sequence[1].unwrap_output().clone();
-                    let invoke = sequence[2].unwrap_output().clone();
+            .with_transform(|former, formation| {
+                let form = former.forms.get_mut(formation.form).unwrap();
+                let sequence = form.as_forms();
+                let keyword = sequence[0].unwrap_input().clone();
+                let name = sequence[1].unwrap_output().clone();
+                let invoke = sequence[2].unwrap_output().clone();
 
-                    let body = if sequence.len() > 3 {
-                        Some(sequence[3].unwrap_output().clone())
-                    } else {
-                        None
-                    };
+                let body = if sequence.len() > 3 {
+                    Some(sequence[3].unwrap_output().clone())
+                } else {
+                    None
+                };
 
-                    let entry = if let ElementKind::Literal(token) = &name.kind {
-                        if let Some(identifier) = token.kind.try_unwrap_identifier() {
-                            *identifier == Str::from("main")
-                        } else {
-                            false
-                        }
+                let entry = if let ElementKind::Literal(token) = &name.kind {
+                    if let Some(identifier) = token.kind.try_unwrap_identifier() {
+                        *identifier == Str::from("main")
                     } else {
                         false
-                    };
+                    }
+                } else {
+                    false
+                };
 
-                    let mut interface = Interface::Axo;
-                    let mut variadic = false;
+                let mut interface = Interface::Axo;
+                let mut variadic = false;
 
-                    let members: Vec<_> = Self::get_body(invoke.clone())
-                        .into_iter()
-                        .filter_map(|element| match element.kind {
-                            ElementKind::Symbolize(symbol) => Some(*symbol),
-                            ElementKind::Literal(token) => {
-                                if let Some(identifier) = token.kind.try_unwrap_identifier() {
-                                    match identifier.as_str().unwrap() {
-                                        "C" => interface = Interface::C,
-                                        "Axo" => interface = Interface::Axo,
-                                        "Compiler" => interface = Interface::Compiler,
-                                        "Variadic" => variadic = true,
-                                        _ => {}
-                                    }
+                let members: Vec<_> = Self::get_body(invoke.clone())
+                    .into_iter()
+                    .filter_map(|element| match element.kind {
+                        ElementKind::Symbolize(symbol) => Some(*symbol),
+                        ElementKind::Literal(token) => {
+                            if let Some(identifier) = token.kind.try_unwrap_identifier() {
+                                match identifier.as_str().unwrap() {
+                                    "C" => interface = Interface::C,
+                                    "Axo" => interface = Interface::Axo,
+                                    "Compiler" => interface = Interface::Compiler,
+                                    "Variadic" => variadic = true,
+                                    _ => {}
                                 }
-
-                                None
                             }
-                            _ => None,
-                        })
-                        .collect();
 
-                    let span = if let Some(ref b) = body {
-                        Span::merge(&keyword.span(), &b.span())
-                    } else {
-                        Span::merge(&keyword.span(), &invoke.span())
-                    };
+                            None
+                        }
+                        _ => None,
+                    })
+                    .collect();
 
-                    *form = Form::output(Element::new(
-                        ElementKind::Symbolize(Box::from(Symbol::new(
-                            SymbolKind::function(Function::new(
-                                name,
-                                members,
-                                body,
-                                None,
-                                interface,
-                                entry,
-                                variadic,
-                            )),
-                            span,
-                        ))),
+                let span = if let Some(ref b) = body {
+                    Span::merge(&keyword.span(), &b.span())
+                } else {
+                    Span::merge(&keyword.span(), &invoke.span())
+                };
+
+                *form = Form::output(Element::new(
+                    ElementKind::Symbolize(Box::from(Symbol::new(
+                        SymbolKind::function(Function::new(
+                            name, members, body, None, interface, entry, variadic,
+                        )),
                         span,
-                    ));
-                    Ok(())
-                }),
+                    ))),
+                    span,
+                ));
+                Ok(())
+            }),
         ])
     }
 }

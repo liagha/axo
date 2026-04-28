@@ -20,7 +20,16 @@ pub enum SymbolKind<'symbol> {
     Binding(Box<Binding<Element<'symbol>, Element<'symbol>, Option<Element<'symbol>>>>),
     Structure(Box<Aggregate<Element<'symbol>, Symbol<'symbol>>>),
     Union(Box<Aggregate<Element<'symbol>, Symbol<'symbol>>>),
-    Function(Box<Function<Element<'symbol>, Symbol<'symbol>, Option<Element<'symbol>>, Option<Element<'symbol>>>>),
+    Function(
+        Box<
+            Function<
+                Element<'symbol>,
+                Symbol<'symbol>,
+                Option<Element<'symbol>>,
+                Option<Element<'symbol>>,
+            >,
+        >,
+    ),
     Module(Box<Module<Element<'symbol>>>),
 }
 
@@ -47,7 +56,9 @@ impl<'symbol> Symbol<'symbol> {
     }
 
     pub fn set_members(&mut self, members: Vec<Symbol<'symbol>>) {
-        self.scope.symbols.extend(members.into_iter().map(|member| member.identity));
+        self.scope
+            .symbols
+            .extend(members.into_iter().map(|member| member.identity));
     }
 
     pub fn with_scope(self, scope: Scope) -> Self {
@@ -75,7 +86,9 @@ impl<'symbol> Symbol<'symbol> {
 
 impl<'symbol> SymbolKind<'symbol> {
     #[inline]
-    pub fn binding(binding: Binding<Element<'symbol>, Element<'symbol>, Option<Element<'symbol>>>) -> Self {
+    pub fn binding(
+        binding: Binding<Element<'symbol>, Element<'symbol>, Option<Element<'symbol>>>,
+    ) -> Self {
         Self::Binding(Box::new(binding))
     }
 
@@ -90,7 +103,14 @@ impl<'symbol> SymbolKind<'symbol> {
     }
 
     #[inline]
-    pub fn function(function: Function<Element<'symbol>, Symbol<'symbol>, Option<Element<'symbol>>, Option<Element<'symbol>>>) -> Self {
+    pub fn function(
+        function: Function<
+            Element<'symbol>,
+            Symbol<'symbol>,
+            Option<Element<'symbol>>,
+            Option<Element<'symbol>>,
+        >,
+    ) -> Self {
         Self::Function(Box::new(function))
     }
 
@@ -126,7 +146,9 @@ impl<'symbol> SymbolKind<'symbol> {
 
     #[inline]
     #[track_caller]
-    pub fn unwrap_binding(self) -> Binding<Element<'symbol>, Element<'symbol>, Option<Element<'symbol>>> {
+    pub fn unwrap_binding(
+        self,
+    ) -> Binding<Element<'symbol>, Element<'symbol>, Option<Element<'symbol>>> {
         match self {
             Self::Binding(binding) => *binding,
             _ => panic!("expected binding"),
@@ -153,7 +175,14 @@ impl<'symbol> SymbolKind<'symbol> {
 
     #[inline]
     #[track_caller]
-    pub fn unwrap_function(self) -> Function<Element<'symbol>, Symbol<'symbol>, Option<Element<'symbol>>, Option<Element<'symbol>>> {
+    pub fn unwrap_function(
+        self,
+    ) -> Function<
+        Element<'symbol>,
+        Symbol<'symbol>,
+        Option<Element<'symbol>>,
+        Option<Element<'symbol>>,
+    > {
         match self {
             Self::Function(function) => *function,
             _ => panic!("expected function"),
@@ -170,7 +199,9 @@ impl<'symbol> SymbolKind<'symbol> {
     }
 
     #[inline(always)]
-    pub fn try_unwrap_binding(&self) -> Option<&Binding<Element<'symbol>, Element<'symbol>, Option<Element<'symbol>>>> {
+    pub fn try_unwrap_binding(
+        &self,
+    ) -> Option<&Binding<Element<'symbol>, Element<'symbol>, Option<Element<'symbol>>>> {
         match self {
             Self::Binding(binding) => Some(binding),
             _ => None,
@@ -194,7 +225,16 @@ impl<'symbol> SymbolKind<'symbol> {
     }
 
     #[inline(always)]
-    pub fn try_unwrap_function(&self) -> Option<&Function<Element<'symbol>, Symbol<'symbol>, Option<Element<'symbol>>, Option<Element<'symbol>>>> {
+    pub fn try_unwrap_function(
+        &self,
+    ) -> Option<
+        &Function<
+            Element<'symbol>,
+            Symbol<'symbol>,
+            Option<Element<'symbol>>,
+            Option<Element<'symbol>>,
+        >,
+    > {
         match self {
             Self::Function(function) => Some(function),
             _ => None,
@@ -210,7 +250,9 @@ impl<'symbol> SymbolKind<'symbol> {
     }
 
     #[inline(always)]
-    pub fn try_unwrap_binding_mut(&mut self) -> Option<&mut Binding<Element<'symbol>, Element<'symbol>, Option<Element<'symbol>>>> {
+    pub fn try_unwrap_binding_mut(
+        &mut self,
+    ) -> Option<&mut Binding<Element<'symbol>, Element<'symbol>, Option<Element<'symbol>>>> {
         match self {
             Self::Binding(binding) => Some(binding),
             _ => None,
@@ -218,7 +260,9 @@ impl<'symbol> SymbolKind<'symbol> {
     }
 
     #[inline(always)]
-    pub fn try_unwrap_structure_mut(&mut self) -> Option<&mut Aggregate<Element<'symbol>, Symbol<'symbol>>> {
+    pub fn try_unwrap_structure_mut(
+        &mut self,
+    ) -> Option<&mut Aggregate<Element<'symbol>, Symbol<'symbol>>> {
         match self {
             Self::Structure(structure) => Some(structure),
             _ => None,
@@ -226,7 +270,9 @@ impl<'symbol> SymbolKind<'symbol> {
     }
 
     #[inline(always)]
-    pub fn try_unwrap_union_mut(&mut self) -> Option<&mut Aggregate<Element<'symbol>, Symbol<'symbol>>> {
+    pub fn try_unwrap_union_mut(
+        &mut self,
+    ) -> Option<&mut Aggregate<Element<'symbol>, Symbol<'symbol>>> {
         match self {
             Self::Union(union) => Some(union),
             _ => None,
@@ -234,7 +280,16 @@ impl<'symbol> SymbolKind<'symbol> {
     }
 
     #[inline(always)]
-    pub fn try_unwrap_function_mut(&mut self) -> Option<&mut Function<Element<'symbol>, Symbol<'symbol>, Option<Element<'symbol>>, Option<Element<'symbol>>>> {
+    pub fn try_unwrap_function_mut(
+        &mut self,
+    ) -> Option<
+        &mut Function<
+            Element<'symbol>,
+            Symbol<'symbol>,
+            Option<Element<'symbol>>,
+            Option<Element<'symbol>>,
+        >,
+    > {
         match self {
             Self::Function(function) => Some(function),
             _ => None,
@@ -272,7 +327,7 @@ impl<'symbol> Element<'symbol> {
                     } else {
                         None
                     }
-                },
+                }
                 _ => None,
             },
             _ => None,

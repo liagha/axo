@@ -1,8 +1,8 @@
 use crate::{
     combinator::{
-        formation::former::outcome::Outcome, Former,
-        next_identity, Combinator, Alternative, Deferred, Fail, Formable, Ignore, Literal,
-        Multiple, Optional, Panic, Predicate, Recover, Repetition, Sequence, Skip, Transform,
+        formation::former::outcome::Outcome, next_identity, Alternative, Combinator, Deferred,
+        Fail, Formable, Former, Ignore, Literal, Multiple, Optional, Panic, Predicate, Recover,
+        Repetition, Sequence, Skip, Transform,
     },
     data::{
         memory::{take, Arc},
@@ -20,8 +20,12 @@ where
     Failure: Formable<'a>,
 {
     pub identity: Identity,
-    pub combinator:
-        Arc<dyn Combinator<'a, Former<'a, 'source, Source, Input, Output, Failure>, Self> + Send + Sync + 'source>,
+    pub combinator: Arc<
+        dyn Combinator<'a, Former<'a, 'source, Source, Input, Output, Failure>, Self>
+            + Send
+            + Sync
+            + 'source,
+    >,
     pub marker: Offset,
     pub state: Source::State,
     pub consumed: Vec<Identity>,
@@ -32,7 +36,7 @@ where
 }
 
 impl<'a: 'source, 'source, Source, Input, Output, Failure>
-Formation<'a, 'source, Source, Input, Output, Failure>
+    Formation<'a, 'source, Source, Input, Output, Failure>
 where
     Source: Peekable<'a, Input>,
     Source::State: Default,
@@ -43,7 +47,10 @@ where
     #[inline]
     pub fn new(
         combinator: Arc<
-            dyn Combinator<'a, Former<'a, 'source, Source, Input, Output, Failure>, Self> + Send + Sync + 'source,
+            dyn Combinator<'a, Former<'a, 'source, Source, Input, Output, Failure>, Self>
+                + Send
+                + Sync
+                + 'source,
         >,
         marker: Offset,
         state: Source::State,
@@ -64,7 +71,10 @@ where
     #[inline]
     pub(super) fn create(
         combinator: Arc<
-            dyn Combinator<'a, Former<'a, 'source, Source, Input, Output, Failure>, Self> + Send + Sync + 'source,
+            dyn Combinator<'a, Former<'a, 'source, Source, Input, Output, Failure>, Self>
+                + Send
+                + Sync
+                + 'source,
         >,
         marker: Offset,
         state: Source::State,
@@ -91,7 +101,10 @@ where
     pub(super) fn create_child(
         &mut self,
         combinator: Arc<
-            dyn Combinator<'a, Former<'a, 'source, Source, Input, Output, Failure>, Self> + Send + Sync + 'source,
+            dyn Combinator<'a, Former<'a, 'source, Source, Input, Output, Failure>, Self>
+                + Send
+                + Sync
+                + 'source,
         >,
     ) -> Self {
         Self {
@@ -286,11 +299,7 @@ where
 
     #[inline]
     pub fn deferred(factory: fn() -> Self) -> Self {
-        Self::new(
-            Arc::new(Deferred { factory }),
-            0,
-            Default::default(),
-        )
+        Self::new(Arc::new(Deferred { factory }), 0, Default::default())
     }
 
     #[inline]
@@ -307,7 +316,10 @@ where
     pub fn with_combinator(
         mut self,
         combinator: Arc<
-            dyn Combinator<'a, Former<'a, 'source, Source, Input, Output, Failure>, Self> + Send + Sync + 'source,
+            dyn Combinator<'a, Former<'a, 'source, Source, Input, Output, Failure>, Self>
+                + Send
+                + Sync
+                + 'source,
         >,
     ) -> Self {
         let combinators = vec![self.combinator.clone(), combinator];
@@ -319,12 +331,12 @@ where
     pub fn with_fail<F>(self, emitter: F) -> Self
     where
         F: Fn(
-            &mut Former<'a, 'source, Source, Input, Output, Failure>,
-            Formation<'a, 'source, Source, Input, Output, Failure>,
-        ) -> Failure
-        + Send
-        + Sync
-        + 'source,
+                &mut Former<'a, 'source, Source, Input, Output, Failure>,
+                Formation<'a, 'source, Source, Input, Output, Failure>,
+            ) -> Failure
+            + Send
+            + Sync
+            + 'source,
     {
         self.with_combinator(Arc::new(Fail {
             emitter: Arc::new(emitter),
@@ -341,7 +353,12 @@ where
     pub fn with_multiple(
         self,
         combinators: Vec<
-            Arc<dyn Combinator<'a, Former<'a, 'source, Source, Input, Output, Failure>, Self> + Send + Sync + 'source>,
+            Arc<
+                dyn Combinator<'a, Former<'a, 'source, Source, Input, Output, Failure>, Self>
+                    + Send
+                    + Sync
+                    + 'source,
+            >,
         >,
     ) -> Self {
         self.with_combinator(Arc::new(Multiple { combinators }))
@@ -351,12 +368,12 @@ where
     pub fn with_panic<F>(self, emitter: F) -> Self
     where
         F: Fn(
-            &mut Former<'a, 'source, Source, Input, Output, Failure>,
-            Formation<'a, 'source, Source, Input, Output, Failure>,
-        ) -> Failure
-        + Send
-        + Sync
-        + 'source,
+                &mut Former<'a, 'source, Source, Input, Output, Failure>,
+                Formation<'a, 'source, Source, Input, Output, Failure>,
+            ) -> Failure
+            + Send
+            + Sync
+            + 'source,
     {
         self.with_combinator(Self::panic(emitter))
     }
@@ -366,12 +383,12 @@ where
     where
         S: Fn(&Input) -> bool + Send + Sync + 'source,
         F: Fn(
-            &mut Former<'a, 'source, Source, Input, Output, Failure>,
-            Formation<'a, 'source, Source, Input, Output, Failure>,
-        ) -> Failure
-        + Send
-        + Sync
-        + 'source,
+                &mut Former<'a, 'source, Source, Input, Output, Failure>,
+                Formation<'a, 'source, Source, Input, Output, Failure>,
+            ) -> Failure
+            + Send
+            + Sync
+            + 'source,
     {
         self.with_combinator(Self::recover(sync, emitter))
     }
@@ -385,12 +402,12 @@ where
     pub fn with_transform<T>(self, transform: T) -> Self
     where
         T: Fn(
-            &mut Former<'a, 'source, Source, Input, Output, Failure>,
-            &mut Formation<'a, 'source, Source, Input, Output, Failure>,
-        ) -> Result<(), Failure>
-        + Send
-        + Sync
-        + 'source,
+                &mut Former<'a, 'source, Source, Input, Output, Failure>,
+                &mut Formation<'a, 'source, Source, Input, Output, Failure>,
+            ) -> Result<(), Failure>
+            + Send
+            + Sync
+            + 'source,
     {
         self.with_combinator(Self::transform(transform))
     }
@@ -408,15 +425,20 @@ where
     #[inline]
     pub fn transform<T>(
         transformer: T,
-    ) -> Arc<dyn Combinator<'a, Former<'a, 'source, Source, Input, Output, Failure>, Self> + Send + Sync + 'source>
+    ) -> Arc<
+        dyn Combinator<'a, Former<'a, 'source, Source, Input, Output, Failure>, Self>
+            + Send
+            + Sync
+            + 'source,
+    >
     where
         T: Fn(
-            &mut Former<'a, 'source, Source, Input, Output, Failure>,
-            &mut Formation<'a, 'source, Source, Input, Output, Failure>,
-        ) -> Result<(), Failure>
-        + Send
-        + Sync
-        + 'source,
+                &mut Former<'a, 'source, Source, Input, Output, Failure>,
+                &mut Formation<'a, 'source, Source, Input, Output, Failure>,
+            ) -> Result<(), Failure>
+            + Send
+            + Sync
+            + 'source,
     {
         Arc::new(Transform {
             transformer: Arc::new(transformer),
@@ -427,15 +449,20 @@ where
     #[inline]
     pub fn fail<T>(
         emitter: T,
-    ) -> Arc<dyn Combinator<'a, Former<'a, 'source, Source, Input, Output, Failure>, Self> + Send + Sync + 'source>
+    ) -> Arc<
+        dyn Combinator<'a, Former<'a, 'source, Source, Input, Output, Failure>, Self>
+            + Send
+            + Sync
+            + 'source,
+    >
     where
         T: Fn(
-            &mut Former<'a, 'source, Source, Input, Output, Failure>,
-            Formation<'a, 'source, Source, Input, Output, Failure>,
-        ) -> Failure
-        + Send
-        + Sync
-        + 'source,
+                &mut Former<'a, 'source, Source, Input, Output, Failure>,
+                Formation<'a, 'source, Source, Input, Output, Failure>,
+            ) -> Failure
+            + Send
+            + Sync
+            + 'source,
     {
         Arc::new(Fail {
             emitter: Arc::new(emitter),
@@ -446,15 +473,20 @@ where
     #[inline]
     pub fn panic<T>(
         emitter: T,
-    ) -> Arc<dyn Combinator<'a, Former<'a, 'source, Source, Input, Output, Failure>, Self> + Send + Sync + 'source>
+    ) -> Arc<
+        dyn Combinator<'a, Former<'a, 'source, Source, Input, Output, Failure>, Self>
+            + Send
+            + Sync
+            + 'source,
+    >
     where
         T: Fn(
-            &mut Former<'a, 'source, Source, Input, Output, Failure>,
-            Formation<'a, 'source, Source, Input, Output, Failure>,
-        ) -> Failure
-        + Send
-        + Sync
-        + 'source,
+                &mut Former<'a, 'source, Source, Input, Output, Failure>,
+                Formation<'a, 'source, Source, Input, Output, Failure>,
+            ) -> Failure
+            + Send
+            + Sync
+            + 'source,
     {
         Arc::new(Panic {
             emitter: Arc::new(emitter),
@@ -466,16 +498,21 @@ where
     pub fn recover<S, E>(
         sync: S,
         emitter: E,
-    ) -> Arc<dyn Combinator<'a, Former<'a, 'source, Source, Input, Output, Failure>, Self> + Send + Sync + 'source>
+    ) -> Arc<
+        dyn Combinator<'a, Former<'a, 'source, Source, Input, Output, Failure>, Self>
+            + Send
+            + Sync
+            + 'source,
+    >
     where
         S: Fn(&Input) -> bool + Send + Sync + 'source,
         E: Fn(
-            &mut Former<'a, 'source, Source, Input, Output, Failure>,
-            Formation<'a, 'source, Source, Input, Output, Failure>,
-        ) -> Failure
-        + Send
-        + Sync
-        + 'source,
+                &mut Former<'a, 'source, Source, Input, Output, Failure>,
+                Formation<'a, 'source, Source, Input, Output, Failure>,
+            ) -> Failure
+            + Send
+            + Sync
+            + 'source,
     {
         Arc::new(Recover {
             sync: Arc::new(sync),
@@ -485,24 +522,41 @@ where
     }
 
     #[inline]
-    pub fn ignore() -> Arc<dyn Combinator<'a, Former<'a, 'source, Source, Input, Output, Failure>, Self> + Send + Sync + 'source>
-    {
+    pub fn ignore() -> Arc<
+        dyn Combinator<'a, Former<'a, 'source, Source, Input, Output, Failure>, Self>
+            + Send
+            + Sync
+            + 'source,
+    > {
         Arc::new(Ignore)
     }
 
     #[inline]
     pub fn multiple(
         combinators: Vec<
-            Arc<dyn Combinator<'a, Former<'a, 'source, Source, Input, Output, Failure>, Self> + Send + Sync + 'source>,
+            Arc<
+                dyn Combinator<'a, Former<'a, 'source, Source, Input, Output, Failure>, Self>
+                    + Send
+                    + Sync
+                    + 'source,
+            >,
         >,
-    ) -> Arc<dyn Combinator<'a, Former<'a, 'source, Source, Input, Output, Failure>, Self> + Send + Sync + 'source>
-    {
+    ) -> Arc<
+        dyn Combinator<'a, Former<'a, 'source, Source, Input, Output, Failure>, Self>
+            + Send
+            + Sync
+            + 'source,
+    > {
         Arc::new(Multiple { combinators })
     }
 
     #[inline]
-    pub fn skip() -> Arc<dyn Combinator<'a, Former<'a, 'source, Source, Input, Output, Failure>, Self> + Send + Sync + 'source>
-    {
+    pub fn skip() -> Arc<
+        dyn Combinator<'a, Former<'a, 'source, Source, Input, Output, Failure>, Self>
+            + Send
+            + Sync
+            + 'source,
+    > {
         Arc::new(Skip)
     }
 }

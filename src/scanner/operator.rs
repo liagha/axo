@@ -385,4 +385,3 @@ impl Operator for str {
         }
     }
 }
-

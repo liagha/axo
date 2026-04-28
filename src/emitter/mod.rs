@@ -17,14 +17,9 @@ use {
 };
 
 pub use {
-    cranelift::{CraneliftGenerator, Engine as CraneliftEngine, EvalValue as CraneliftValue},
+    cranelift::{Engine as CraneliftEngine, EvalValue as CraneliftValue},
     error::*,
-    inkwell::{
-        Context,
-        ContextRef,
-        Generator,
-        TargetMachine,
-    },
+    inkwell::{Context, ContextRef, Generator, TargetMachine},
 };
 
 pub static CRANELIFT: AtomicBool = AtomicBool::new(false);
@@ -34,16 +29,15 @@ pub type GenerateError<'source> = Error<'source, ErrorKind<'source>>;
 pub struct GenerateCombinator;
 
 fn use_cranelift<'source>(session: &Session<'source>) -> bool {
-    CRANELIFT.load(Ordering::Relaxed)
-        || session.get_directive(Str::from("Cranelift")).is_some()
+    CRANELIFT.load(Ordering::Relaxed) || session.get_directive(Str::from("Cranelift")).is_some()
 }
 
 impl<'source>
-Combinator<
-    'static,
-    Operator<Arc<Lock<Session<'source>>>>,
-    Operation<'source, Arc<Lock<Session<'source>>>>,
-> for GenerateCombinator
+    Combinator<
+        'static,
+        Operator<Arc<Lock<Session<'source>>>>,
+        Operation<'source, Arc<Lock<Session<'source>>>>,
+    > for GenerateCombinator
 {
     fn combinator(
         &self,
@@ -165,24 +159,96 @@ fn generate_cranelift<'source>(
 ) {
     let mut guard = operator.store.write().unwrap();
     let session = &mut *guard;
+    let base = session.base();
+    let target = session.get_target().map(|value| value.as_str().unwrap_or_default().to_string());
+    let discard = session.get_directive(Str::from("Discard")).is_some();
 
-    session.errors.push(SessionError::Generate(GenerateError::new(
-        ErrorKind::Verification(
-            "Cranelift backend is wired for selection but is still incomplete".to_string(),
-        ),
-        Span::void(),
-    )));
-    operation.set_reject();
+    let mut keys: Vec<_> = session
+        .records
+        .iter()
+        .filter_map(|(&key, record)| {
+            if record.kind == RecordKind::Source && record.fetch(0).is_some() {
+                Some(key)
+            } else {
+                None
+            }
+        })
+        .collect();
+    keys.sort();
+
+    for &key in &keys {
+        let record = session.records.get_mut(&key).unwrap();
+        let location = record.location;
+
+        if let Some(Artifact::Analyses(items)) = record.fetch(3) {
+            match cranelift::compile(
+                items.clone(),
+                &location
+                    .stem()
+                    .map(|value| value.to_string())
+                    .unwrap_or_else(|| "module".to_string()),
+                target.as_deref(),
+            ) {
+                Ok(bytes) => {
+                    if discard {
+                        continue;
+                    }
+
+                    let object = Session::object(&base, location, &record.kind, None);
+                    match object.as_path() {
+                        Ok(path) => {
+                            if let Some(parent) = path.parent() {
+                                _ = create_dir_all(parent);
+                            }
+
+                            match crate::internal::platform::File::create(&path) {
+                                Ok(mut file) => {
+                                    use crate::internal::platform::Write;
+                                    if let Err(error) = file.write_all(&bytes) {
+                                        let kind = crate::tracker::ErrorKind::from_io(error, object);
+                                        let track = TrackError::new(kind, Span::void());
+                                        session.errors.push(SessionError::Track(track));
+                                        operation.set_reject();
+                                        return;
+                                    }
+                                    record.store(5, Artifact::Object(object));
+                                }
+                                Err(error) => {
+                                    let kind = crate::tracker::ErrorKind::from_io(error, object);
+                                    let track = TrackError::new(kind, Span::void());
+                                    session.errors.push(SessionError::Track(track));
+                                }
+                            }
+                        }
+                        Err(error) => session.errors.push(SessionError::Track(error)),
+                    }
+                }
+                Err(errors) => {
+                    session.errors.extend(
+                        errors
+                            .into_iter()
+                            .map(SessionError::Generate),
+                    );
+                }
+            }
+        }
+    }
+
+    if session.errors.is_empty() {
+        operation.set_resolve(Vec::new());
+    } else {
+        operation.set_reject();
+    }
 }
 
 pub struct EmitCombinator;
 
 impl<'source>
-Combinator<
-    'static,
-    Operator<Arc<Lock<Session<'source>>>>,
-    Operation<'source, Arc<Lock<Session<'source>>>>,
-> for EmitCombinator
+    Combinator<
+        'static,
+        Operator<Arc<Lock<Session<'source>>>>,
+        Operation<'source, Arc<Lock<Session<'source>>>>,
+    > for EmitCombinator
 {
     fn combinator(
         &self,
@@ -206,7 +272,9 @@ Combinator<
         let mut keys: Vec<_> = session.records.keys().copied().collect();
         keys.sort();
 
-        let target = session.get_target().map(|t| t.as_str().unwrap().to_string());
+        let target = session
+            .get_target()
+            .map(|t| t.as_str().unwrap().to_string());
         let msvc = target
             .as_ref()
             .map(|t| t.contains("msvc"))
@@ -217,7 +285,9 @@ Combinator<
 
             let path = match record.kind {
                 RecordKind::Source => {
-                    if let Some(Artifact::Output(location)) = record.fetch(4) {
+                    if record.fetch(5).is_some() {
+                        None
+                    } else if let Some(Artifact::Output(location)) = record.fetch(4) {
                         Some(location.to_string())
                     } else {
                         None
@@ -234,9 +304,7 @@ Combinator<
                         let output = build.join(name);
 
                         if !output.exists() {
-                            if let Ok(mut file) =
-                                crate::internal::platform::File::create(&output)
-                            {
+                            if let Ok(mut file) = crate::internal::platform::File::create(&output) {
                                 use crate::internal::platform::Write;
                                 _ = file.write_all(content.as_bytes());
                             }
@@ -352,11 +420,11 @@ Combinator<
 pub struct RunCombinator;
 
 impl<'source>
-Combinator<
-    'static,
-    Operator<Arc<Lock<Session<'source>>>>,
-    Operation<'source, Arc<Lock<Session<'source>>>>,
-> for RunCombinator
+    Combinator<
+        'static,
+        Operator<Arc<Lock<Session<'source>>>>,
+        Operation<'source, Arc<Lock<Session<'source>>>>,
+    > for RunCombinator
 {
     fn combinator(
         &self,

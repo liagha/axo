@@ -22,9 +22,24 @@ use {
 };
 
 impl<'backend> Generator<'backend> {
-    pub(crate) fn linked(&self, name: Str<'backend>, function: FunctionValue<'backend>) -> FunctionValue<'backend> {
+    fn bind_name(target: &Analysis<'backend>) -> Option<Str<'backend>> {
+        match &target.kind {
+            AnalysisKind::Usage(name) => Some(*name),
+            AnalysisKind::Symbol(target) => Some(target.name),
+            _ => None,
+        }
+    }
+
+    pub(crate) fn linked(
+        &self,
+        name: Str<'backend>,
+        function: FunctionValue<'backend>,
+    ) -> FunctionValue<'backend> {
         let module = self.current_module();
-        let symbol = function.get_name().to_str().unwrap_or(name.as_str().unwrap_or_default());
+        let symbol = function
+            .get_name()
+            .to_str()
+            .unwrap_or(name.as_str().unwrap_or_default());
 
         if let Some(existing) = module.get_function(symbol) {
             existing
@@ -171,7 +186,10 @@ impl<'backend> Generator<'backend> {
 
         let signature = match output {
             Some(layout) => layout.fn_type(&parameters, function.variadic),
-            None => self.context.void_type().fn_type(&parameters, function.variadic),
+            None => self
+                .context
+                .void_type()
+                .fn_type(&parameters, function.variadic),
         };
 
         let name = function.target.as_str().unwrap_or("function");
@@ -235,7 +253,7 @@ impl<'backend> Generator<'backend> {
 
         for (parameter, member) in value.get_param_iter().zip(function.members.iter()) {
             if let AnalysisKind::Binding(binding) = &member.kind {
-                if let AnalysisKind::Usage(target) = binding.target.kind {
+                if let Some(target) = Self::bind_name(&binding.target) {
                     let pointer = self.build_entry(value, parameter.get_type(), target.clone());
                     let align = self.align(parameter.get_type());
 
@@ -340,19 +358,18 @@ impl<'backend> Generator<'backend> {
 
         let pass = self.context.append_basic_block(parent, "pass");
         let fail = self.context.append_basic_block(parent, "fail");
-        let merge = self.context.append_basic_block(parent, "merge");
 
-        self.builder.build_conditional_branch(flag, pass, fail).ok();
+        self.builder
+            .build_conditional_branch(flag, pass, fail)
+            .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
 
+        // --- THEN branch ---
         self.builder.position_at_end(pass);
         let left = self.analysis(truth)?;
         let left_end = self.builder.get_insert_block().unwrap_or(pass);
-        let left_done = left_end.get_terminator().is_some();
+        let left_terminated = left_end.get_terminator().is_some();
 
-        if !left_done {
-            self.builder.build_unconditional_branch(merge).ok();
-        }
-
+        // --- ELSE branch ---
         self.builder.position_at_end(fail);
         let right = if let Some(expression) = fall {
             self.analysis(expression)?
@@ -367,46 +384,71 @@ impl<'backend> Generator<'backend> {
                 BasicTypeEnum::ScalableVectorType(layout) => layout.const_zero().into(),
             }
         };
-
         let right_end = self.builder.get_insert_block().unwrap_or(fail);
-        let right_done = right_end.get_terminator().is_some();
+        let right_terminated = right_end.get_terminator().is_some();
 
-        if !right_done {
-            self.builder.build_unconditional_branch(merge).ok();
+        // If we don't need the result (statement context), we must not create a merge block.
+        if !needed {
+            if !left_terminated || !right_terminated {
+                let continue_block = self.context.append_basic_block(parent, "continue");
+
+                if !left_terminated {
+                    self.builder.position_at_end(left_end);
+                    self.builder
+                        .build_unconditional_branch(continue_block)
+                        .map_err(|error| {
+                            GenerateError::new(ErrorKind::BuilderError(error.into()), span)
+                        })?;
+                }
+
+                if !right_terminated {
+                    self.builder.position_at_end(right_end);
+                    self.builder
+                        .build_unconditional_branch(continue_block)
+                        .map_err(|error| {
+                            GenerateError::new(ErrorKind::BuilderError(error.into()), span)
+                        })?;
+                }
+
+                self.builder.position_at_end(continue_block);
+            } else {
+                let dead = self.context.append_basic_block(parent, "dead");
+                self.builder.position_at_end(dead);
+                self.builder.build_unreachable().map_err(|error| {
+                    GenerateError::new(ErrorKind::BuilderError(error.into()), span)
+                })?;
+            }
+
+            return Ok(self.context.i64_type().const_zero().into());
+        }
+
+        // --- Expression context: we need a phi node ---
+        let merge = self.context.append_basic_block(parent, "merge");
+
+        let mut edges: Vec<(&dyn BasicValue, BasicBlock)> = Vec::new();
+        if !left_terminated {
+            self.builder.position_at_end(left_end);
+            self.builder
+                .build_unconditional_branch(merge)
+                .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
+            edges.push((&left, left_end));
+        }
+        if !right_terminated {
+            self.builder.position_at_end(right_end);
+            self.builder
+                .build_unconditional_branch(merge)
+                .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
+            edges.push((&right, right_end));
         }
 
         self.builder.position_at_end(merge);
 
-        let mut edges: Vec<(&dyn BasicValue, BasicBlock)> = Vec::new();
-
-        if !left_done {
-            edges.push((&left, left_end));
-        }
-
-        if !right_done {
-            edges.push((&right, right_end));
-        }
-
         if edges.is_empty() {
-            self.builder.build_unreachable().ok();
+            // Both branches terminated, no value to phi.
+            self.builder
+                .build_unreachable()
+                .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
             return Ok(left);
-        }
-
-        if !needed {
-            return Ok(left);
-        }
-
-        if edges.len() == 1 {
-            return Ok(edges[0].0.as_basic_value_enum());
-        }
-
-        let first = edges[0].0.as_basic_value_enum();
-        let identical = edges
-            .iter()
-            .all(|(val, _)| val.as_basic_value_enum() == first);
-
-        if identical {
-            return Ok(first);
         }
 
         let layout = left.get_type();
@@ -414,9 +456,7 @@ impl<'backend> Generator<'backend> {
             .builder
             .build_phi(layout, "mapping")
             .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
-
         phi.add_incoming(&edges);
-
         Ok(phi.as_basic_value())
     }
 
@@ -496,7 +536,10 @@ impl<'backend> Generator<'backend> {
                 Entity::Function(function) => Some(self.linked(target.name, *function)),
                 _ => None,
             })
-            .or_else(|| self.current_module().get_function(target.name.as_str().unwrap_or_default()));
+            .or_else(|| {
+                self.current_module()
+                    .get_function(target.name.as_str().unwrap_or_default())
+            });
 
         if let Some(function) = function {
             let mut arguments = vec![];
@@ -568,8 +611,12 @@ impl<'backend> Generator<'backend> {
         call: Invoke<Box<Analysis<'backend>>, Analysis<'backend>>,
         span: Span,
     ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
-        let name = self.function_target(&call.target.typing).unwrap_or_default();
-        let entity = self.callable(&call.target.typing).map(|function| self.linked(name, function));
+        let name = self
+            .function_target(&call.target.typing)
+            .unwrap_or_default();
+        let entity = self
+            .callable(&call.target.typing)
+            .map(|function| self.linked(name, function));
 
         if let Some(function) = entity {
             let mut arguments = vec![];
@@ -755,10 +802,7 @@ impl<'backend> Generator<'backend> {
         Ok(self.context.i64_type().const_zero().into())
     }
 
-    pub fn parent(
-        &self,
-        span: Span,
-    ) -> Result<FunctionValue<'backend>, GenerateError<'backend>> {
+    pub fn parent(&self, span: Span) -> Result<FunctionValue<'backend>, GenerateError<'backend>> {
         self.builder
             .get_insert_block()
             .and_then(|block| block.get_parent())

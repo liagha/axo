@@ -1,8 +1,10 @@
-use {
-    crate::{
-        combinator::{Operation, Status},
-        data::Identity,
-        internal::{hash::Map, platform::{sleep, metadata}, time::Duration},
+use crate::{
+    combinator::{Operation, Status},
+    data::Identity,
+    internal::{
+        hash::Map,
+        platform::{metadata, sleep},
+        time::Duration,
     },
 };
 
@@ -23,7 +25,7 @@ impl<Store: Clone + Send + Sync> Operator<Store> {
     #[inline]
     pub fn build<'source>(&mut self, operation: &mut Operation<'source, Store>)
     where
-        Store: 'source
+        Store: 'source,
     {
         if let Some(status) = self.cache.get(&operation.identity) {
             operation.status = status.clone();
@@ -46,14 +48,15 @@ impl<Store: Clone + Send + Sync> Operator<Store> {
         combinator.combinator(self, operation);
 
         if !operation.is_pending() {
-            self.cache.insert(operation.identity, operation.status.clone());
+            self.cache
+                .insert(operation.identity, operation.status.clone());
         }
     }
 
     #[inline]
     pub fn execute<'source>(&mut self, operation: &mut Operation<'source, Store>) -> Status
     where
-        Store: 'source
+        Store: 'source,
     {
         loop {
             self.build(operation);
@@ -70,7 +73,7 @@ impl<Store: Clone + Send + Sync> Operator<Store> {
     #[inline]
     pub fn watch<'source>(&mut self, operation: &mut Operation<'source, Store>, paths: &[&str])
     where
-        Store: 'source
+        Store: 'source,
     {
         let mut last: Vec<_> = paths
             .iter()

@@ -1,26 +1,11 @@
 pub mod session;
 
-pub use {
-    session::{
-        Artifact,
-        RecordKind,
-        Record,
-        Session,
-    }
-};
+pub use session::{Artifact, Record, RecordKind, Session};
 
 pub mod time {
     pub use {
-        core::time::{
-            Duration,
-        },
-        std::{
-            time::{
-                SystemTime,
-                Instant,
-                UNIX_EPOCH,
-            },
-        }
+        core::time::Duration,
+        std::time::{Instant, SystemTime, UNIX_EPOCH},
     };
 }
 
@@ -47,38 +32,37 @@ pub mod operation {
 pub mod platform {
     pub use std::{
         alloc::{alloc, dealloc, realloc, Layout},
-        env::{args, temp_dir, set_current_dir, current_dir, current_exe, var, consts::{DLL_EXTENSION, OS, ARCH}},
+        env::{
+            args,
+            consts::{ARCH, DLL_EXTENSION, OS},
+            current_dir, current_exe, set_current_dir, temp_dir, var,
+        },
         ffi::{OsStr, OsString},
-        fs::{canonicalize, create_dir_all, read, read_dir, read_to_string, write, metadata, File},
+        fs::{canonicalize, create_dir_all, metadata, read, read_dir, read_to_string, write, File},
         io::{
-            stderr, stdin, stdout, BufRead, Error, ErrorKind, Result, Stdin, StdinLock, Stdout,
-            IsTerminal,
-            StdoutLock, Read, Write,
+            stderr, stdin, stdout, BufRead, Error, ErrorKind, IsTerminal, Read, Result, Stdin,
+            StdinLock, Stdout, StdoutLock, Write,
         },
-        path::{Path, PathBuf},
-        process::{
-            Command, Stdio,
-        },
-        ptr::{null, NonNull},
-        thread::{sleep, scope},
-        sync::{RwLock as Lock},
         panic::{catch_unwind, AssertUnwindSafe},
+        path::{Path, PathBuf},
+        process::{Command, Stdio},
+        ptr::{null, NonNull},
+        sync::RwLock as Lock,
+        thread::{scope, sleep},
     };
 }
 
 pub mod foreign {
-    pub use std::{
-        ffi::{CStr, c_void as CVoid, c_char as CChar}
-    };
+    pub use std::ffi::{c_char as CChar, c_void as CVoid, CStr};
 }
 
-use crate::initializer::InitializeError;
-use crate::scanner::ScanError;
-use crate::parser::ParseError;
-use crate::resolver::ResolveError;
 use crate::analyzer::AnalyzeError;
 #[cfg(feature = "generator")]
 use crate::generator::GenerateError;
+use crate::initializer::InitializeError;
+use crate::parser::ParseError;
+use crate::resolver::ResolveError;
+use crate::scanner::ScanError;
 use crate::tracker::TrackError;
 
 pub enum SessionError<'error> {

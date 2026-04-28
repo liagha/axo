@@ -8,11 +8,7 @@ pub struct Analysis<'analysis> {
 }
 
 impl<'analysis> Analysis<'analysis> {
-    pub fn new(
-        kind: AnalysisKind<'analysis>,
-        span: Span,
-        typing: Type<'analysis>,
-    ) -> Self {
+    pub fn new(kind: AnalysisKind<'analysis>, span: Span, typing: Type<'analysis>) -> Self {
         Self { kind, span, typing }
     }
 }

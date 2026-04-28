@@ -7,9 +7,7 @@ mod scanner;
 mod token;
 mod traits;
 
-pub use {
-    character::Character, error::*, operator::*, punctuation::*, scanner::Scanner, token::*,
-};
+pub use {character::Character, error::*, operator::*, punctuation::*, scanner::Scanner, token::*};
 
 pub type ScanError<'error> = Error<'error, ErrorKind<'error>>;
 
@@ -21,11 +19,11 @@ use crate::{
 };
 
 impl<'source>
-Combinator<
-    'static,
-    crate::combinator::Operator<Arc<Lock<Session<'source>>>>,
-    Operation<'source, Arc<Lock<Session<'source>>>>,
-> for Scanner<'source>
+    Combinator<
+        'static,
+        crate::combinator::Operator<Arc<Lock<Session<'source>>>>,
+        Operation<'source, Arc<Lock<Session<'source>>>>,
+    > for Scanner<'source>
 {
     fn combinator(
         &self,

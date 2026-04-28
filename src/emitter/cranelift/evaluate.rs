@@ -168,11 +168,7 @@ impl<'a> Engine<'a> {
         self.run_analyses(analyses)
     }
 
-    fn run_unit(
-        &mut self,
-        session: &Session<'a>,
-        key: Identity,
-    ) -> Result<(), GenerateError<'a>> {
+    fn run_unit(&mut self, session: &Session<'a>, key: Identity) -> Result<(), GenerateError<'a>> {
         let Some(record) = session.records.get(&key) else {
             return Ok(());
         };
@@ -330,7 +326,12 @@ impl<'a> Engine<'a> {
         }
 
         if let Some(id) = self.target_key(&self.globals, target) {
-            return Ok(self.globals.values.get(&id).cloned().unwrap_or(Value::Empty));
+            return Ok(self
+                .globals
+                .values
+                .get(&id)
+                .cloned()
+                .unwrap_or(Value::Empty));
         }
 
         Err(self.error(
@@ -391,9 +392,9 @@ impl<'a> Engine<'a> {
             AnalysisKind::Float { value, .. } => Ok(Flow::Value(Value::Float(value.0))),
             AnalysisKind::Boolean { value } => Ok(Flow::Value(Value::Boolean(*value))),
             AnalysisKind::Character { value } => Ok(Flow::Value(Value::Character(*value))),
-            AnalysisKind::String { value } => {
-                Ok(Flow::Value(Value::String(value.as_str().unwrap_or_default().to_string())))
-            }
+            AnalysisKind::String { value } => Ok(Flow::Value(Value::String(
+                value.as_str().unwrap_or_default().to_string(),
+            ))),
             AnalysisKind::Array(values) | AnalysisKind::Tuple(values) => {
                 let mut items = Vec::with_capacity(values.len());
                 for value in values {
@@ -402,7 +403,9 @@ impl<'a> Engine<'a> {
                 Ok(Flow::Value(Value::Sequence(items)))
             }
             AnalysisKind::Negate(value) => self.negate(value, analysis.span),
-            AnalysisKind::SizeOf(typing) => Ok(Flow::Value(Value::Integer(self.size_of(typing) as i64))),
+            AnalysisKind::SizeOf(typing) => {
+                Ok(Flow::Value(Value::Integer(self.size_of(typing) as i64)))
+            }
             AnalysisKind::Add(left, right) => self.add(left, right, analysis.span),
             AnalysisKind::Subtract(left, right) => self.subtract(left, right, analysis.span),
             AnalysisKind::Multiply(left, right) => self.multiply(left, right, analysis.span),
@@ -425,16 +428,26 @@ impl<'a> Engine<'a> {
             AnalysisKind::Equal(left, right) => self.equal(left, right),
             AnalysisKind::NotEqual(left, right) => self.not_equal(left, right),
             AnalysisKind::Less(left, right) => self.less(left, right, analysis.span),
-            AnalysisKind::LessOrEqual(left, right) => self.less_or_equal(left, right, analysis.span),
+            AnalysisKind::LessOrEqual(left, right) => {
+                self.less_or_equal(left, right, analysis.span)
+            }
             AnalysisKind::Greater(left, right) => self.greater(left, right, analysis.span),
-            AnalysisKind::GreaterOrEqual(left, right) => self.greater_or_equal(left, right, analysis.span),
+            AnalysisKind::GreaterOrEqual(left, right) => {
+                self.greater_or_equal(left, right, analysis.span)
+            }
             AnalysisKind::Index(index) => self.index(index, analysis.span),
             AnalysisKind::Usage(name) => self.usage(*name, analysis.span),
-            AnalysisKind::Symbol(target) => Ok(Flow::Value(self.read_target(target, analysis.span)?)),
+            AnalysisKind::Symbol(target) => {
+                Ok(Flow::Value(self.read_target(target, analysis.span)?))
+            }
             AnalysisKind::Access(target, member) => self.access(target, member, analysis.span),
             AnalysisKind::Slot(target, slot) => self.slot(target, *slot, analysis.span),
-            AnalysisKind::Constructor(value) => self.constructor(&analysis.typing, value, analysis.span),
-            AnalysisKind::Pack(target, values) => self.pack(&analysis.typing, target, values, analysis.span),
+            AnalysisKind::Constructor(value) => {
+                self.constructor(&analysis.typing, value, analysis.span)
+            }
+            AnalysisKind::Pack(target, values) => {
+                self.pack(&analysis.typing, target, values, analysis.span)
+            }
             AnalysisKind::Assign(name, value) => self.assign(*name, value, analysis.span),
             AnalysisKind::Write(target, value) => self.write(target, value, analysis.span),
             AnalysisKind::Store(target, value) => self.store(target, value, analysis.span),
@@ -622,7 +635,10 @@ impl<'a> Engine<'a> {
         let id = if target.id != 0 {
             target.id
         } else {
-            self.func_names.get(&target.name).copied().unwrap_or_default()
+            self.func_names
+                .get(&target.name)
+                .copied()
+                .unwrap_or_default()
         };
 
         let Some(routine) = self.funcs.get(&id).cloned() else {
@@ -650,7 +666,10 @@ impl<'a> Engine<'a> {
         match &invoke.target.kind {
             AnalysisKind::Symbol(target) => self.call(target, &invoke.members, span),
             AnalysisKind::Usage(name) => {
-                let target = Target::new(self.func_names.get(name).copied().unwrap_or_default(), *name);
+                let target = Target::new(
+                    self.func_names.get(name).copied().unwrap_or_default(),
+                    *name,
+                );
                 self.call(&target, &invoke.members, span)
             }
             _ => Err(self.error(
@@ -748,9 +767,11 @@ impl<'a> Engine<'a> {
     fn slot_of(&self, typing: &Type<'a>, target: &Target<'a>) -> Option<usize> {
         match &typing.kind {
             TypeKind::Pointer { target: typing } => self.slot_of(typing, target),
-            TypeKind::Structure(value) | TypeKind::Union(value) => value.members.iter().position(|item| {
-                item.identity == target.id || self.name_of(item) == Some(target.name)
-            }),
+            TypeKind::Structure(value) | TypeKind::Union(value) => {
+                value.members.iter().position(|item| {
+                    item.identity == target.id || self.name_of(item) == Some(target.name)
+                })
+            }
             _ => None,
         }
     }
@@ -771,15 +792,17 @@ impl<'a> Engine<'a> {
         span: Span,
     ) -> Result<Value, GenerateError<'a>> {
         match value {
-            Value::Composite(values) | Value::Sequence(values) => values.get(slot).cloned().ok_or_else(|| {
-                self.error(
-                    ErrorKind::DataStructure(DataStructureError::UnknownField {
-                        target: String::new(),
-                        member: slot.to_string(),
-                    }),
-                    span,
-                )
-            }),
+            Value::Composite(values) | Value::Sequence(values) => {
+                values.get(slot).cloned().ok_or_else(|| {
+                    self.error(
+                        ErrorKind::DataStructure(DataStructureError::UnknownField {
+                            target: String::new(),
+                            member: slot.to_string(),
+                        }),
+                        span,
+                    )
+                })
+            }
             _ => Err(self.error(
                 ErrorKind::DataStructure(DataStructureError::NotIndexable),
                 span,
@@ -932,7 +955,10 @@ impl<'a> Engine<'a> {
         value: &crate::data::Aggregate<Str<'a>, Analysis<'a>>,
         span: Span,
     ) -> Result<Flow, GenerateError<'a>> {
-        let target = Target::new(self.names.get(&value.target).copied().unwrap_or_default(), value.target);
+        let target = Target::new(
+            self.names.get(&value.target).copied().unwrap_or_default(),
+            value.target,
+        );
         let values = value
             .members
             .iter()
@@ -986,7 +1012,11 @@ impl<'a> Engine<'a> {
         Ok(Flow::Value(self.slot_value(value, slot, span)?))
     }
 
-    fn index_value(&mut self, value: &Analysis<'a>, span: Span) -> Result<usize, GenerateError<'a>> {
+    fn index_value(
+        &mut self,
+        value: &Analysis<'a>,
+        span: Span,
+    ) -> Result<usize, GenerateError<'a>> {
         match self.value(value)? {
             Value::Integer(value) if value >= 0 => Ok(value as usize),
             _ => Err(self.error(
@@ -1010,7 +1040,13 @@ impl<'a> Engine<'a> {
         right: &Analysis<'a>,
         span: Span,
     ) -> Result<Flow, GenerateError<'a>> {
-        self.numeric(left, right, span, |left, right| left + right, |left, right| left + right)
+        self.numeric(
+            left,
+            right,
+            span,
+            |left, right| left + right,
+            |left, right| left + right,
+        )
     }
 
     fn subtract(
@@ -1019,7 +1055,13 @@ impl<'a> Engine<'a> {
         right: &Analysis<'a>,
         span: Span,
     ) -> Result<Flow, GenerateError<'a>> {
-        self.numeric(left, right, span, |left, right| left - right, |left, right| left - right)
+        self.numeric(
+            left,
+            right,
+            span,
+            |left, right| left - right,
+            |left, right| left - right,
+        )
     }
 
     fn multiply(
@@ -1028,7 +1070,13 @@ impl<'a> Engine<'a> {
         right: &Analysis<'a>,
         span: Span,
     ) -> Result<Flow, GenerateError<'a>> {
-        self.numeric(left, right, span, |left, right| left * right, |left, right| left * right)
+        self.numeric(
+            left,
+            right,
+            span,
+            |left, right| left * right,
+            |left, right| left * right,
+        )
     }
 
     fn divide(
@@ -1040,12 +1088,21 @@ impl<'a> Engine<'a> {
         let right_value = self.value(right)?;
         match right_value {
             Value::Integer(0) | Value::Float(0.0) => {
-                return Err(self.error(ErrorKind::Verification("division by zero".to_string()), span))
+                return Err(self.error(
+                    ErrorKind::Verification("division by zero".to_string()),
+                    span,
+                ))
             }
             _ => {}
         }
         let left_value = self.value(left)?;
-        self.numeric_pair(left_value, right_value, span, |left, right| left / right, |left, right| left / right)
+        self.numeric_pair(
+            left_value,
+            right_value,
+            span,
+            |left, right| left / right,
+            |left, right| left / right,
+        )
     }
 
     fn modulus(
@@ -1059,7 +1116,10 @@ impl<'a> Engine<'a> {
         Ok(Flow::Value(match (left, right) {
             (Value::Integer(left), Value::Integer(right)) => {
                 if right == 0 {
-                    return Err(self.error(ErrorKind::Verification("division by zero".to_string()), span));
+                    return Err(self.error(
+                        ErrorKind::Verification("division by zero".to_string()),
+                        span,
+                    ));
                 }
                 Value::Integer(left % right)
             }
@@ -1208,12 +1268,24 @@ impl<'a> Engine<'a> {
         }))
     }
 
-    fn equal(&mut self, left: &Analysis<'a>, right: &Analysis<'a>) -> Result<Flow, GenerateError<'a>> {
-        Ok(Flow::Value(Value::Boolean(self.value(left)? == self.value(right)?)))
+    fn equal(
+        &mut self,
+        left: &Analysis<'a>,
+        right: &Analysis<'a>,
+    ) -> Result<Flow, GenerateError<'a>> {
+        Ok(Flow::Value(Value::Boolean(
+            self.value(left)? == self.value(right)?,
+        )))
     }
 
-    fn not_equal(&mut self, left: &Analysis<'a>, right: &Analysis<'a>) -> Result<Flow, GenerateError<'a>> {
-        Ok(Flow::Value(Value::Boolean(self.value(left)? != self.value(right)?)))
+    fn not_equal(
+        &mut self,
+        left: &Analysis<'a>,
+        right: &Analysis<'a>,
+    ) -> Result<Flow, GenerateError<'a>> {
+        Ok(Flow::Value(Value::Boolean(
+            self.value(left)? != self.value(right)?,
+        )))
     }
 
     fn less(
@@ -1222,7 +1294,13 @@ impl<'a> Engine<'a> {
         right: &Analysis<'a>,
         span: Span,
     ) -> Result<Flow, GenerateError<'a>> {
-        self.compare(left, right, span, |left, right| left < right, |left, right| left < right)
+        self.compare(
+            left,
+            right,
+            span,
+            |left, right| left < right,
+            |left, right| left < right,
+        )
     }
 
     fn less_or_equal(
@@ -1231,7 +1309,13 @@ impl<'a> Engine<'a> {
         right: &Analysis<'a>,
         span: Span,
     ) -> Result<Flow, GenerateError<'a>> {
-        self.compare(left, right, span, |left, right| left <= right, |left, right| left <= right)
+        self.compare(
+            left,
+            right,
+            span,
+            |left, right| left <= right,
+            |left, right| left <= right,
+        )
     }
 
     fn greater(
@@ -1240,7 +1324,13 @@ impl<'a> Engine<'a> {
         right: &Analysis<'a>,
         span: Span,
     ) -> Result<Flow, GenerateError<'a>> {
-        self.compare(left, right, span, |left, right| left > right, |left, right| left > right)
+        self.compare(
+            left,
+            right,
+            span,
+            |left, right| left > right,
+            |left, right| left > right,
+        )
     }
 
     fn greater_or_equal(
@@ -1249,7 +1339,13 @@ impl<'a> Engine<'a> {
         right: &Analysis<'a>,
         span: Span,
     ) -> Result<Flow, GenerateError<'a>> {
-        self.compare(left, right, span, |left, right| left >= right, |left, right| left >= right)
+        self.compare(
+            left,
+            right,
+            span,
+            |left, right| left >= right,
+            |left, right| left >= right,
+        )
     }
 
     fn compare(
@@ -1260,13 +1356,15 @@ impl<'a> Engine<'a> {
         ints: fn(i64, i64) -> bool,
         floats: fn(f64, f64) -> bool,
     ) -> Result<Flow, GenerateError<'a>> {
-        Ok(Flow::Value(Value::Boolean(match (self.value(left)?, self.value(right)?) {
-            (Value::Integer(left), Value::Integer(right)) => ints(left, right),
-            (Value::Float(left), Value::Float(right)) => floats(left, right),
-            (Value::Float(left), Value::Integer(right)) => floats(left, right as f64),
-            (Value::Integer(left), Value::Float(right)) => floats(left as f64, right),
-            _ => return Err(self.error(ErrorKind::Normalize, span)),
-        })))
+        Ok(Flow::Value(Value::Boolean(
+            match (self.value(left)?, self.value(right)?) {
+                (Value::Integer(left), Value::Integer(right)) => ints(left, right),
+                (Value::Float(left), Value::Float(right)) => floats(left, right),
+                (Value::Float(left), Value::Integer(right)) => floats(left, right as f64),
+                (Value::Integer(left), Value::Float(right)) => floats(left as f64, right),
+                _ => return Err(self.error(ErrorKind::Normalize, span)),
+            },
+        )))
     }
 
     fn size_of(&self, typing: &Type<'a>) -> usize {
@@ -1280,7 +1378,12 @@ impl<'a> Engine<'a> {
             TypeKind::Array { member, size } => self.size_of(member) * size,
             TypeKind::Tuple { members } => members.iter().map(|item| self.size_of(item)).sum(),
             TypeKind::Structure(value) => value.members.iter().map(|item| self.size_of(item)).sum(),
-            TypeKind::Union(value) => value.members.iter().map(|item| self.size_of(item)).max().unwrap_or(0),
+            TypeKind::Union(value) => value
+                .members
+                .iter()
+                .map(|item| self.size_of(item))
+                .max()
+                .unwrap_or(0),
             TypeKind::Binding(value) => value
                 .value
                 .as_deref()

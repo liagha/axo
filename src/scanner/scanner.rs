@@ -35,7 +35,10 @@ impl<'scanner> Peekable<'scanner, Character> for Scanner<'scanner> {
 
     fn next(&self, index: &mut Offset, state: &mut Self::State) -> Option<Character> {
         let ch = self.get(*index)?;
-        *state = Position { identity: ch.span.identity, offset: ch.span.end };
+        *state = Position {
+            identity: ch.span.identity,
+            offset: ch.span.end,
+        };
         *index += 1;
         Some(*ch)
     }
@@ -104,11 +107,7 @@ impl<'scanner> Scanner<'scanner> {
     fn process(session: &mut Session<'scanner>, key: Identity) {
         let (kind, location, content) = {
             let record = session.records.get(&key).unwrap();
-            (
-                record.kind.clone(),
-                record.location,
-                record.content.clone(),
-            )
+            (record.kind.clone(), record.location, record.content.clone())
         };
 
         if kind != RecordKind::Source {
