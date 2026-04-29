@@ -99,19 +99,19 @@ use crate::{
     tracker::Peekable,
 };
 
-use super::memo::Memo;
+use super::{memo::Memo, Sink};
 
 pub type Stash<'a, 'source, Source, Input, Output, Failure> = Vec<(
     usize,
     Arc<
-    dyn Combinator<
-    'a,
-    Former<'a, 'source, Source, Input, Output, Failure>,
-    Formation<'a, 'source, Source, Input, Output, Failure>,
-> + Send
-+ Sync
-+ 'source,
->,
+        dyn Combinator<
+                'a,
+                Former<'a, 'source, Source, Input, Output, Failure>,
+                Formation<'a, 'source, Source, Input, Output, Failure>,
+            > + Send
+            + Sync
+            + 'source,
+    >,
 )>;
 
 pub struct Former<'a, 'source, Source, Input, Output, Failure>
@@ -130,7 +130,7 @@ where
 }
 
 impl<'a, 'source, Source, Input, Output, Failure>
-Former<'a, 'source, Source, Input, Output, Failure>
+    Former<'a, 'source, Source, Input, Output, Failure>
 where
     Source: Peekable<'a, Input> + Clone,
     Source::State: Default,
@@ -155,18 +155,7 @@ where
         formation: &mut Formation<'a, 'source, Source, Input, Output, Failure>,
         input: Input,
     ) {
-        self.source
-            .next(&mut formation.marker, &mut formation.state);
-
-        let consumed = self.consumed.len();
-        let form = self.forms.len();
-
-        self.consumed.push(input.clone());
-        self.forms.push(Form::input(input));
-
-        formation.consumed.push(consumed);
-        formation.form = form;
-        formation.stack.push(form);
+        Sink::push(self, formation, input);
     }
 
     #[inline(always)]
