@@ -1,8 +1,8 @@
 use crate::{
     combinator::{
-        formation::former::outcome::Outcome, next_identity, Alternative, Combinator, Deferred,
-        Fail, Formable, Former, Ignore, Literal, Multiple, Optional, Panic, Predicate, Recover,
-        Repetition, Sequence, Skip, Transform,
+        next_identity, Alternative, Combinator, Deferred, Fail, Formable, Former, Ignore, Literal,
+        Multiple, Optional, Outcome, Panic, Predicate, Recover, Repetition, Sequence, Skip,
+        Transform,
     },
     data::{
         memory::{take, Arc},
