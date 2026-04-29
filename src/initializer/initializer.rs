@@ -9,6 +9,7 @@ use crate::{
     tracker::{Location, Peekable, Position, Span},
 };
 
+#[derive(Clone)]
 pub struct Initializer<'a> {
     pub content: Str<'a>,
     pub index: Offset,

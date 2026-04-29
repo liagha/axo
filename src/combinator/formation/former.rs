@@ -6,6 +6,7 @@ pub mod outcome {
         Failed,
         Blank,
         Ignored,
+        Custom(i8),
     }
 
     impl Outcome {
@@ -17,6 +18,7 @@ pub mod outcome {
                 Outcome::Aligned => 2,
                 Outcome::Ignored => 1,
                 Outcome::Blank => 0,
+                Outcome::Custom(v) => v,
             }
         }
 
@@ -59,14 +61,15 @@ pub mod outcome {
         }
     }
 
-    impl Into<i8> for Outcome {
-        fn into(self) -> i8 {
-            match self {
+    impl From<Outcome> for i8 {
+        fn from(val: Outcome) -> i8 {
+            match val {
                 Outcome::Panicked => 127,
                 Outcome::Aligned => 1,
                 Outcome::Failed => 0,
                 Outcome::Blank => -1,
                 Outcome::Ignored => -2,
+                Outcome::Custom(value) => value,
             }
         }
     }
@@ -79,7 +82,7 @@ pub mod outcome {
                 0 => Outcome::Failed,
                 -1 => Outcome::Blank,
                 -2 => Outcome::Ignored,
-                _ => unreachable!(),
+                value => Outcome::Custom(value),
             }
         }
     }
@@ -90,52 +93,30 @@ use crate::{
     combinator::{Combinator, Form, Formable, Formation},
     data::{
         memory::{replace, Arc},
-        Identity, Offset,
+        Offset,
     },
     internal::hash::Map,
     tracker::Peekable,
 };
 
+use super::memo::Memo;
+
 pub type Stash<'a, 'source, Source, Input, Output, Failure> = Vec<(
     usize,
     Arc<
-        dyn Combinator<
-                'a,
-                Former<'a, 'source, Source, Input, Output, Failure>,
-                Formation<'a, 'source, Source, Input, Output, Failure>,
-            > + Send
-            + Sync
-            + 'source,
-    >,
+    dyn Combinator<
+    'a,
+    Former<'a, 'source, Source, Input, Output, Failure>,
+    Formation<'a, 'source, Source, Input, Output, Failure>,
+> + Send
++ Sync
++ 'source,
+>,
 )>;
-
-pub struct Record<'a, Input: Formable<'a>, Output: Formable<'a>, Failure: Formable<'a>> {
-    pub forms: Box<[Form<'a, Input, Output, Failure>]>,
-    pub inputs: Box<[Input]>,
-    pub consumed: Box<[Identity]>,
-    pub stack: Box<[Identity]>,
-    pub form: Identity,
-    pub form_base: Offset,
-    pub input_base: Offset,
-}
-
-pub struct Memo<'a, Source, Input, Output, Failure>
-where
-    Source: Peekable<'a, Input>,
-    Source::State: Default,
-    Input: Formable<'a>,
-    Output: Formable<'a>,
-    Failure: Formable<'a>,
-{
-    pub outcome: Outcome,
-    pub advance: Offset,
-    pub state: Source::State,
-    pub record: Option<Box<Record<'a, Input, Output, Failure>>>,
-}
 
 pub struct Former<'a, 'source, Source, Input, Output, Failure>
 where
-    Source: Peekable<'a, Input>,
+    Source: Peekable<'a, Input> + Clone,
     Source::State: Default,
     Input: Formable<'a>,
     Output: Formable<'a>,
@@ -149,9 +130,9 @@ where
 }
 
 impl<'a, 'source, Source, Input, Output, Failure>
-    Former<'a, 'source, Source, Input, Output, Failure>
+Former<'a, 'source, Source, Input, Output, Failure>
 where
-    Source: Peekable<'a, Input>,
+    Source: Peekable<'a, Input> + Clone,
     Source::State: Default,
     Input: Formable<'a>,
     Output: Formable<'a>,
@@ -166,6 +147,26 @@ where
             stash: Stash::new(),
             memo: Map::new(),
         }
+    }
+
+    #[inline(always)]
+    pub fn push(
+        &mut self,
+        formation: &mut Formation<'a, 'source, Source, Input, Output, Failure>,
+        input: Input,
+    ) {
+        self.source
+            .next(&mut formation.marker, &mut formation.state);
+
+        let consumed = self.consumed.len();
+        let form = self.forms.len();
+
+        self.consumed.push(input.clone());
+        self.forms.push(Form::input(input));
+
+        formation.consumed.push(consumed);
+        formation.form = form;
+        formation.stack.push(form);
     }
 
     #[inline(always)]

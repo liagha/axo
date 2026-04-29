@@ -13,7 +13,7 @@ use crate::{
 
 pub struct Formation<'a: 'source, 'source, Source, Input, Output, Failure>
 where
-    Source: Peekable<'a, Input>,
+    Source: Peekable<'a, Input> + Clone,
     Source::State: Default,
     Input: Formable<'a>,
     Output: Formable<'a>,
@@ -38,7 +38,7 @@ where
 impl<'a: 'source, 'source, Source, Input, Output, Failure>
     Formation<'a, 'source, Source, Input, Output, Failure>
 where
-    Source: Peekable<'a, Input>,
+    Source: Peekable<'a, Input> + Clone,
     Source::State: Default,
     Input: Formable<'a>,
     Output: Formable<'a>,

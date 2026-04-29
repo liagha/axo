@@ -6,6 +6,7 @@ use crate::{
     tracker::{Peekable, Position},
 };
 
+#[derive(Clone)]
 pub struct Scanner<'scanner> {
     pub index: Offset,
     pub state: Position,

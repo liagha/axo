@@ -24,7 +24,7 @@ where
 impl<'a, 'source, Source, Input, Output, Failure> Clone
     for Formation<'a, 'source, Source, Input, Output, Failure>
 where
-    Source: Peekable<'a, Input>,
+    Source: Peekable<'a, Input> + Clone,
     Input: Formable<'a>,
     Output: Formable<'a>,
     Failure: Formable<'a>,

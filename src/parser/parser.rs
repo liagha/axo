@@ -7,6 +7,7 @@ use crate::{
     tracker::{Peekable, Position},
 };
 
+#[derive(Clone)]
 pub struct Parser<'a> {
     pub index: Offset,
     pub state: Position,

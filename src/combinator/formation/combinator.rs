@@ -9,46 +9,20 @@ use crate::data::{
 };
 use crate::tracker::Peekable;
 
-fn push_input<'a, 'source, Source, Input, Output, Failure>(
-    former: &mut Former<'a, 'source, Source, Input, Output, Failure>,
-    formation: &mut Formation<'a, 'source, Source, Input, Output, Failure>,
-    input: Input,
-) where
-    Source: Peekable<'a, Input>,
-    Source::State: Default,
-    Input: Formable<'a>,
-    Output: Formable<'a>,
-    Failure: Formable<'a>,
-{
-    former
-        .source
-        .next(&mut formation.marker, &mut formation.state);
-
-    let consumed = former.consumed.len();
-    let form = former.forms.len();
-
-    former.consumed.push(input.clone());
-    former.forms.push(Form::input(input));
-
-    formation.consumed.push(consumed);
-    formation.form = form;
-    formation.stack.push(form);
-}
-
 impl<'a, 'source, Source, Input, Output, Failure>
-    Combinator<
-        'a,
-        Former<'a, 'source, Source, Input, Output, Failure>,
-        Formation<'a, 'source, Source, Input, Output, Failure>,
-    >
-    for Multiple<
-        'a,
-        'source,
-        Former<'a, 'source, Source, Input, Output, Failure>,
-        Formation<'a, 'source, Source, Input, Output, Failure>,
-    >
+Combinator<
+    'a,
+    Former<'a, 'source, Source, Input, Output, Failure>,
+    Formation<'a, 'source, Source, Input, Output, Failure>,
+>
+for Multiple<
+    'a,
+    'source,
+    Former<'a, 'source, Source, Input, Output, Failure>,
+    Formation<'a, 'source, Source, Input, Output, Failure>,
+>
 where
-    Source: Peekable<'a, Input>,
+    Source: Peekable<'a, Input> + Clone,
     Source::State: Default,
     Input: Formable<'a>,
     Output: Formable<'a>,
@@ -67,13 +41,13 @@ where
 }
 
 impl<'a, 'source, Source, Input, Output, Failure>
-    Combinator<
-        'a,
-        Former<'a, 'source, Source, Input, Output, Failure>,
-        Formation<'a, 'source, Source, Input, Output, Failure>,
-    > for Literal<'a, 'source, Input>
+Combinator<
+    'a,
+    Former<'a, 'source, Source, Input, Output, Failure>,
+    Formation<'a, 'source, Source, Input, Output, Failure>,
+> for Literal<'a, 'source, Input>
 where
-    Source: Peekable<'a, Input>,
+    Source: Peekable<'a, Input> + Clone,
     Source::State: Default,
     Input: Formable<'a>,
     Output: Formable<'a>,
@@ -85,27 +59,24 @@ where
         former: &mut Former<'a, 'source, Source, Input, Output, Failure>,
         formation: &mut Formation<'a, 'source, Source, Input, Output, Failure>,
     ) {
-        if let Some(input) = former.source.get(formation.marker) {
-            if self.value.eq(input) {
+        match former.source.get(formation.marker) {
+            Some(input) if self.value.eq(input) => {
                 formation.set_align();
-                push_input(former, formation, input.clone());
-            } else {
-                formation.set_empty();
+                former.push(formation, input.clone());
             }
-        } else {
-            formation.set_empty();
+            _ => formation.set_empty(),
         }
     }
 }
 
 impl<'a, 'source, Source, Input, Output, Failure>
-    Combinator<
-        'a,
-        Former<'a, 'source, Source, Input, Output, Failure>,
-        Formation<'a, 'source, Source, Input, Output, Failure>,
-    > for Predicate<'a, 'source, Input>
+Combinator<
+    'a,
+    Former<'a, 'source, Source, Input, Output, Failure>,
+    Formation<'a, 'source, Source, Input, Output, Failure>,
+> for Predicate<'a, 'source, Input>
 where
-    Source: Peekable<'a, Input>,
+    Source: Peekable<'a, Input> + Clone,
     Source::State: Default,
     Input: Formable<'a>,
     Output: Formable<'a>,
@@ -117,27 +88,24 @@ where
         former: &mut Former<'a, 'source, Source, Input, Output, Failure>,
         formation: &mut Formation<'a, 'source, Source, Input, Output, Failure>,
     ) {
-        if let Some(input) = former.source.get(formation.marker) {
-            if (self.function)(input) {
+        match former.source.get(formation.marker) {
+            Some(input) if (self.function)(input) => {
                 formation.set_align();
-                push_input(former, formation, input.clone());
-            } else {
-                formation.set_empty();
+                former.push(formation, input.clone());
             }
-        } else {
-            formation.set_empty();
+            _ => formation.set_empty(),
         }
     }
 }
 
 impl<'a, 'source, Source, Input, Output, Failure, const SIZE: Scale>
-    Combinator<
-        'a,
-        Former<'a, 'source, Source, Input, Output, Failure>,
-        Formation<'a, 'source, Source, Input, Output, Failure>,
-    > for Alternative<Formation<'a, 'source, Source, Input, Output, Failure>, SIZE>
+Combinator<
+    'a,
+    Former<'a, 'source, Source, Input, Output, Failure>,
+    Formation<'a, 'source, Source, Input, Output, Failure>,
+> for Alternative<Formation<'a, 'source, Source, Input, Output, Failure>, SIZE>
 where
-    Source: Peekable<'a, Input>,
+    Source: Peekable<'a, Input> + Clone,
     Source::State: Default,
     Input: Formable<'a>,
     Output: Formable<'a>,
@@ -236,9 +204,9 @@ where
 }
 
 impl<'a, 'source, Source, Input, Output, Failure> Clone
-    for Deferred<Formation<'a, 'source, Source, Input, Output, Failure>>
+for Deferred<Formation<'a, 'source, Source, Input, Output, Failure>>
 where
-    Source: Peekable<'a, Input>,
+    Source: Peekable<'a, Input> + Clone,
     Source::State: Default,
     Input: Formable<'a>,
     Output: Formable<'a>,
@@ -252,13 +220,13 @@ where
 }
 
 impl<'a, 'source, Source, Input, Output, Failure>
-    Combinator<
-        'a,
-        Former<'a, 'source, Source, Input, Output, Failure>,
-        Formation<'a, 'source, Source, Input, Output, Failure>,
-    > for Deferred<Formation<'a, 'source, Source, Input, Output, Failure>>
+Combinator<
+    'a,
+    Former<'a, 'source, Source, Input, Output, Failure>,
+    Formation<'a, 'source, Source, Input, Output, Failure>,
+> for Deferred<Formation<'a, 'source, Source, Input, Output, Failure>>
 where
-    Source: Peekable<'a, Input>,
+    Source: Peekable<'a, Input> + Clone,
     Source::State: Default,
     Input: Formable<'a>,
     Output: Formable<'a>,
@@ -273,44 +241,8 @@ where
         let id = self.factory as usize;
         let key = (id, formation.marker);
 
-        if let Some(memo) = former.memo.get(&key) {
-            if let Some(record) = &memo.record {
-                let delta = (
-                    former.forms.len() as isize - record.form_base as isize,
-                    former.consumed.len() as isize - record.input_base as isize,
-                );
-
-                former.forms.extend(record.forms.iter().cloned());
-                former.consumed.extend(record.inputs.iter().cloned());
-
-                formation.consumed.extend(
-                    record
-                        .consumed
-                        .iter()
-                        .map(|&id| (id as isize + delta.1) as Identity),
-                );
-
-                formation.stack.extend(record.stack.iter().map(|&id| {
-                    if id == 0 {
-                        0
-                    } else {
-                        (id as isize + delta.0) as Identity
-                    }
-                }));
-
-                formation.form = if record.form == 0 {
-                    0
-                } else {
-                    (record.form as isize + delta.0) as Identity
-                };
-            } else {
-                formation.form = 0;
-            }
-
-            formation.marker += memo.advance;
-            formation.state = memo.state;
-            formation.outcome = memo.outcome;
-
+        if let Some(memo) = (&former.memo.get(&key)).cloned() {
+            apply_memo(former, formation, &memo);
             return;
         }
 
@@ -323,81 +255,152 @@ where
             }
         };
 
-        let consumed = take(&mut formation.consumed);
-        let stack = take(&mut formation.stack);
-        let base = (
-            consumed.len(),
-            stack.len(),
-            former.forms.len() as Offset,
-            former.consumed.len() as Offset,
-            formation.marker,
-        );
-
-        let mut child = Formation::create(
-            combinator,
-            formation.marker,
-            formation.state,
-            consumed,
-            Outcome::Blank,
-            0,
-            stack,
-            formation.depth + 1,
-        );
-
-        former.build(&mut child);
-
-        let record = if !former.forms[base.2 as usize..].is_empty()
-            || !former.consumed[base.3 as usize..].is_empty()
-            || !child.consumed[base.0..].is_empty()
-            || !child.stack[base.1..].is_empty()
-            || child.form != 0
-        {
-            Some(Box::new(Record {
-                forms: former.forms[base.2 as usize..].to_vec().into_boxed_slice(),
-                inputs: former.consumed[base.3 as usize..]
-                    .to_vec()
-                    .into_boxed_slice(),
-                consumed: child.consumed[base.0..].to_vec().into_boxed_slice(),
-                stack: child.stack[base.1..].to_vec().into_boxed_slice(),
-                form: child.form,
-                form_base: base.2,
-                input_base: base.3,
-            }))
-        } else {
-            None
-        };
+        let memo = record_memo(former, formation, combinator);
 
         if former.memo.len() > 2048 {
             former.memo.clear();
         }
 
-        former.memo.insert(
-            key,
-            Memo {
-                outcome: child.outcome,
-                advance: child.marker - base.4,
-                state: child.state,
-                record,
-            },
+        former.memo.insert(key, memo);
+    }
+}
+
+fn apply_memo<'a, 'source, Source, Input, Output, Failure>(
+    former: &mut Former<'a, 'source, Source, Input, Output, Failure>,
+    formation: &mut Formation<'a, 'source, Source, Input, Output, Failure>,
+    memo: &Memo<'a, Source, Input, Output, Failure>,
+) where
+    Source: Peekable<'a, Input> + Clone,
+    Source::State: Default,
+    Input: Formable<'a>,
+    Output: Formable<'a>,
+    Failure: Formable<'a>,
+{
+    if let Some(record) = &memo.record {
+        let delta = (
+            former.forms.len() as isize - record.form_base as isize,
+            former.consumed.len() as isize - record.input_base as isize,
         );
 
-        formation.marker = child.marker;
-        formation.state = child.state;
-        formation.outcome = child.outcome;
-        formation.form = child.form;
-        formation.consumed = child.consumed;
-        formation.stack = child.stack;
+        former.forms.extend(record.forms.iter().cloned());
+        former.consumed.extend(record.inputs.iter().cloned());
+
+        formation.consumed.extend(
+            record
+                .consumed
+                .iter()
+                .map(|&id| (id as isize + delta.1) as Identity),
+        );
+
+        formation.stack.extend(record.stack.iter().map(|&id| {
+            if id == 0 {
+                0
+            } else {
+                (id as isize + delta.0) as Identity
+            }
+        }));
+
+        formation.form = if record.form == 0 {
+            0
+        } else {
+            (record.form as isize + delta.0) as Identity
+        };
+    } else {
+        formation.form = 0;
+    }
+
+    formation.marker += memo.advance;
+    formation.state = memo.state;
+    formation.outcome = memo.outcome;
+}
+
+fn record_memo<'a, 'source, Source, Input, Output, Failure>(
+    former: &mut Former<'a, 'source, Source, Input, Output, Failure>,
+    formation: &mut Formation<'a, 'source, Source, Input, Output, Failure>,
+    combinator: crate::data::memory::Arc<
+        dyn Combinator<
+            'a,
+            Former<'a, 'source, Source, Input, Output, Failure>,
+            Formation<'a, 'source, Source, Input, Output, Failure>,
+        > + Send
+        + Sync
+        + 'source,
+    >,
+) -> Memo<'a, Source, Input, Output, Failure>
+where
+    Source: Peekable<'a, Input> + Clone,
+    Source::State: Default,
+    Input: Formable<'a>,
+    Output: Formable<'a>,
+    Failure: Formable<'a>,
+{
+    let consumed = take(&mut formation.consumed);
+    let stack = take(&mut formation.stack);
+    let base = (
+        consumed.len(),
+        stack.len(),
+        former.forms.len() as Offset,
+        former.consumed.len() as Offset,
+        formation.marker,
+    );
+
+    let mut child = Formation::create(
+        combinator,
+        formation.marker,
+        formation.state,
+        consumed,
+        Outcome::Blank,
+        0,
+        stack,
+        formation.depth + 1,
+    );
+
+    former.build(&mut child);
+
+    let record = if !former.forms[base.2 as usize..].is_empty()
+        || !former.consumed[base.3 as usize..].is_empty()
+        || !child.consumed[base.0..].is_empty()
+        || !child.stack[base.1..].is_empty()
+        || child.form != 0
+    {
+        Some(Box::new(Record {
+            forms: former.forms[base.2 as usize..].to_vec().into_boxed_slice(),
+            inputs: former.consumed[base.3 as usize..]
+                .to_vec()
+                .into_boxed_slice(),
+            consumed: child.consumed[base.0..].to_vec().into_boxed_slice(),
+            stack: child.stack[base.1..].to_vec().into_boxed_slice(),
+            form: child.form,
+            form_base: base.2,
+            input_base: base.3,
+        }))
+    } else {
+        None
+    };
+
+    formation.marker = child.marker;
+    formation.state = child.state;
+    formation.outcome = child.outcome;
+    formation.form = child.form;
+    formation.consumed = child.consumed;
+    formation.stack = child.stack;
+
+    Memo {
+        outcome: formation.outcome,
+        advance: formation.marker - base.4,
+        state: formation.state,
+        record,
     }
 }
 
 impl<'a, 'source, Source, Input, Output, Failure>
-    Combinator<
-        'a,
-        Former<'a, 'source, Source, Input, Output, Failure>,
-        Formation<'a, 'source, Source, Input, Output, Failure>,
-    > for Optional<Formation<'a, 'source, Source, Input, Output, Failure>>
+Combinator<
+    'a,
+    Former<'a, 'source, Source, Input, Output, Failure>,
+    Formation<'a, 'source, Source, Input, Output, Failure>,
+> for Optional<Formation<'a, 'source, Source, Input, Output, Failure>>
 where
-    Source: Peekable<'a, Input>,
+    Source: Peekable<'a, Input> + Clone,
     Source::State: Default,
     Input: Formable<'a>,
     Output: Formable<'a>,
@@ -419,21 +422,23 @@ where
         let mut child = formation.create_child(self.state.combinator.clone());
         former.build(&mut child);
 
-        let panicked = child.is_panicked();
-        let aligned = child.is_aligned();
+        let outcome = child.outcome;
+        let marker = child.marker;
+        let state = child.state;
+        let form = child.form;
 
         formation.consumed = child.consumed;
         formation.stack = child.stack;
 
-        if panicked {
-            formation.marker = child.marker;
-            formation.state = child.state;
-            formation.form = child.form;
+        if outcome.is_terminal() && matches!(outcome, crate::combinator::outcome::Outcome::Panicked) {
+            formation.marker = marker;
+            formation.state = state;
+            formation.form = form;
             formation.set_panic();
-        } else if aligned {
-            formation.marker = child.marker;
-            formation.state = child.state;
-            formation.form = child.form;
+        } else if matches!(outcome, crate::combinator::outcome::Outcome::Aligned) {
+            formation.marker = marker;
+            formation.state = state;
+            formation.form = form;
             formation.set_align();
         } else {
             former.consumed.truncate(base.0);
@@ -446,13 +451,13 @@ where
 }
 
 impl<'a, 'source, Source, Input, Output, Failure, const SIZE: Scale>
-    Combinator<
-        'a,
-        Former<'a, 'source, Source, Input, Output, Failure>,
-        Formation<'a, 'source, Source, Input, Output, Failure>,
-    > for Sequence<Formation<'a, 'source, Source, Input, Output, Failure>, SIZE>
+Combinator<
+    'a,
+    Former<'a, 'source, Source, Input, Output, Failure>,
+    Formation<'a, 'source, Source, Input, Output, Failure>,
+> for Sequence<Formation<'a, 'source, Source, Input, Output, Failure>, SIZE>
 where
-    Source: Peekable<'a, Input>,
+    Source: Peekable<'a, Input> + Clone,
     Source::State: Default,
     Input: Formable<'a>,
     Output: Formable<'a>,
@@ -552,13 +557,13 @@ where
 }
 
 impl<'a, 'source, Source, Input, Output, Failure>
-    Combinator<
-        'a,
-        Former<'a, 'source, Source, Input, Output, Failure>,
-        Formation<'a, 'source, Source, Input, Output, Failure>,
-    > for Repetition<Formation<'a, 'source, Source, Input, Output, Failure>>
+Combinator<
+    'a,
+    Former<'a, 'source, Source, Input, Output, Failure>,
+    Formation<'a, 'source, Source, Input, Output, Failure>,
+> for Repetition<Formation<'a, 'source, Source, Input, Output, Failure>>
 where
-    Source: Peekable<'a, Input>,
+    Source: Peekable<'a, Input> + Clone,
     Source::State: Default,
     Input: Formable<'a>,
     Output: Formable<'a>,
@@ -689,21 +694,21 @@ where
 }
 
 impl<'a, 'source, Source, Input, Output, Failure>
-    Combinator<
-        'a,
-        Former<'a, 'source, Source, Input, Output, Failure>,
-        Formation<'a, 'source, Source, Input, Output, Failure>,
-    >
-    for Recover<
-        'a,
-        'source,
-        Former<'a, 'source, Source, Input, Output, Failure>,
-        Formation<'a, 'source, Source, Input, Output, Failure>,
-        Input,
-        Failure,
-    >
+Combinator<
+    'a,
+    Former<'a, 'source, Source, Input, Output, Failure>,
+    Formation<'a, 'source, Source, Input, Output, Failure>,
+>
+for Recover<
+    'a,
+    'source,
+    Former<'a, 'source, Source, Input, Output, Failure>,
+    Formation<'a, 'source, Source, Input, Output, Failure>,
+    Input,
+    Failure,
+>
 where
-    Source: Peekable<'a, Input>,
+    Source: Peekable<'a, Input> + Clone,
     Source::State: Default,
     Input: Formable<'a>,
     Output: Formable<'a>,
@@ -724,40 +729,18 @@ where
         former.forms.push(Form::Failure(failure));
 
         let mut moved = false;
+
         while let Some(input) = former.source.get(formation.marker) {
             if (self.sync)(input) {
                 break;
             }
-
-            former
-                .source
-                .next(&mut formation.marker, &mut formation.state);
-
-            let consumed_id = former.consumed.len();
-            let stack_id = former.forms.len();
-
-            former.consumed.push(input.clone());
-            former.forms.push(Form::input(input.clone()));
-
-            formation.consumed.push(consumed_id);
-            formation.stack.push(stack_id);
+            former.push(formation, input.clone());
             moved = true;
         }
 
         if !moved {
             if let Some(input) = former.source.get(formation.marker) {
-                former
-                    .source
-                    .next(&mut formation.marker, &mut formation.state);
-
-                let consumed_id = former.consumed.len();
-                let stack_id = former.forms.len();
-
-                former.consumed.push(input.clone());
-                former.forms.push(Form::input(input.clone()));
-
-                formation.consumed.push(consumed_id);
-                formation.stack.push(stack_id);
+                former.push(formation, input.clone());
             }
         }
 
@@ -767,13 +750,13 @@ where
 }
 
 impl<'a, 'source, Source, Input, Output, Failure>
-    Combinator<
-        'a,
-        Former<'a, 'source, Source, Input, Output, Failure>,
-        Formation<'a, 'source, Source, Input, Output, Failure>,
-    > for Ignore
+Combinator<
+    'a,
+    Former<'a, 'source, Source, Input, Output, Failure>,
+    Formation<'a, 'source, Source, Input, Output, Failure>,
+> for Ignore
 where
-    Source: Peekable<'a, Input>,
+    Source: Peekable<'a, Input> + Clone,
     Source::State: Default,
     Input: Formable<'a>,
     Output: Formable<'a>,
@@ -793,13 +776,13 @@ where
 }
 
 impl<'a, 'source, Source, Input, Output, Failure>
-    Combinator<
-        'a,
-        Former<'a, 'source, Source, Input, Output, Failure>,
-        Formation<'a, 'source, Source, Input, Output, Failure>,
-    > for Skip
+Combinator<
+    'a,
+    Former<'a, 'source, Source, Input, Output, Failure>,
+    Formation<'a, 'source, Source, Input, Output, Failure>,
+> for Skip
 where
-    Source: Peekable<'a, Input>,
+    Source: Peekable<'a, Input> + Clone,
     Source::State: Default,
     Input: Formable<'a>,
     Output: Formable<'a>,
@@ -819,20 +802,20 @@ where
 }
 
 impl<'a, 'source, Source, Input, Output, Failure>
-    Combinator<
-        'a,
-        Former<'a, 'source, Source, Input, Output, Failure>,
-        Formation<'a, 'source, Source, Input, Output, Failure>,
-    >
-    for Transform<
-        'a,
-        'source,
-        Former<'a, 'source, Source, Input, Output, Failure>,
-        Formation<'a, 'source, Source, Input, Output, Failure>,
-        Failure,
-    >
+Combinator<
+    'a,
+    Former<'a, 'source, Source, Input, Output, Failure>,
+    Formation<'a, 'source, Source, Input, Output, Failure>,
+>
+for Transform<
+    'a,
+    'source,
+    Former<'a, 'source, Source, Input, Output, Failure>,
+    Formation<'a, 'source, Source, Input, Output, Failure>,
+    Failure,
+>
 where
-    Source: Peekable<'a, Input>,
+    Source: Peekable<'a, Input> + Clone,
     Source::State: Default,
     Input: Formable<'a>,
     Output: Formable<'a>,
@@ -848,7 +831,6 @@ where
             if let Err(error) = (self.transformer)(former, formation) {
                 let form_id = former.forms.len();
                 former.forms.push(Form::Failure(error));
-
                 formation.set_fail();
                 formation.form = form_id;
             }
@@ -857,20 +839,20 @@ where
 }
 
 impl<'a, 'source, Source, Input, Output, Failure>
-    Combinator<
-        'a,
-        Former<'a, 'source, Source, Input, Output, Failure>,
-        Formation<'a, 'source, Source, Input, Output, Failure>,
-    >
-    for Fail<
-        'a,
-        'source,
-        Former<'a, 'source, Source, Input, Output, Failure>,
-        Formation<'a, 'source, Source, Input, Output, Failure>,
-        Failure,
-    >
+Combinator<
+    'a,
+    Former<'a, 'source, Source, Input, Output, Failure>,
+    Formation<'a, 'source, Source, Input, Output, Failure>,
+>
+for Fail<
+    'a,
+    'source,
+    Former<'a, 'source, Source, Input, Output, Failure>,
+    Formation<'a, 'source, Source, Input, Output, Failure>,
+    Failure,
+>
 where
-    Source: Peekable<'a, Input>,
+    Source: Peekable<'a, Input> + Clone,
     Source::State: Default,
     Input: Formable<'a>,
     Output: Formable<'a>,
@@ -884,10 +866,8 @@ where
     ) {
         if !formation.is_aligned() {
             let failure = (self.emitter)(former, formation.clone());
-
             let form_id = former.forms.len();
             former.forms.push(Form::Failure(failure));
-
             formation.set_fail();
             formation.form = form_id;
         }
@@ -895,20 +875,20 @@ where
 }
 
 impl<'a, 'source, Source, Input, Output, Failure>
-    Combinator<
-        'a,
-        Former<'a, 'source, Source, Input, Output, Failure>,
-        Formation<'a, 'source, Source, Input, Output, Failure>,
-    >
-    for Panic<
-        'a,
-        'source,
-        Former<'a, 'source, Source, Input, Output, Failure>,
-        Formation<'a, 'source, Source, Input, Output, Failure>,
-        Failure,
-    >
+Combinator<
+    'a,
+    Former<'a, 'source, Source, Input, Output, Failure>,
+    Formation<'a, 'source, Source, Input, Output, Failure>,
+>
+for Panic<
+    'a,
+    'source,
+    Former<'a, 'source, Source, Input, Output, Failure>,
+    Formation<'a, 'source, Source, Input, Output, Failure>,
+    Failure,
+>
 where
-    Source: Peekable<'a, Input>,
+    Source: Peekable<'a, Input> + Clone,
     Source::State: Default,
     Input: Formable<'a>,
     Output: Formable<'a>,
@@ -922,10 +902,8 @@ where
     ) {
         if !formation.is_aligned() {
             let failure = (self.emitter)(former, formation.clone());
-
             let form_id = former.forms.len();
             former.forms.push(Form::Failure(failure));
-
             formation.set_panic();
             formation.form = form_id;
         }
