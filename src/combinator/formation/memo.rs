@@ -1,12 +1,8 @@
 use crate::{
-    combinator::{
-        Form, Formable,
-        outcome::Outcome
-    },
+    combinator::{Form, Formable, Outcome},
     data::{Identity, Offset},
     tracker::Peekable,
 };
-
 
 #[derive(Clone)]
 pub struct Record<'a, Input: Formable<'a>, Output: Formable<'a>, Failure: Formable<'a>> {
