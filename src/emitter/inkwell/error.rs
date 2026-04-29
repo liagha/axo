@@ -1,5 +1,5 @@
 pub use crate::generator::{
-    AlignmentError, BitwiseError, BuilderError, ControlFlowError, DataStructureError, ErrorKind,
+    AlignmentError, BuilderError, ControlFlowError, ErrorKind,
     FunctionError, OrderingError, VariableError,
 };
 
