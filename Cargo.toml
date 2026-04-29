@@ -27,7 +27,6 @@ cranelift-codegen = "0.131.0"
 cranelift-frontend = "0.131.0"
 cranelift-module = "0.131.0"
 cranelift-object = "0.131.0"
-cranelift-interpreter = "0.131.0"
 cranelift-jit = "0.131.0"
 target-lexicon = "0.13.5"
 

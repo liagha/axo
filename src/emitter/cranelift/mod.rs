@@ -1,10 +1,15 @@
+mod arithmetic;
+mod bitwise;
+mod comparison;
+mod composite;
 mod error;
 pub mod evaluate;
+mod functions;
+mod logical;
+mod primitives;
+mod variables;
 
-pub use {
-    error::*,
-    evaluate::{Engine, Value as EvalValue},
-};
+pub use evaluate::{Engine, Value as EvalValue};
 
 use {
     crate::{
@@ -36,8 +41,8 @@ use {
 #[derive(Clone, Debug)]
 pub enum Entity<'a> {
     Variable { slot: StackSlot, typing: Type<'a> },
-    Structure { members: Vec<Str<'a>> },
-    Union { members: Vec<Str<'a>> },
+    Structure,
+    Union,
     Function(FuncData<'a>),
     Module,
 }
@@ -48,15 +53,12 @@ pub struct FuncData<'a> {
     pub sig: Signature,
     pub output: Option<Type<'a>>,
     pub indirect: bool,
-    pub variadic: bool,
-    pub entry: bool,
-    pub interface: Interface,
 }
 
 #[derive(Clone, Copy, Debug)]
-struct Layout {
-    size: u32,
-    align: u8,
+pub(crate) struct Layout {
+    pub(crate) size: u32,
+    pub(crate) align: u8,
 }
 
 #[derive(Clone, Copy)]
@@ -87,20 +89,10 @@ pub(crate) fn lower<'a, M: Module>(
     for analysis in &analyses {
         match &analysis.kind {
             AnalysisKind::Structure(value) => {
-                entities.insert(
-                    value.target,
-                    Entity::Structure {
-                        members: member_names(value),
-                    },
-                );
+                entities.insert(value.target, Entity::Structure);
             }
             AnalysisKind::Union(value) => {
-                entities.insert(
-                    value.target,
-                    Entity::Union {
-                        members: member_names(value),
-                    },
-                );
+                entities.insert(value.target, Entity::Union);
             }
             AnalysisKind::Function(value) => match declare_function(module, pointer, value) {
                 Ok(data) => {
@@ -254,15 +246,7 @@ fn declare_function<'a, M: Module>(
         .declare_function(value.target.as_str().unwrap_or_default(), linkage, &sig)
         .map_err(|error| error.to_string())?;
 
-    Ok(FuncData {
-        id,
-        sig,
-        output,
-        indirect: use_memory,
-        variadic: value.variadic,
-        entry: value.entry,
-        interface: value.interface,
-    })
+    Ok(FuncData { id, sig, output, indirect: use_memory })
 }
 
 fn define_static<'a, M: Module>(
@@ -311,10 +295,10 @@ fn define_function<'a, M: Module>(
         IrFunction::with_name_signature(UserFuncName::user(0, func.id.as_u32()), func.sig.clone());
     let mut funcs = FunctionBuilderContext::new();
     let mut builder = FunctionBuilder::new(&mut ctx.func, &mut funcs);
-    let entry = builder.create_block();
-    builder.switch_to_block(entry);
-    builder.append_block_params_for_function_params(entry);
-    builder.seal_block(entry);
+    let head = builder.create_block();
+    builder.switch_to_block(head);
+    builder.append_block_params_for_function_params(head);
+    builder.seal_block(head);
 
     let mut lower = Lower {
         module,
@@ -326,7 +310,7 @@ fn define_function<'a, M: Module>(
         ret: None,
     };
 
-    let params = lower.builder.block_params(entry).to_vec();
+    let params = lower.builder.block_params(head).to_vec();
     let mut next = 0usize;
 
     if lower.func.indirect {
@@ -390,19 +374,7 @@ fn define_function<'a, M: Module>(
     Ok(())
 }
 
-fn member_names<'a>(value: &Aggregate<Str<'a>, Analysis<'a>>) -> Vec<Str<'a>> {
-    let mut members = Vec::new();
-    for member in &value.members {
-        if let AnalysisKind::Binding(binding) = &member.kind {
-            if let AnalysisKind::Symbol(target) = &binding.target.kind {
-                members.push(target.name);
-            }
-        }
-    }
-    members
-}
-
-fn resolved<'a>(typing: &Type<'a>) -> Type<'a> {
+pub(crate) fn resolved<'a>(typing: &Type<'a>) -> Type<'a> {
     match &typing.kind {
         TypeKind::Binding(value) => value
             .value
@@ -415,7 +387,7 @@ fn resolved<'a>(typing: &Type<'a>) -> Type<'a> {
     }
 }
 
-fn indirect<'a>(typing: &Type<'a>) -> bool {
+pub(crate) fn indirect<'a>(typing: &Type<'a>) -> bool {
     matches!(
         resolved(typing).kind,
         TypeKind::Array { .. }
@@ -443,8 +415,7 @@ fn scalar_type<'a>(typing: &Type<'a>, pointer: IrType) -> Option<IrType> {
 
 fn int_type(size: Scale) -> IrType {
     match size {
-        1 => types::I8,
-        8 => types::I8,
+        1 | 8 => types::I8,
         16 => types::I16,
         32 => types::I32,
         64 => types::I64,
@@ -457,7 +428,7 @@ fn align_shift(align: u8) -> u8 {
     align.trailing_zeros() as u8
 }
 
-fn layout<'a>(typing: &Type<'a>) -> Layout {
+pub(crate) fn layout<'a>(typing: &Type<'a>) -> Layout {
     match &resolved(typing).kind {
         TypeKind::Integer { size, .. } => {
             let bytes = ((*size).div_ceil(8)).max(1) as u32;
@@ -521,11 +492,11 @@ fn aggregate_layout<'a>(members: &[Type<'a>]) -> Layout {
 
 fn pad(size: u32, align: u8) -> u32 {
     let align = align.max(1) as u32;
-    let rem = size % align;
-    if rem == 0 {
+    let rest = size % align;
+    if rest == 0 {
         size
     } else {
-        size + align - rem
+        size + align - rest
     }
 }
 
@@ -638,7 +609,7 @@ impl<'a, 'b, M: Module> Lower<'a, 'b, M> {
         span: Span,
     ) -> Result<(Value, Type<'b>), GenerateError<'b>> {
         let (base, typing) = self.base_place(target)?;
-        let target = field_type(&typing, index as usize).ok_or_else(|| {
+        let item = field_type(&typing, index as usize).ok_or_else(|| {
             self.error(
                 ErrorKind::DataStructure(DataStructureError::UnknownField {
                     target: String::new(),
@@ -647,7 +618,7 @@ impl<'a, 'b, M: Module> Lower<'a, 'b, M> {
                 span,
             )
         })?;
-        let offset = field_offset(&typing, index as usize).ok_or_else(|| {
+        let offs = field_offset(&typing, index as usize).ok_or_else(|| {
             self.error(
                 ErrorKind::DataStructure(DataStructureError::UnknownField {
                     target: String::new(),
@@ -656,12 +627,12 @@ impl<'a, 'b, M: Module> Lower<'a, 'b, M> {
                 span,
             )
         })?;
-        let addr = if offset == 0 {
+        let addr = if offs == 0 {
             base
         } else {
-            self.builder.ins().iadd_imm(base, offset as i64)
+            self.builder.ins().iadd_imm(base, offs as i64)
         };
-        Ok((addr, target))
+        Ok((addr, item))
     }
 
     fn index_place(
@@ -710,20 +681,10 @@ impl<'a, 'b, M: Module> Lower<'a, 'b, M> {
         let span = analysis.span;
         let typing = analysis.typing.clone();
         match analysis.kind {
-            AnalysisKind::Integer { value, size, .. } => {
-                Ok(self.builder.ins().iconst(int_type(size), value as i64))
-            }
-            AnalysisKind::Float { value, size } => match size {
-                32 => Ok(self.builder.ins().f32const(value.0 as f32)),
-                64 => Ok(self.builder.ins().f64const(value.0)),
-                width => Err(self.error(ErrorKind::UnsupportedFloatWidth(width), span)),
-            },
-            AnalysisKind::Boolean { value } => {
-                Ok(self.builder.ins().iconst(types::I8, i64::from(value)))
-            }
-            AnalysisKind::Character { value } => {
-                Ok(self.builder.ins().iconst(types::I32, value as i64))
-            }
+            AnalysisKind::Integer { value, size, .. } => self.integer(value, size),
+            AnalysisKind::Float { value, size } => self.float(value, size, span),
+            AnalysisKind::Boolean { value } => self.boolean(value),
+            AnalysisKind::Character { value } => self.character(value),
             AnalysisKind::String { value } => self.string(value, span),
             AnalysisKind::Array(values) => self.array(&typing, values),
             AnalysisKind::Tuple(values) => self.tuple(&typing, values),
@@ -782,9 +743,9 @@ impl<'a, 'b, M: Module> Lower<'a, 'b, M> {
                 })
             }
             AnalysisKind::ShiftRight(left, right) => {
-                let signed = signed(&left.typing) && signed(&right.typing);
+                let sign = signed(&left.typing) && signed(&right.typing);
                 self.bitwise(*left, *right, span, move |this, left, right| {
-                    if signed {
+                    if sign {
                         this.builder.ins().sshr(left, right)
                     } else {
                         this.builder.ins().ushr(left, right)
@@ -887,13 +848,13 @@ impl<'a, 'b, M: Module> Lower<'a, 'b, M> {
             AnalysisKind::Structure(_)
             | AnalysisKind::Union(_)
             | AnalysisKind::Composite(_)
-            | AnalysisKind::Module(_, _) => Ok(self.builder.ins().iconst(types::I64, 0)),
-            AnalysisKind::Function(_) => Ok(self.builder.ins().iconst(types::I64, 0)),
+            | AnalysisKind::Module(_, _)
+            | AnalysisKind::Function(_) => Ok(self.builder.ins().iconst(types::I64, 0)),
             AnalysisKind::Block(values) => self.block(values),
             AnalysisKind::Conditional(condition, truth, fall) => {
                 self.conditional(typing, *condition, *truth, fall.map(|item| *item), span)
             }
-            AnalysisKind::While(condition, body) => self.loop_expr(typing, *condition, *body, span),
+            AnalysisKind::While(condition, body) => self.loop_expr(typing, *condition, *body),
             AnalysisKind::Invoke(_) => Err(self.error(
                 ErrorKind::Verification("unexpected invoke".to_string()),
                 span,
@@ -903,725 +864,6 @@ impl<'a, 'b, M: Module> Lower<'a, 'b, M> {
             AnalysisKind::Break(value) => self.break_value(value.map(|item| *item), span),
             AnalysisKind::Continue(_) => self.continue_value(span),
         }
-    }
-
-    fn string(&mut self, value: Str<'b>, span: Span) -> Result<Value, GenerateError<'b>> {
-        let text = value.as_str().unwrap_or_default();
-        let name = format!(".str.{}", self.builder.func.dfg.num_values());
-        let id = self
-            .module
-            .declare_data(&name, Linkage::Local, false, false)
-            .map_err(|error| self.error(ErrorKind::Verification(error.to_string()), span))?;
-        let mut data = cranelift_module::DataDescription::new();
-        let mut bytes = text.as_bytes().to_vec();
-        bytes.push(0);
-        data.define(bytes.into_boxed_slice());
-        self.module
-            .define_data(id, &data)
-            .map_err(|error| self.error(ErrorKind::Verification(error.to_string()), span))?;
-        let gv = self.module.declare_data_in_func(id, &mut self.builder.func);
-        Ok(self.builder.ins().global_value(self.pointer, gv))
-    }
-
-    fn array(
-        &mut self,
-        typing: &Type<'b>,
-        values: Vec<Analysis<'b>>,
-    ) -> Result<Value, GenerateError<'b>> {
-        let slot = self.stack(typing);
-        let addr = self.addr(slot);
-        if let TypeKind::Array { member, .. } = &resolved(typing).kind {
-            let step = layout(member).size;
-            for (index, value) in values.into_iter().enumerate() {
-                let item = if step == 0 {
-                    addr
-                } else {
-                    self.builder
-                        .ins()
-                        .iadd_imm(addr, (index as u32 * step) as i64)
-                };
-                let value = self.expr(value)?;
-                self.write(item, member, value);
-            }
-        }
-        Ok(addr)
-    }
-
-    fn tuple(
-        &mut self,
-        typing: &Type<'b>,
-        values: Vec<Analysis<'b>>,
-    ) -> Result<Value, GenerateError<'b>> {
-        let slot = self.stack(typing);
-        let addr = self.addr(slot);
-        if let TypeKind::Tuple { members } = &resolved(typing).kind {
-            for (index, value) in values.into_iter().enumerate() {
-                if let Some(item) = members.get(index) {
-                    let offs = field_offset(typing, index).unwrap_or(0);
-                    let place = if offs == 0 {
-                        addr
-                    } else {
-                        self.builder.ins().iadd_imm(addr, offs as i64)
-                    };
-                    let value = self.expr(value)?;
-                    self.write(place, item, value);
-                }
-            }
-        }
-        Ok(addr)
-    }
-
-    fn constructor(
-        &mut self,
-        typing: &Type<'b>,
-        value: Aggregate<Str<'b>, Analysis<'b>>,
-        span: Span,
-    ) -> Result<Value, GenerateError<'b>> {
-        let slot = self.stack(typing);
-        let addr = self.addr(slot);
-        let names = member_names_of(typing);
-        for (index, item) in value.members.into_iter().enumerate() {
-            match item.kind {
-                AnalysisKind::Assign(name, value) => {
-                    if let Some(slot) = names.iter().position(|item| *item == name) {
-                        let place = self.field_addr(addr, typing, slot, span)?;
-                        let item_type = field_type(typing, slot).unwrap();
-                        let value = self.expr(*value)?;
-                        self.write(place, &item_type, value);
-                    }
-                }
-                _ => {
-                    let place = self.field_addr(addr, typing, index, span)?;
-                    let item_type = field_type(typing, index).unwrap();
-                    let value = self.expr(item)?;
-                    self.write(place, &item_type, value);
-                }
-            }
-        }
-        Ok(addr)
-    }
-
-    fn pack(
-        &mut self,
-        typing: &Type<'b>,
-        _target: Target<'b>,
-        values: Vec<(Scale, Analysis<'b>)>,
-        span: Span,
-    ) -> Result<Value, GenerateError<'b>> {
-        let slot = self.stack(typing);
-        let addr = self.addr(slot);
-        for (index, value) in values {
-            let slot = index as usize;
-            let place = self.field_addr(addr, typing, slot, span)?;
-            let item = field_type(typing, slot).unwrap();
-            let value = self.expr(value)?;
-            self.write(place, &item, value);
-        }
-        Ok(addr)
-    }
-
-    fn field_addr(
-        &mut self,
-        addr: Value,
-        typing: &Type<'b>,
-        index: usize,
-        span: Span,
-    ) -> Result<Value, GenerateError<'b>> {
-        let offs = field_offset(typing, index).ok_or_else(|| {
-            self.error(
-                ErrorKind::DataStructure(DataStructureError::UnknownField {
-                    target: String::new(),
-                    member: index.to_string(),
-                }),
-                span,
-            )
-        })?;
-        Ok(if offs == 0 {
-            addr
-        } else {
-            self.builder.ins().iadd_imm(addr, offs as i64)
-        })
-    }
-
-    fn bind(
-        &mut self,
-        value: Binding<Box<Analysis<'b>>, Box<Analysis<'b>>, Type<'b>>,
-        span: Span,
-    ) -> Result<Value, GenerateError<'b>> {
-        let AnalysisKind::Symbol(target) = &value.target.kind else {
-            return Err(self.error(
-                ErrorKind::Variable(VariableError::InvalidAssignmentTarget),
-                span,
-            ));
-        };
-        let slot = self.stack(&value.annotation);
-        let addr = self.addr(slot);
-        if let Some(init) = value.value {
-            let current = self.expr(*init)?;
-            self.write(addr, &value.annotation, current);
-        } else {
-            if matches!(value.kind, BindingKind::Let) {
-                return Err(self.error(
-                    ErrorKind::Variable(VariableError::BindingWithoutInitializer {
-                        name: target.name.as_str().unwrap_or_default().to_string(),
-                    }),
-                    span,
-                ));
-            }
-        }
-        self.entities.insert(
-            target.name,
-            Entity::Variable {
-                slot,
-                typing: value.annotation.clone(),
-            },
-        );
-        if indirect(&value.annotation) {
-            Ok(addr)
-        } else {
-            self.load(addr, &value.annotation)
-        }
-    }
-
-    fn read(&mut self, name: Str<'b>, span: Span) -> Result<Value, GenerateError<'b>> {
-        match self.entities.get(&name).cloned() {
-            Some(Entity::Variable { slot, typing }) => {
-                let addr = self.addr(slot);
-                if indirect(&typing) {
-                    Ok(addr)
-                } else {
-                    self.load(addr, &typing)
-                }
-            }
-            Some(Entity::Function(_)) => Err(self.error(
-                ErrorKind::Function(FunctionError::Undefined {
-                    name: name.as_str().unwrap_or_default().to_string(),
-                }),
-                span,
-            )),
-            _ => Err(self.error(
-                ErrorKind::Variable(VariableError::Undefined {
-                    name: name.as_str().unwrap_or_default().to_string(),
-                }),
-                span,
-            )),
-        }
-    }
-
-    fn assign(
-        &mut self,
-        name: Str<'b>,
-        value: Analysis<'b>,
-        span: Span,
-    ) -> Result<Value, GenerateError<'b>> {
-        let target = Analysis::new(AnalysisKind::Usage(name), span, value.typing.clone());
-        self.store_target(target, value, span)
-    }
-
-    fn write_target(
-        &mut self,
-        target: Target<'b>,
-        value: Analysis<'b>,
-        span: Span,
-    ) -> Result<Value, GenerateError<'b>> {
-        self.store_target(
-            Analysis::new(AnalysisKind::Symbol(target), span, value.typing.clone()),
-            value,
-            span,
-        )
-    }
-
-    fn store_target(
-        &mut self,
-        target: Analysis<'b>,
-        value: Analysis<'b>,
-        span: Span,
-    ) -> Result<Value, GenerateError<'b>> {
-        let (addr, typing) = self.place(&target)?;
-        let value = self.expr(value)?;
-        self.write(addr, &typing, value);
-        if indirect(&typing) {
-            Ok(addr)
-        } else {
-            self.load(addr, &typing)
-        }
-    }
-
-    fn block(&mut self, values: Vec<Analysis<'b>>) -> Result<Value, GenerateError<'b>> {
-        let mut last = self.builder.ins().iconst(types::I64, 0);
-        for value in values {
-            if self.done() {
-                break;
-            }
-            last = self.expr(value)?;
-        }
-        Ok(last)
-    }
-
-    fn conditional(
-        &mut self,
-        typing: Type<'b>,
-        condition: Analysis<'b>,
-        truth: Analysis<'b>,
-        fall: Option<Analysis<'b>>,
-        _span: Span,
-    ) -> Result<Value, GenerateError<'b>> {
-        let check = self.expr(condition)?;
-        let check = self.truth(check);
-        let pass = self.builder.create_block();
-        let fail = self.builder.create_block();
-        let join = self.builder.create_block();
-        self.builder.ins().brif(check, pass, &[], fail, &[]);
-
-        let mut slot = None;
-        let mut var = None;
-
-        if indirect(&typing) {
-            slot = Some(self.stack(&typing));
-        } else if let Some(kind) = scalar_type(&typing, self.pointer) {
-            let temp = self.builder.declare_var(kind);
-            var = Some(temp);
-        }
-
-        self.builder.switch_to_block(pass);
-        let left = self.expr(truth)?;
-        if let Some(slot) = slot {
-            let addr = self.addr(slot);
-            self.write(addr, &typing, left);
-        }
-        if let Some(var) = var {
-            self.builder.def_var(var, left);
-        }
-        if !self.done() {
-            self.builder.ins().jump(join, &[]);
-        }
-        self.builder.seal_block(pass);
-
-        self.builder.switch_to_block(fail);
-        let right = if let Some(fall) = fall {
-            self.expr(fall)?
-        } else if indirect(&typing) {
-            let slot = self.stack(&typing);
-            self.addr(slot)
-        } else {
-            self.zero(&typing)
-        };
-        if let Some(slot) = slot {
-            let addr = self.addr(slot);
-            self.write(addr, &typing, right);
-        }
-        if let Some(var) = var {
-            self.builder.def_var(var, right);
-        }
-        if !self.done() {
-            self.builder.ins().jump(join, &[]);
-        }
-        self.builder.seal_block(fail);
-
-        self.builder.switch_to_block(join);
-        self.builder.seal_block(join);
-
-        if let Some(slot) = slot {
-            Ok(self.addr(slot))
-        } else if let Some(var) = var {
-            Ok(self.builder.use_var(var))
-        } else {
-            Ok(self.zero(&typing))
-        }
-    }
-
-    fn loop_expr(
-        &mut self,
-        typing: Type<'b>,
-        condition: Analysis<'b>,
-        body: Analysis<'b>,
-        span: Span,
-    ) -> Result<Value, GenerateError<'b>> {
-        let head = self.builder.create_block();
-        let body_block = self.builder.create_block();
-        let exit = self.builder.create_block();
-        let slot = if matches!(resolved(&typing).kind, TypeKind::Void | TypeKind::Unknown) {
-            None
-        } else {
-            Some(self.stack(&typing))
-        };
-        self.builder.ins().jump(head, &[]);
-        self.builder.switch_to_block(head);
-        let check = self.expr(condition)?;
-        let check = self.truth(check);
-        self.builder.ins().brif(check, body_block, &[], exit, &[]);
-        self.loops.push(Loop { head, exit, slot });
-
-        self.builder.switch_to_block(body_block);
-        let _ = self.expr(body)?;
-        if !self.done() {
-            self.builder.ins().jump(head, &[]);
-        }
-        self.builder.seal_block(body_block);
-        self.loops.pop();
-        self.builder.seal_block(head);
-        self.builder.switch_to_block(exit);
-        self.builder.seal_block(exit);
-        if let Some(slot) = slot {
-            Ok(self.addr(slot))
-        } else {
-            Ok(self.builder.ins().iconst(types::I64, 0))
-        }
-    }
-
-    fn call(
-        &mut self,
-        target: Target<'b>,
-        values: Vec<Analysis<'b>>,
-        typing: &Type<'b>,
-        span: Span,
-    ) -> Result<Value, GenerateError<'b>> {
-        let Some(Entity::Function(func)) = self.entities.get(&target.name).cloned() else {
-            return Err(self.error(
-                ErrorKind::Function(FunctionError::Undefined {
-                    name: target.name.as_str().unwrap_or_default().to_string(),
-                }),
-                span,
-            ));
-        };
-        let callee = self
-            .module
-            .declare_func_in_func(func.id, &mut self.builder.func);
-        let mut args = Vec::new();
-        let mut slot = None;
-        if func.indirect {
-            let temp = self.stack(typing);
-            let addr = self.addr(temp);
-            slot = Some(temp);
-            args.push(addr);
-        }
-        for value in values {
-            let current = self.expr(value.clone())?;
-            if indirect(&value.typing) {
-                args.push(current);
-            } else {
-                args.push(current);
-            }
-        }
-        let call = self.builder.ins().call(callee, &args);
-        if let Some(slot) = slot {
-            Ok(self.addr(slot))
-        } else if let Some(result) = self.builder.inst_results(call).first().copied() {
-            Ok(result)
-        } else {
-            Ok(self.builder.ins().iconst(types::I64, 0))
-        }
-    }
-
-    fn return_value(
-        &mut self,
-        value: Option<Analysis<'b>>,
-        span: Span,
-    ) -> Result<Value, GenerateError<'b>> {
-        if self.done() {
-            return Ok(self.builder.ins().iconst(types::I64, 0));
-        }
-        match (self.func.output.clone(), value) {
-            (Some(output), Some(value)) => {
-                let value = self.expr(value)?;
-                if self.func.indirect {
-                    let Some(ret) = self.ret else {
-                        return Err(self.error(
-                            ErrorKind::Function(FunctionError::IncompatibleReturnType),
-                            span,
-                        ));
-                    };
-                    self.write(ret, &output, value);
-                    self.builder.ins().return_(&[]);
-                } else {
-                    self.builder.ins().return_(&[value]);
-                }
-                Ok(value)
-            }
-            (None, _) => {
-                self.builder.ins().return_(&[]);
-                Ok(self.builder.ins().iconst(types::I64, 0))
-            }
-            _ => Err(self.error(
-                ErrorKind::Function(FunctionError::IncompatibleReturnType),
-                span,
-            )),
-        }
-    }
-
-    fn break_value(
-        &mut self,
-        value: Option<Analysis<'b>>,
-        span: Span,
-    ) -> Result<Value, GenerateError<'b>> {
-        let looped = self.loops.last().copied().ok_or_else(|| {
-            self.error(
-                ErrorKind::ControlFlow(ControlFlowError::BreakOutsideLoop),
-                span,
-            )
-        })?;
-        if let (Some(value), Some(loop_slot)) = (value, looped.slot) {
-            let value = self.expr(value)?;
-            let addr = self.addr(loop_slot);
-            self.builder.ins().store(MemFlags::new(), value, addr, 0);
-        }
-        if !self.done() {
-            self.builder.ins().jump(looped.exit, &[]);
-        }
-        Ok(self.builder.ins().iconst(types::I64, 0))
-    }
-
-    fn continue_value(&mut self, span: Span) -> Result<Value, GenerateError<'b>> {
-        let looped = self.loops.last().copied().ok_or_else(|| {
-            self.error(
-                ErrorKind::ControlFlow(ControlFlowError::ContinueOutsideLoop),
-                span,
-            )
-        })?;
-        if !self.done() {
-            self.builder.ins().jump(looped.head, &[]);
-        }
-        Ok(self.builder.ins().iconst(types::I64, 0))
-    }
-
-    fn negate(&mut self, value: Analysis<'b>, span: Span) -> Result<Value, GenerateError<'b>> {
-        let value = self.expr(value)?;
-        let kind = self.builder.func.dfg.value_type(value);
-        if kind.is_int() {
-            Ok(self.builder.ins().ineg(value))
-        } else if kind.is_float() {
-            Ok(self.builder.ins().fneg(value))
-        } else {
-            Err(self.error(ErrorKind::Negate, span))
-        }
-    }
-
-    fn add(
-        &mut self,
-        left: Analysis<'b>,
-        right: Analysis<'b>,
-        span: Span,
-    ) -> Result<Value, GenerateError<'b>> {
-        self.numeric(left, right, span, |this, left, right, float| {
-            if float {
-                this.builder.ins().fadd(left, right)
-            } else {
-                this.builder.ins().iadd(left, right)
-            }
-        })
-    }
-
-    fn subtract(
-        &mut self,
-        left: Analysis<'b>,
-        right: Analysis<'b>,
-        span: Span,
-    ) -> Result<Value, GenerateError<'b>> {
-        self.numeric(left, right, span, |this, left, right, float| {
-            if float {
-                this.builder.ins().fsub(left, right)
-            } else {
-                this.builder.ins().isub(left, right)
-            }
-        })
-    }
-
-    fn multiply(
-        &mut self,
-        left: Analysis<'b>,
-        right: Analysis<'b>,
-        span: Span,
-    ) -> Result<Value, GenerateError<'b>> {
-        self.numeric(left, right, span, |this, left, right, float| {
-            if float {
-                this.builder.ins().fmul(left, right)
-            } else {
-                this.builder.ins().imul(left, right)
-            }
-        })
-    }
-
-    fn divide(
-        &mut self,
-        left: Analysis<'b>,
-        right: Analysis<'b>,
-        span: Span,
-    ) -> Result<Value, GenerateError<'b>> {
-        let sign = signed(&left.typing) && signed(&right.typing);
-        self.numeric(left, right, span, move |this, left, right, float| {
-            if float {
-                this.builder.ins().fdiv(left, right)
-            } else if sign {
-                this.builder.ins().sdiv(left, right)
-            } else {
-                this.builder.ins().udiv(left, right)
-            }
-        })
-    }
-
-    fn modulus(
-        &mut self,
-        left: Analysis<'b>,
-        right: Analysis<'b>,
-        span: Span,
-    ) -> Result<Value, GenerateError<'b>> {
-        let sign = signed(&left.typing) && signed(&right.typing);
-        let left = self.expr(left)?;
-        let right = self.expr(right)?;
-        let kind = self.builder.func.dfg.value_type(left);
-        if kind != self.builder.func.dfg.value_type(right) {
-            return Err(self.error(ErrorKind::Normalize, span));
-        }
-        if kind.is_float() {
-            return Err(self.error(ErrorKind::Normalize, span));
-        }
-        Ok(if sign {
-            self.builder.ins().srem(left, right)
-        } else {
-            self.builder.ins().urem(left, right)
-        })
-    }
-
-    fn numeric<F>(
-        &mut self,
-        left: Analysis<'b>,
-        right: Analysis<'b>,
-        span: Span,
-        apply: F,
-    ) -> Result<Value, GenerateError<'b>>
-    where
-        F: Fn(&mut Self, Value, Value, bool) -> Value,
-    {
-        let left = self.expr(left)?;
-        let right = self.expr(right)?;
-        let left_kind = self.builder.func.dfg.value_type(left);
-        let right_kind = self.builder.func.dfg.value_type(right);
-        if left_kind != right_kind {
-            return Err(self.error(ErrorKind::Normalize, span));
-        }
-        Ok(apply(self, left, right, left_kind.is_float()))
-    }
-
-    fn bitwise<F>(
-        &mut self,
-        left: Analysis<'b>,
-        right: Analysis<'b>,
-        span: Span,
-        apply: F,
-    ) -> Result<Value, GenerateError<'b>>
-    where
-        F: Fn(&mut Self, Value, Value) -> Value,
-    {
-        let left = self.expr(left)?;
-        let right = self.expr(right)?;
-        let kind = self.builder.func.dfg.value_type(left);
-        if kind != self.builder.func.dfg.value_type(right) || kind.is_float() {
-            return Err(self.error(ErrorKind::Normalize, span));
-        }
-        Ok(apply(self, left, right))
-    }
-
-    fn compare(
-        &mut self,
-        left: Analysis<'b>,
-        right: Analysis<'b>,
-        span: Span,
-        float: FloatCC,
-        ints: IntCC,
-        _uints: IntCC,
-    ) -> Result<Value, GenerateError<'b>> {
-        let left = self.expr(left)?;
-        let right = self.expr(right)?;
-        let kind = self.builder.func.dfg.value_type(left);
-        if kind != self.builder.func.dfg.value_type(right) {
-            return Err(self.error(ErrorKind::Normalize, span));
-        }
-        let value = if kind.is_float() {
-            self.builder.ins().fcmp(float, left, right)
-        } else {
-            self.builder.ins().icmp(ints, left, right)
-        };
-        Ok(self.cast_bool(value))
-    }
-
-    fn ordered(
-        &mut self,
-        left: Analysis<'b>,
-        right: Analysis<'b>,
-        span: Span,
-        float: FloatCC,
-        ints: IntCC,
-        uints: IntCC,
-    ) -> Result<Value, GenerateError<'b>> {
-        let sign = signed(&left.typing) && signed(&right.typing);
-        let left = self.expr(left)?;
-        let right = self.expr(right)?;
-        let kind = self.builder.func.dfg.value_type(left);
-        if kind != self.builder.func.dfg.value_type(right) {
-            return Err(self.error(ErrorKind::Normalize, span));
-        }
-        let value = if kind.is_float() {
-            self.builder.ins().fcmp(float, left, right)
-        } else if sign {
-            self.builder.ins().icmp(ints, left, right)
-        } else {
-            self.builder.ins().icmp(uints, left, right)
-        };
-        Ok(self.cast_bool(value))
-    }
-
-    fn logical_and(
-        &mut self,
-        left: Analysis<'b>,
-        right: Analysis<'b>,
-    ) -> Result<Value, GenerateError<'b>> {
-        let left = self.expr(left)?;
-        let left = self.truth(left);
-        let pass = self.builder.create_block();
-        let join = self.builder.create_block();
-        let temp = self.builder.declare_var(types::I8);
-        let zero = self.builder.ins().iconst(types::I8, 0);
-        self.builder.def_var(temp, zero);
-        self.builder.ins().brif(left, pass, &[], join, &[]);
-        self.builder.switch_to_block(pass);
-        let right = self.expr(right)?;
-        let right = self.truth(right);
-        let right = self.cast_bool(right);
-        self.builder.def_var(temp, right);
-        if !self.done() {
-            self.builder.ins().jump(join, &[]);
-        }
-        self.builder.seal_block(pass);
-        self.builder.switch_to_block(join);
-        self.builder.seal_block(join);
-        Ok(self.builder.use_var(temp))
-    }
-
-    fn logical_or(
-        &mut self,
-        left: Analysis<'b>,
-        right: Analysis<'b>,
-    ) -> Result<Value, GenerateError<'b>> {
-        let left = self.expr(left)?;
-        let left = self.truth(left);
-        let pass = self.builder.create_block();
-        let join = self.builder.create_block();
-        let temp = self.builder.declare_var(types::I8);
-        let one = self.builder.ins().iconst(types::I8, 1);
-        self.builder.def_var(temp, one);
-        self.builder.ins().brif(left, join, &[], pass, &[]);
-        self.builder.switch_to_block(pass);
-        let right = self.expr(right)?;
-        let right = self.truth(right);
-        let right = self.cast_bool(right);
-        self.builder.def_var(temp, right);
-        if !self.done() {
-            self.builder.ins().jump(join, &[]);
-        }
-        self.builder.seal_block(pass);
-        self.builder.switch_to_block(join);
-        self.builder.seal_block(join);
-        Ok(self.builder.use_var(temp))
     }
 
     fn load(&mut self, addr: Value, typing: &Type<'b>) -> Result<Value, GenerateError<'b>> {
@@ -1702,9 +944,7 @@ fn symbol<'a>(analysis: &Analysis<'a>) -> Option<Str<'a>> {
 }
 
 fn member_index<'a>(typing: &Type<'a>, name: Str<'a>) -> Option<usize> {
-    member_names_of(typing)
-        .iter()
-        .position(|item| *item == name)
+    member_names_of(typing).iter().position(|item| *item == name)
 }
 
 fn member_names_of<'a>(typing: &Type<'a>) -> Vec<Str<'a>> {
@@ -1712,7 +952,6 @@ fn member_names_of<'a>(typing: &Type<'a>) -> Vec<Str<'a>> {
         TypeKind::Structure(value) | TypeKind::Union(value) => {
             value.members.iter().filter_map(field_name).collect()
         }
-        TypeKind::Tuple { .. } | TypeKind::Array { .. } => Vec::new(),
         _ => Vec::new(),
     }
 }
@@ -1725,7 +964,7 @@ fn field_name<'a>(typing: &Type<'a>) -> Option<Str<'a>> {
     }
 }
 
-fn field_type<'a>(typing: &Type<'a>, index: usize) -> Option<Type<'a>> {
+pub(crate) fn field_type<'a>(typing: &Type<'a>, index: usize) -> Option<Type<'a>> {
     match &resolved(typing).kind {
         TypeKind::Tuple { members } => members.get(index).cloned(),
         TypeKind::Structure(value) | TypeKind::Union(value) => value.members.get(index).cloned(),
@@ -1734,7 +973,7 @@ fn field_type<'a>(typing: &Type<'a>, index: usize) -> Option<Type<'a>> {
     }
 }
 
-fn field_offset<'a>(typing: &Type<'a>, index: usize) -> Option<u32> {
+pub(crate) fn field_offset<'a>(typing: &Type<'a>, index: usize) -> Option<u32> {
     match &resolved(typing).kind {
         TypeKind::Tuple { members } => offset_of(members, index),
         TypeKind::Structure(value) => offset_of(&value.members, index),
@@ -1771,8 +1010,4 @@ fn signed<'a>(typing: &Type<'a>) -> bool {
         resolved(typing).kind,
         TypeKind::Integer { signed: true, .. }
     )
-}
-
-fn field_like<'a>(_output: &Option<Type<'a>>, _value: &Value, _span: Span) -> Type<'a> {
-    Type::from(TypeKind::Unknown)
 }

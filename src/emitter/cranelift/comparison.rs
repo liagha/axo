@@ -1,142 +1,52 @@
-// src/generator/cranelift/comparison.rs
-use {
-    crate::{
-        analyzer::Analysis,
-        generator::{cranelift::CraneliftGenerator, GenerateError},
-        tracker::Span,
-    },
-    cranelift_codegen::ir::{
-        condcodes::{FloatCC, IntCC},
-        InstBuilder, Value,
-    },
-};
+use super::*;
 
-impl<'backend> CraneliftGenerator<'backend> {
-    pub fn equal(
+impl<'a, 'b, M: Module> Lower<'a, 'b, M> {
+    pub(super) fn compare(
         &mut self,
-        left: Box<Analysis<'backend>>,
-        right: Box<Analysis<'backend>>,
+        left: Analysis<'b>,
+        right: Analysis<'b>,
         span: Span,
-    ) -> Result<Value, GenerateError<'backend>> {
-        let alpha = self.analysis(*left)?;
-        let beta = self.analysis(*right)?;
-
-        let (primary, secondary, floating) = self.normalize(alpha, beta, span)?;
-
-        if floating {
-            Ok(self.builder.ins().fcmp(FloatCC::Equal, primary, secondary))
-        } else {
-            Ok(self.builder.ins().icmp(IntCC::Equal, primary, secondary))
+        float: FloatCC,
+        ints: IntCC,
+        _uints: IntCC,
+    ) -> Result<Value, GenerateError<'b>> {
+        let left = self.expr(left)?;
+        let right = self.expr(right)?;
+        let kind = self.builder.func.dfg.value_type(left);
+        if kind != self.builder.func.dfg.value_type(right) {
+            return Err(self.error(ErrorKind::Normalize, span));
         }
+        let value = if kind.is_float() {
+            self.builder.ins().fcmp(float, left, right)
+        } else {
+            self.builder.ins().icmp(ints, left, right)
+        };
+        Ok(self.cast_bool(value))
     }
 
-    pub fn not_equal(
+    pub(super) fn ordered(
         &mut self,
-        left: Box<Analysis<'backend>>,
-        right: Box<Analysis<'backend>>,
+        left: Analysis<'b>,
+        right: Analysis<'b>,
         span: Span,
-    ) -> Result<Value, GenerateError<'backend>> {
-        let alpha = self.analysis(*left)?;
-        let beta = self.analysis(*right)?;
-
-        let (primary, secondary, floating) = self.normalize(alpha, beta, span)?;
-
-        if floating {
-            Ok(self.builder.ins().fcmp(FloatCC::NotEqual, primary, secondary))
-        } else {
-            Ok(self.builder.ins().icmp(IntCC::NotEqual, primary, secondary))
+        float: FloatCC,
+        ints: IntCC,
+        uints: IntCC,
+    ) -> Result<Value, GenerateError<'b>> {
+        let sign = signed(&left.typing) && signed(&right.typing);
+        let left = self.expr(left)?;
+        let right = self.expr(right)?;
+        let kind = self.builder.func.dfg.value_type(left);
+        if kind != self.builder.func.dfg.value_type(right) {
+            return Err(self.error(ErrorKind::Normalize, span));
         }
-    }
-
-    pub fn less(
-        &mut self,
-        left: Box<Analysis<'backend>>,
-        right: Box<Analysis<'backend>>,
-        span: Span,
-    ) -> Result<Value, GenerateError<'backend>> {
-        let signed = self.infer_signedness(&left).unwrap_or(true)
-            && self.infer_signedness(&right).unwrap_or(true);
-
-        let alpha = self.analysis(*left)?;
-        let beta = self.analysis(*right)?;
-
-        let (primary, secondary, floating) = self.normalize(alpha, beta, span)?;
-
-        if floating {
-            Ok(self.builder.ins().fcmp(FloatCC::LessThan, primary, secondary))
-        } else if signed {
-            Ok(self.builder.ins().icmp(IntCC::SignedLessThan, primary, secondary))
+        let value = if kind.is_float() {
+            self.builder.ins().fcmp(float, left, right)
+        } else if sign {
+            self.builder.ins().icmp(ints, left, right)
         } else {
-            Ok(self.builder.ins().icmp(IntCC::UnsignedLessThan, primary, secondary))
-        }
-    }
-
-    pub fn less_or_equal(
-        &mut self,
-        left: Box<Analysis<'backend>>,
-        right: Box<Analysis<'backend>>,
-        span: Span,
-    ) -> Result<Value, GenerateError<'backend>> {
-        let signed = self.infer_signedness(&left).unwrap_or(true)
-            && self.infer_signedness(&right).unwrap_or(true);
-
-        let alpha = self.analysis(*left)?;
-        let beta = self.analysis(*right)?;
-
-        let (primary, secondary, floating) = self.normalize(alpha, beta, span)?;
-
-        if floating {
-            Ok(self.builder.ins().fcmp(FloatCC::LessThanOrEqual, primary, secondary))
-        } else if signed {
-            Ok(self.builder.ins().icmp(IntCC::SignedLessThanOrEqual, primary, secondary))
-        } else {
-            Ok(self.builder.ins().icmp(IntCC::UnsignedLessThanOrEqual, primary, secondary))
-        }
-    }
-
-    pub fn greater(
-        &mut self,
-        left: Box<Analysis<'backend>>,
-        right: Box<Analysis<'backend>>,
-        span: Span,
-    ) -> Result<Value, GenerateError<'backend>> {
-        let signed = self.infer_signedness(&left).unwrap_or(true)
-            && self.infer_signedness(&right).unwrap_or(true);
-
-        let alpha = self.analysis(*left)?;
-        let beta = self.analysis(*right)?;
-
-        let (primary, secondary, floating) = self.normalize(alpha, beta, span)?;
-
-        if floating {
-            Ok(self.builder.ins().fcmp(FloatCC::GreaterThan, primary, secondary))
-        } else if signed {
-            Ok(self.builder.ins().icmp(IntCC::SignedGreaterThan, primary, secondary))
-        } else {
-            Ok(self.builder.ins().icmp(IntCC::UnsignedGreaterThan, primary, secondary))
-        }
-    }
-
-    pub fn greater_or_equal(
-        &mut self,
-        left: Box<Analysis<'backend>>,
-        right: Box<Analysis<'backend>>,
-        span: Span,
-    ) -> Result<Value, GenerateError<'backend>> {
-        let signed = self.infer_signedness(&left).unwrap_or(true)
-            && self.infer_signedness(&right).unwrap_or(true);
-
-        let alpha = self.analysis(*left)?;
-        let beta = self.analysis(*right)?;
-
-        let (primary, secondary, floating) = self.normalize(alpha, beta, span)?;
-
-        if floating {
-            Ok(self.builder.ins().fcmp(FloatCC::GreaterThanOrEqual, primary, secondary))
-        } else if signed {
-            Ok(self.builder.ins().icmp(IntCC::SignedGreaterThanOrEqual, primary, secondary))
-        } else {
-            Ok(self.builder.ins().icmp(IntCC::UnsignedGreaterThanOrEqual, primary, secondary))
-        }
+            self.builder.ins().icmp(uints, left, right)
+        };
+        Ok(self.cast_bool(value))
     }
 }

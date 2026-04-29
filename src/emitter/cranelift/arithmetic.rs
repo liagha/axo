@@ -1,130 +1,118 @@
-use {
-    crate::{
-        analyzer::Analysis,
-        generator::{CraneliftGenerator, ErrorKind, GenerateError},
-        tracker::Span,
-    },
-    cranelift_codegen::ir::{InstBuilder, Value},
-};
+use super::*;
 
-impl<'backend> CraneliftGenerator<'backend> {
-    pub fn normalize(
-        &self,
-        left: Value,
-        right: Value,
-        span: Span,
-    ) -> Result<(Value, Value, bool), GenerateError<'backend>> {
-        let left_type = self.builder.func.dfg.value_type(left);
-        let right_type = self.builder.func.dfg.value_type(right);
-
-        if left_type != right_type {
-            return Err(GenerateError::new(ErrorKind::Normalize, span));
-        }
-
-        let floating = left_type.is_float();
-
-        Ok((left, right, floating))
-    }
-
-    pub fn add(
-        &mut self,
-        left: Box<Analysis<'backend>>,
-        right: Box<Analysis<'backend>>,
-        span: Span,
-    ) -> Result<Value, GenerateError<'backend>> {
-        let alpha = self.analysis(*left)?;
-        let beta = self.analysis(*right)?;
-
-        let (primary, secondary, floating) = self.normalize(alpha, beta, span)?;
-
-        if floating {
-            Ok(self.builder.ins().fadd(primary, secondary))
+impl<'a, 'b, M: Module> Lower<'a, 'b, M> {
+    pub(super) fn negate(&mut self, value: Analysis<'b>, span: Span) -> Result<Value, GenerateError<'b>> {
+        let value = self.expr(value)?;
+        let kind = self.builder.func.dfg.value_type(value);
+        if kind.is_int() {
+            Ok(self.builder.ins().ineg(value))
+        } else if kind.is_float() {
+            Ok(self.builder.ins().fneg(value))
         } else {
-            Ok(self.builder.ins().iadd(primary, secondary))
+            Err(self.error(ErrorKind::Negate, span))
         }
     }
 
-    pub fn subtract(
+    pub(super) fn add(
         &mut self,
-        left: Box<Analysis<'backend>>,
-        right: Box<Analysis<'backend>>,
+        left: Analysis<'b>,
+        right: Analysis<'b>,
         span: Span,
-    ) -> Result<Value, GenerateError<'backend>> {
-        let alpha = self.analysis(*left)?;
-        let beta = self.analysis(*right)?;
-
-        let (primary, secondary, floating) = self.normalize(alpha, beta, span)?;
-
-        if floating {
-            Ok(self.builder.ins().fsub(primary, secondary))
-        } else {
-            Ok(self.builder.ins().isub(primary, secondary))
-        }
+    ) -> Result<Value, GenerateError<'b>> {
+        self.numeric(left, right, span, |this, left, right, float| {
+            if float {
+                this.builder.ins().fadd(left, right)
+            } else {
+                this.builder.ins().iadd(left, right)
+            }
+        })
     }
 
-    pub fn multiply(
+    pub(super) fn subtract(
         &mut self,
-        left: Box<Analysis<'backend>>,
-        right: Box<Analysis<'backend>>,
+        left: Analysis<'b>,
+        right: Analysis<'b>,
         span: Span,
-    ) -> Result<Value, GenerateError<'backend>> {
-        let alpha = self.analysis(*left)?;
-        let beta = self.analysis(*right)?;
-
-        let (primary, secondary, floating) = self.normalize(alpha, beta, span)?;
-
-        if floating {
-            Ok(self.builder.ins().fmul(primary, secondary))
-        } else {
-            Ok(self.builder.ins().imul(primary, secondary))
-        }
+    ) -> Result<Value, GenerateError<'b>> {
+        self.numeric(left, right, span, |this, left, right, float| {
+            if float {
+                this.builder.ins().fsub(left, right)
+            } else {
+                this.builder.ins().isub(left, right)
+            }
+        })
     }
 
-    pub fn divide(
+    pub(super) fn multiply(
         &mut self,
-        left: Box<Analysis<'backend>>,
-        right: Box<Analysis<'backend>>,
+        left: Analysis<'b>,
+        right: Analysis<'b>,
         span: Span,
-    ) -> Result<Value, GenerateError<'backend>> {
-        let signed = self.infer_signedness(&left).unwrap_or(true)
-            && self.infer_signedness(&right).unwrap_or(true);
-
-        let alpha = self.analysis(*left)?;
-        let beta = self.analysis(*right)?;
-
-        let (primary, secondary, floating) = self.normalize(alpha, beta, span)?;
-
-        if floating {
-            Ok(self.builder.ins().fdiv(primary, secondary))
-        } else if signed {
-            Ok(self.builder.ins().sdiv(primary, secondary))
-        } else {
-            Ok(self.builder.ins().udiv(primary, secondary))
-        }
+    ) -> Result<Value, GenerateError<'b>> {
+        self.numeric(left, right, span, |this, left, right, float| {
+            if float {
+                this.builder.ins().fmul(left, right)
+            } else {
+                this.builder.ins().imul(left, right)
+            }
+        })
     }
 
-    pub fn modulus(
+    pub(super) fn divide(
         &mut self,
-        left: Box<Analysis<'backend>>,
-        right: Box<Analysis<'backend>>,
+        left: Analysis<'b>,
+        right: Analysis<'b>,
         span: Span,
-    ) -> Result<Value, GenerateError<'backend>> {
-        let signed = self.infer_signedness(&left).unwrap_or(true)
-            && self.infer_signedness(&right).unwrap_or(true);
+    ) -> Result<Value, GenerateError<'b>> {
+        let sign = signed(&left.typing) && signed(&right.typing);
+        self.numeric(left, right, span, move |this, left, right, float| {
+            if float {
+                this.builder.ins().fdiv(left, right)
+            } else if sign {
+                this.builder.ins().sdiv(left, right)
+            } else {
+                this.builder.ins().udiv(left, right)
+            }
+        })
+    }
 
-        let alpha = self.analysis(*left)?;
-        let beta = self.analysis(*right)?;
-
-        let (primary, secondary, floating) = self.normalize(alpha, beta, span)?;
-
-        if floating {
-            return Err(GenerateError::new(ErrorKind::Normalize, span));
+    pub(super) fn modulus(
+        &mut self,
+        left: Analysis<'b>,
+        right: Analysis<'b>,
+        span: Span,
+    ) -> Result<Value, GenerateError<'b>> {
+        let sign = signed(&left.typing) && signed(&right.typing);
+        let left = self.expr(left)?;
+        let right = self.expr(right)?;
+        let kind = self.builder.func.dfg.value_type(left);
+        if kind != self.builder.func.dfg.value_type(right) || kind.is_float() {
+            return Err(self.error(ErrorKind::Normalize, span));
         }
-
-        if signed {
-            Ok(self.builder.ins().srem(primary, secondary))
+        Ok(if sign {
+            self.builder.ins().srem(left, right)
         } else {
-            Ok(self.builder.ins().urem(primary, secondary))
+            self.builder.ins().urem(left, right)
+        })
+    }
+
+    pub(super) fn numeric<F>(
+        &mut self,
+        left: Analysis<'b>,
+        right: Analysis<'b>,
+        span: Span,
+        apply: F,
+    ) -> Result<Value, GenerateError<'b>>
+    where
+        F: Fn(&mut Self, Value, Value, bool) -> Value,
+    {
+        let left = self.expr(left)?;
+        let right = self.expr(right)?;
+        let left_kind = self.builder.func.dfg.value_type(left);
+        let right_kind = self.builder.func.dfg.value_type(right);
+        if left_kind != right_kind {
+            return Err(self.error(ErrorKind::Normalize, span));
         }
+        Ok(apply(self, left, right, left_kind.is_float()))
     }
 }

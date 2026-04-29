@@ -1,49 +1,105 @@
-// src/generator/cranelift/variables.rs
-use {
-    crate::{
-        analyzer::{Analysis, Target},
-        data::{Binding, Str},
-        generator::{cranelift::CraneliftGenerator, GenerateError},
-        resolver::Type,
-        tracker::Span,
-    },
-    cranelift_codegen::ir::{InstBuilder, Value, types},
-};
+use super::*;
 
-impl<'backend> CraneliftGenerator<'backend> {
-    pub fn symbol_value(&mut self, target: Target<'backend>, span: Span) -> Result<Value, GenerateError<'backend>> {
-        self.usage(target.name, span)
-    }
-
-    pub fn write(&mut self, target: Target<'backend>, value: Box<Analysis<'backend>>, span: Span) -> Result<Value, GenerateError<'backend>> {
-        self.assign(target.name, value, span)
-    }
-
-    pub fn address_of(&mut self, _operand: Box<Analysis<'backend>>, _span: Span) -> Result<Value, GenerateError<'backend>> {
-        Ok(self.builder.ins().iconst(types::I64, 0))
-    }
-
-    pub fn dereference(&mut self, _operand: Box<Analysis<'backend>>, _span: Span) -> Result<Value, GenerateError<'backend>> {
-        Ok(self.builder.ins().iconst(types::I64, 0))
-    }
-
-    pub fn usage(&mut self, _identifier: Str<'backend>, _span: Span) -> Result<Value, GenerateError<'backend>> {
-        Ok(self.builder.ins().iconst(types::I64, 0))
-    }
-
-    pub fn assign(&mut self, _target: Str<'backend>, _value: Box<Analysis<'backend>>, _span: Span) -> Result<Value, GenerateError<'backend>> {
-        Ok(self.builder.ins().iconst(types::I64, 0))
-    }
-
-    pub fn store(&mut self, _target: Box<Analysis<'backend>>, _value: Box<Analysis<'backend>>, _span: Span) -> Result<Value, GenerateError<'backend>> {
-        Ok(self.builder.ins().iconst(types::I64, 0))
-    }
-
-    pub fn binding(
+impl<'a, 'b, M: Module> Lower<'a, 'b, M> {
+    pub(super) fn bind(
         &mut self,
-        _binding: Binding<Box<Analysis<'backend>>, Box<Analysis<'backend>>, Type<'backend>>,
+        value: Binding<Box<Analysis<'b>>, Box<Analysis<'b>>, Type<'b>>,
+        span: Span,
+    ) -> Result<Value, GenerateError<'b>> {
+        let AnalysisKind::Symbol(target) = &value.target.kind else {
+            return Err(self.error(
+                ErrorKind::Variable(VariableError::InvalidAssignmentTarget),
+                span,
+            ));
+        };
+        let slot = self.stack(&value.annotation);
+        let addr = self.addr(slot);
+        if let Some(init) = value.value {
+            let init = self.expr(*init)?;
+            self.write(addr, &value.annotation, init);
+        } else if matches!(value.kind, BindingKind::Let) {
+            return Err(self.error(
+                ErrorKind::Variable(VariableError::BindingWithoutInitializer {
+                    name: target.name.as_str().unwrap_or_default().to_string(),
+                }),
+                span,
+            ));
+        }
+        self.entities.insert(
+            target.name,
+            Entity::Variable {
+                slot,
+                typing: value.annotation.clone(),
+            },
+        );
+        if indirect(&value.annotation) {
+            Ok(addr)
+        } else {
+            self.load(addr, &value.annotation)
+        }
+    }
+
+    pub(super) fn read(&mut self, name: Str<'b>, span: Span) -> Result<Value, GenerateError<'b>> {
+        match self.entities.get(&name).cloned() {
+            Some(Entity::Variable { slot, typing }) => {
+                let addr = self.addr(slot);
+                if indirect(&typing) {
+                    Ok(addr)
+                } else {
+                    self.load(addr, &typing)
+                }
+            }
+            Some(Entity::Function(_)) => Err(self.error(
+                ErrorKind::Function(FunctionError::Undefined {
+                    name: name.as_str().unwrap_or_default().to_string(),
+                }),
+                span,
+            )),
+            _ => Err(self.error(
+                ErrorKind::Variable(VariableError::Undefined {
+                    name: name.as_str().unwrap_or_default().to_string(),
+                }),
+                span,
+            )),
+        }
+    }
+
+    pub(super) fn assign(
+        &mut self,
+        name: Str<'b>,
+        value: Analysis<'b>,
+        span: Span,
+    ) -> Result<Value, GenerateError<'b>> {
+        let target = Analysis::new(AnalysisKind::Usage(name), span, value.typing.clone());
+        self.store_target(target, value, span)
+    }
+
+    pub(super) fn write_target(
+        &mut self,
+        target: Target<'b>,
+        value: Analysis<'b>,
+        span: Span,
+    ) -> Result<Value, GenerateError<'b>> {
+        self.store_target(
+            Analysis::new(AnalysisKind::Symbol(target), span, value.typing.clone()),
+            value,
+            span,
+        )
+    }
+
+    pub(super) fn store_target(
+        &mut self,
+        target: Analysis<'b>,
+        value: Analysis<'b>,
         _span: Span,
-    ) -> Result<Value, GenerateError<'backend>> {
-        Ok(self.builder.ins().iconst(types::I64, 0))
+    ) -> Result<Value, GenerateError<'b>> {
+        let (addr, typing) = self.place(&target)?;
+        let value = self.expr(value)?;
+        self.write(addr, &typing, value);
+        if indirect(&typing) {
+            Ok(addr)
+        } else {
+            self.load(addr, &typing)
+        }
     }
 }
