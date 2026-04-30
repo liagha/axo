@@ -1,5 +1,5 @@
 use crate::{
-    combinator::{Form, Formable, Formation},
+    combinator::{Consume, Formable, Formation},
     tracker::Peekable,
 };
 
@@ -20,18 +20,6 @@ impl Sink {
         Output: Formable<'a>,
         Failure: Formable<'a>,
     {
-        former
-            .source
-            .next(&mut formation.marker, &mut formation.state);
-
-        let consumed = former.consumed.len();
-        let form = former.forms.len();
-
-        former.consumed.push(input.clone());
-        former.forms.push(Form::input(input));
-
-        formation.consumed.push(consumed);
-        formation.form = form;
-        formation.stack.push(form);
+        Consume::run(former, formation, input);
     }
 }

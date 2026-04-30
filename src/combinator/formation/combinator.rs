@@ -1,6 +1,6 @@
 use crate::combinator::{
     Alternative, Combinator, Deferred, Fail, Form, Formable, Formation, Former, Ignore, Literal,
-    Memo, Multiple, Optional, Outcome, Panic, Predicate, Record, Recover, Repetition, Sequence,
+    Cache, Memo, Multiple, Optional, Outcome, Panic, Predicate, Recover, Repetition, Sequence,
     Skip, Transform,
 };
 use crate::data::{
@@ -9,6 +9,155 @@ use crate::data::{
 };
 use crate::tracker::Peekable;
 
+
+
+struct Recall<'a, Source, Input, Output, Failure>
+where
+    Source: Peekable<'a, Input> + Clone,
+    Source::State: Default,
+    Input: Formable<'a>,
+    Output: Formable<'a>,
+    Failure: Formable<'a>,
+{
+    pub memo: Memo<'a, Source, Input, Output, Failure>,
+}
+
+impl<'a, Source, Input, Output, Failure> Recall<'a, Source, Input, Output, Failure>
+where
+    Source: Peekable<'a, Input> + Clone,
+    Source::State: Default,
+    Input: Formable<'a>,
+    Output: Formable<'a>,
+    Failure: Formable<'a>,
+{
+    #[inline]
+    pub fn new(memo: Memo<'a, Source, Input, Output, Failure>) -> Self {
+        Self { memo }
+    }
+}
+
+impl<'a, Source, Input, Output, Failure> Recall<'a, Source, Input, Output, Failure>
+where
+    Source: Peekable<'a, Input> + Clone,
+    Source::State: Default,
+    Input: Formable<'a>,
+    Output: Formable<'a>,
+    Failure: Formable<'a>,
+{
+    #[inline]
+    pub fn apply<'source>(
+        &self,
+        former: &mut Former<'a, 'source, Source, Input, Output, Failure>,
+        formation: &mut Formation<'a, 'source, Source, Input, Output, Failure>,
+    ) {
+        let delta = (
+            former.forms.len() as isize - self.memo.form_base as isize,
+            former.consumed.len() as isize - self.memo.input_base as isize,
+        );
+
+        former.forms.extend(self.memo.forms.iter().cloned());
+        former.consumed.extend(self.memo.inputs.iter().cloned());
+
+        formation.consumed.extend(
+            self.memo
+                .consumed
+                .iter()
+                .map(|&id| (id as isize + delta.1) as Identity),
+        );
+
+        formation.stack.extend(self.memo.stack.iter().map(|&id| {
+            if id == 0 {
+                0
+            } else {
+                (id as isize + delta.0) as Identity
+            }
+        }));
+
+        formation.form = if self.memo.form == 0 {
+            0
+        } else {
+            (self.memo.form as isize + delta.0) as Identity
+        };
+
+        formation.marker += self.memo.advance;
+        formation.state = self.memo.state;
+        formation.outcome = self.memo.outcome;
+    }
+}
+
+struct Store;
+
+impl Store {
+    #[inline]
+    pub fn capture<'a, 'source, Source, Input, Output, Failure>(
+        former: &mut Former<'a, 'source, Source, Input, Output, Failure>,
+        formation: &mut Formation<'a, 'source, Source, Input, Output, Failure>,
+        combinator: crate::data::memory::Arc<
+            dyn Combinator<
+                    'a,
+                    Former<'a, 'source, Source, Input, Output, Failure>,
+                    Formation<'a, 'source, Source, Input, Output, Failure>,
+                > + Send
+                + Sync
+                + 'source,
+        >,
+    ) -> Memo<'a, Source, Input, Output, Failure>
+    where
+        Source: Peekable<'a, Input> + Clone,
+        Source::State: Default,
+        Input: Formable<'a>,
+        Output: Formable<'a>,
+        Failure: Formable<'a>,
+    {
+        let consumed = take(&mut formation.consumed);
+        let stack = take(&mut formation.stack);
+        let base = (
+            consumed.len(),
+            stack.len(),
+            former.forms.len() as Offset,
+            former.consumed.len() as Offset,
+            formation.marker,
+        );
+
+        let mut child = Formation::create(
+            combinator,
+            formation.marker,
+            formation.state,
+            consumed,
+            Outcome::Blank,
+            0,
+            stack,
+            formation.depth + 1,
+        );
+
+        former.build(&mut child);
+
+        let forms = former.forms[base.2 as usize..].to_vec().into_boxed_slice();
+        let inputs = former.consumed[base.3 as usize..].to_vec().into_boxed_slice();
+        let consumed = child.consumed[base.0..].to_vec().into_boxed_slice();
+        let stack = child.stack[base.1..].to_vec().into_boxed_slice();
+
+        formation.marker = child.marker;
+        formation.state = child.state;
+        formation.outcome = child.outcome;
+        formation.form = child.form;
+        formation.consumed = child.consumed;
+        formation.stack = child.stack;
+
+        Memo {
+            outcome: formation.outcome,
+            advance: formation.marker - base.4,
+            state: formation.state,
+            forms,
+            inputs,
+            consumed,
+            stack,
+            form: child.form,
+            form_base: base.2,
+            input_base: base.3,
+        }
+    }
+}
 impl<'a, 'source, Source, Input, Output, Failure>
     Combinator<
         'a,
@@ -241,8 +390,8 @@ where
         let id = self.factory as usize;
         let key = (id, formation.marker);
 
-        if let Some(memo) = (&former.memo.get(&key)).cloned() {
-            apply_memo(former, formation, &memo);
+        if let Some(memo) = Cache::get(former, key) {
+            Recall::new(memo).apply(former, formation);
             return;
         }
 
@@ -255,141 +404,9 @@ where
             }
         };
 
-        let memo = record_memo(former, formation, combinator);
+        let memo = Store::capture(former, formation, combinator);
 
-        if former.memo.len() > 2048 {
-            former.memo.clear();
-        }
-
-        former.memo.insert(key, memo);
-    }
-}
-
-fn apply_memo<'a, 'source, Source, Input, Output, Failure>(
-    former: &mut Former<'a, 'source, Source, Input, Output, Failure>,
-    formation: &mut Formation<'a, 'source, Source, Input, Output, Failure>,
-    memo: &Memo<'a, Source, Input, Output, Failure>,
-) where
-    Source: Peekable<'a, Input> + Clone,
-    Source::State: Default,
-    Input: Formable<'a>,
-    Output: Formable<'a>,
-    Failure: Formable<'a>,
-{
-    if let Some(record) = &memo.record {
-        let delta = (
-            former.forms.len() as isize - record.form_base as isize,
-            former.consumed.len() as isize - record.input_base as isize,
-        );
-
-        former.forms.extend(record.forms.iter().cloned());
-        former.consumed.extend(record.inputs.iter().cloned());
-
-        formation.consumed.extend(
-            record
-                .consumed
-                .iter()
-                .map(|&id| (id as isize + delta.1) as Identity),
-        );
-
-        formation.stack.extend(record.stack.iter().map(|&id| {
-            if id == 0 {
-                0
-            } else {
-                (id as isize + delta.0) as Identity
-            }
-        }));
-
-        formation.form = if record.form == 0 {
-            0
-        } else {
-            (record.form as isize + delta.0) as Identity
-        };
-    } else {
-        formation.form = 0;
-    }
-
-    formation.marker += memo.advance;
-    formation.state = memo.state;
-    formation.outcome = memo.outcome;
-}
-
-fn record_memo<'a, 'source, Source, Input, Output, Failure>(
-    former: &mut Former<'a, 'source, Source, Input, Output, Failure>,
-    formation: &mut Formation<'a, 'source, Source, Input, Output, Failure>,
-    combinator: crate::data::memory::Arc<
-        dyn Combinator<
-                'a,
-                Former<'a, 'source, Source, Input, Output, Failure>,
-                Formation<'a, 'source, Source, Input, Output, Failure>,
-            > + Send
-            + Sync
-            + 'source,
-    >,
-) -> Memo<'a, Source, Input, Output, Failure>
-where
-    Source: Peekable<'a, Input> + Clone,
-    Source::State: Default,
-    Input: Formable<'a>,
-    Output: Formable<'a>,
-    Failure: Formable<'a>,
-{
-    let consumed = take(&mut formation.consumed);
-    let stack = take(&mut formation.stack);
-    let base = (
-        consumed.len(),
-        stack.len(),
-        former.forms.len() as Offset,
-        former.consumed.len() as Offset,
-        formation.marker,
-    );
-
-    let mut child = Formation::create(
-        combinator,
-        formation.marker,
-        formation.state,
-        consumed,
-        Outcome::Blank,
-        0,
-        stack,
-        formation.depth + 1,
-    );
-
-    former.build(&mut child);
-
-    let record = if !former.forms[base.2 as usize..].is_empty()
-        || !former.consumed[base.3 as usize..].is_empty()
-        || !child.consumed[base.0..].is_empty()
-        || !child.stack[base.1..].is_empty()
-        || child.form != 0
-    {
-        Some(Box::new(Record {
-            forms: former.forms[base.2 as usize..].to_vec().into_boxed_slice(),
-            inputs: former.consumed[base.3 as usize..]
-                .to_vec()
-                .into_boxed_slice(),
-            consumed: child.consumed[base.0..].to_vec().into_boxed_slice(),
-            stack: child.stack[base.1..].to_vec().into_boxed_slice(),
-            form: child.form,
-            form_base: base.2,
-            input_base: base.3,
-        }))
-    } else {
-        None
-    };
-
-    formation.marker = child.marker;
-    formation.state = child.state;
-    formation.outcome = child.outcome;
-    formation.form = child.form;
-    formation.consumed = child.consumed;
-    formation.stack = child.stack;
-
-    Memo {
-        outcome: formation.outcome,
-        advance: formation.marker - base.4,
-        state: formation.state,
-        record,
+        Cache::put(former, key, memo);
     }
 }
 
