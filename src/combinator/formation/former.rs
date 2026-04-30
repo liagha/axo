@@ -1,6 +1,5 @@
-use crate::combinator::Outcome;
 use crate::{
-    combinator::{Combinator, Form, Formable, Formation},
+    combinator::{Build, Commit, Combinator, Form, Formable, Formation},
     data::{
         memory::{replace, Arc},
         Offset,
@@ -73,8 +72,7 @@ where
         &mut self,
         formation: &mut Formation<'a, 'source, Source, Input, Output, Failure>,
     ) {
-        let combinator = formation.combinator.clone();
-        combinator.combinator(self, formation);
+        Build::run(self, formation);
     }
 
     #[inline(always)]
@@ -85,10 +83,7 @@ where
         let mut active = Formation::new(formation.combinator.clone(), 0, self.source.origin());
         self.build(&mut active);
 
-        if matches!(active.outcome, Outcome::Aligned | Outcome::Failed) {
-            self.source.set_index(active.marker);
-            self.source.set_state(active.state);
-        }
+        Commit::run(self, &active);
 
         replace(&mut self.forms[active.form], Form::Blank)
     }

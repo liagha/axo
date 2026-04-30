@@ -5,6 +5,7 @@ mod former;
 mod memo;
 mod outcome;
 mod sink;
+mod flow;
 mod traits;
 
 pub use form::*;
@@ -13,3 +14,4 @@ pub use former::*;
 pub use memo::*;
 pub use outcome::*;
 pub use sink::*;
+pub use flow::*;
