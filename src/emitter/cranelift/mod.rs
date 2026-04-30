@@ -85,8 +85,27 @@ pub(crate) fn lower<'a, M: Module>(
     let pointer = module.target_config().pointer_type();
     let mut entities = Map::new();
     let mut errors = Vec::new();
+    let mut plan = analyses;
 
-    for analysis in &analyses {
+    let mut body = Vec::new();
+    let mut keep = Vec::new();
+    for analysis in plan {
+        match &analysis.kind {
+            AnalysisKind::Structure(_) | AnalysisKind::Union(_) | AnalysisKind::Function(_) | AnalysisKind::Module(_, _) => keep.push(analysis),
+            AnalysisKind::Binding(value) if value.kind == BindingKind::Static => keep.push(analysis),
+            _ => body.push(analysis),
+        }
+    }
+    if !body.is_empty() {
+        let output = body.last().map(|value| value.typing.clone());
+        let body_type = output.clone().unwrap_or_else(|| Type::from(TypeKind::Void));
+        let block = Analysis::new(AnalysisKind::Block(body), Span::void(), body_type);
+        let func = Function::new(Str::from("main"), Vec::new(), Some(Box::new(block)), output, Interface::C, true, false);
+        keep.push(Analysis::new(AnalysisKind::Function(func), Span::void(), Type::from(TypeKind::Unknown)));
+    }
+    plan = keep;
+
+    for analysis in &plan {
         match &analysis.kind {
             AnalysisKind::Structure(value) => {
                 entities.insert(value.target, Entity::Structure);
@@ -116,7 +135,7 @@ pub(crate) fn lower<'a, M: Module>(
 
     let mut entry = None;
 
-    for analysis in analyses {
+    for analysis in plan {
         match analysis.kind {
             AnalysisKind::Function(value) => {
                 if value.entry {
