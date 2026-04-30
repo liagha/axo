@@ -1,5 +1,5 @@
 use crate::{
-    combinator::{Operation, Status},
+    combinator::{Depend, Operation, Pulse, Resolve, Status},
     data::Identity,
     internal::{
         hash::Map,
@@ -8,6 +8,60 @@ use crate::{
     },
 };
 
+
+
+struct Cache;
+
+impl Cache {
+    #[inline]
+    pub fn get(cache: &Map<Identity, Status>, identity: Identity) -> Option<Status> {
+        cache.get(&identity).cloned()
+    }
+
+    #[inline]
+    pub fn put(cache: &mut Map<Identity, Status>, identity: Identity, status: Status) {
+        cache.insert(identity, status);
+    }
+
+    #[inline]
+    pub fn reset(cache: &mut Map<Identity, Status>) {
+        cache.clear();
+    }
+}
+
+
+impl Resolve {
+    #[inline]
+    pub fn run<'source, Store: Clone + Send + Sync>(operator: &mut Operator<Store>, operation: &mut Operation<'source, Store>) {
+        let combinator = operation.combinator.clone();
+        combinator.combinator(operator, operation);
+    }
+}
+
+impl Depend {
+    #[inline]
+    pub fn run<'source, Store: Clone + Send + Sync>(operator: &mut Operator<Store>, operation: &mut Operation<'source, Store>) -> bool {
+        for dependency in &operation.depends {
+            if let Some(status) = operator.cache.get(dependency) {
+                if !matches!(status, Status::Resolved(_)) {
+                    operation.set_reject();
+                    return false;
+                }
+            } else {
+                operation.set_pending();
+                return false;
+            }
+        }
+        true
+    }
+}
+
+impl Pulse {
+    #[inline]
+    pub fn tick(&self) {
+        sleep(Duration::from_millis(self.idle));
+    }
+}
 pub struct Operator<Store = ()> {
     pub cache: Map<Identity, Status>,
     pub store: Store,
@@ -23,47 +77,31 @@ impl<Store: Clone + Send + Sync> Operator<Store> {
     }
 
     #[inline]
-    pub fn build<'source>(&mut self, operation: &mut Operation<'source, Store>)
-    where
-        Store: 'source,
-    {
-        if let Some(status) = self.cache.get(&operation.identity) {
-            operation.status = status.clone();
+    pub fn build<'source>(&mut self, operation: &mut Operation<'source, Store>) {
+        if let Some(status) = Cache::get(&self.cache, operation.identity) {
+            operation.status = status;
             return;
         }
 
-        for dependency in &operation.depends {
-            if let Some(status) = self.cache.get(dependency) {
-                if !matches!(status, Status::Resolved(_)) {
-                    operation.set_reject();
-                    return;
-                }
-            } else {
-                operation.set_pending();
-                return;
-            }
+        if !Depend::run(self, operation) {
+            return;
         }
 
-        let combinator = operation.combinator.clone();
-        combinator.combinator(self, operation);
+        Resolve::run(self, operation);
 
         if !operation.is_pending() {
-            self.cache
-                .insert(operation.identity, operation.status.clone());
+            Cache::put(&mut self.cache, operation.identity, operation.status.clone());
         }
     }
 
     #[inline]
-    pub fn execute<'source>(&mut self, operation: &mut Operation<'source, Store>) -> Status
-    where
-        Store: 'source,
-    {
+    pub fn execute<'source>(&mut self, operation: &mut Operation<'source, Store>) -> Status {
         loop {
             self.build(operation);
 
             match &operation.status {
                 Status::Pending => {
-                    sleep(Duration::from_millis(10));
+                    Pulse { idle: 10 }.tick();
                 }
                 Status::Resolved(_) | Status::Rejected => break operation.status.clone(),
             }
@@ -71,22 +109,19 @@ impl<Store: Clone + Send + Sync> Operator<Store> {
     }
 
     #[inline]
-    pub fn watch<'source>(&mut self, operation: &mut Operation<'source, Store>, paths: &[&str])
-    where
-        Store: 'source,
-    {
+    pub fn watch<'source>(&mut self, operation: &mut Operation<'source, Store>, paths: &[&str]) {
         let mut last: Vec<_> = paths
             .iter()
             .map(|path| metadata(path).and_then(|m| m.modified()).ok())
             .collect();
 
         loop {
-            self.cache.clear();
+            Cache::reset(&mut self.cache);
             operation.status = Status::Pending;
             self.execute(operation);
 
             loop {
-                sleep(Duration::from_millis(500));
+                Pulse { idle: 500 }.tick();
 
                 let current: Vec<_> = paths
                     .iter()
