@@ -1,5 +1,5 @@
 use crate::{
-    combinator::{Build, Commit, Combinator, Form, Formable, Formation},
+    combinator::{Build, Combinator, Commit, Form, Formable, Formation},
     data::{
         memory::{replace, Arc},
         Offset,

@@ -1,7 +1,11 @@
 use super::*;
 
 impl<'a, 'b, M: Module> Lower<'a, 'b, M> {
-    pub(super) fn negate(&mut self, value: Analysis<'b>, span: Span) -> Result<Value, GenerateError<'b>> {
+    pub(super) fn negate(
+        &mut self,
+        value: Analysis<'b>,
+        span: Span,
+    ) -> Result<Value, GenerateError<'b>> {
         let value = self.expr(value)?;
         let kind = self.builder.func.dfg.value_type(value);
         if kind.is_int() {

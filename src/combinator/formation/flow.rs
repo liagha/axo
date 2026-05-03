@@ -119,5 +119,3 @@ impl Build {
         combinator.combinator(former, formation);
     }
 }
-
-

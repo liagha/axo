@@ -136,7 +136,9 @@ impl<'a, 'b, M: Module> Lower<'a, 'b, M> {
                 span,
             ));
         };
-        let callee = self.module.declare_func_in_func(func.id, &mut self.builder.func);
+        let callee = self
+            .module
+            .declare_func_in_func(func.id, &mut self.builder.func);
         let mut args = Vec::new();
         let mut slot = None;
         if func.indirect {

@@ -160,7 +160,9 @@ fn generate_cranelift<'source>(
     let mut guard = operator.store.write().unwrap();
     let session = &mut *guard;
     let base = session.base();
-    let target = session.get_target().map(|value| value.as_str().unwrap_or_default().to_string());
+    let target = session
+        .get_target()
+        .map(|value| value.as_str().unwrap_or_default().to_string());
     let discard = session.get_directive(Str::from("Discard")).is_some();
 
     let mut keys: Vec<_> = session
@@ -205,7 +207,8 @@ fn generate_cranelift<'source>(
                                 Ok(mut file) => {
                                     use crate::internal::platform::Write;
                                     if let Err(error) = file.write_all(&bytes) {
-                                        let kind = crate::tracker::ErrorKind::from_io(error, object);
+                                        let kind =
+                                            crate::tracker::ErrorKind::from_io(error, object);
                                         let track = TrackError::new(kind, Span::void());
                                         session.errors.push(SessionError::Track(track));
                                         operation.set_reject();
@@ -224,11 +227,9 @@ fn generate_cranelift<'source>(
                     }
                 }
                 Err(errors) => {
-                    session.errors.extend(
-                        errors
-                            .into_iter()
-                            .map(SessionError::Generate),
-                    );
+                    session
+                        .errors
+                        .extend(errors.into_iter().map(SessionError::Generate));
                 }
             }
         }

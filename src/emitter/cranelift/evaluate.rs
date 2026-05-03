@@ -2,7 +2,10 @@ use {
     crate::{
         analyzer::{Analysis, AnalysisKind},
         data::{BindingKind, Function, Identity, Interface, Str},
-        generator::{cranelift::{field_offset, field_type, layout, lower, resolved, Entity}, ErrorKind, FunctionError, GenerateError},
+        generator::{
+            cranelift::{field_offset, field_type, layout, lower, resolved, Entity},
+            ErrorKind, FunctionError, GenerateError,
+        },
         internal::{Artifact, Session},
         resolver::{Type, TypeKind},
         tracker::Span,
@@ -27,15 +30,23 @@ pub enum Value {
 pub struct Engine<'a>(PhantomData<&'a ()>);
 
 impl<'a> Default for Engine<'a> {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl<'a> Engine<'a> {
-    pub fn new() -> Self { Self(PhantomData) }
+    pub fn new() -> Self {
+        Self(PhantomData)
+    }
 
     pub fn reset(&mut self) {}
 
-    pub fn process<'b>(&mut self, session: &Session<'b>, keys: &[Identity]) -> Result<(), GenerateError<'b>> {
+    pub fn process<'b>(
+        &mut self,
+        session: &Session<'b>,
+        keys: &[Identity],
+    ) -> Result<(), GenerateError<'b>> {
         let plan = Plan::build(session, keys, None);
         if plan.items.is_empty() {
             return Ok(());
@@ -45,18 +56,27 @@ impl<'a> Engine<'a> {
         Ok(())
     }
 
-    pub fn execute_line<'b>(&mut self, session: &Session<'b>, key: Identity) -> Result<Option<Value>, GenerateError<'b>> {
+    pub fn execute_line<'b>(
+        &mut self,
+        session: &Session<'b>,
+        key: Identity,
+    ) -> Result<Option<Value>, GenerateError<'b>> {
         let plan = Plan::build(session, &session.all_source_keys(), Some(key));
         if plan.output.is_none() && plan.body.is_empty() {
             return Ok(None);
         }
         let mut module = build_module()?;
         let entities = lower(&mut module, plan.items).map_err(fail)?;
-        let entity = entities.get(&plan.name).cloned().ok_or_else(|| missing(plan.name))?;
+        let entity = entities
+            .get(&plan.name)
+            .cloned()
+            .ok_or_else(|| missing(plan.name))?;
         let Entity::Function(func) = entity else {
             return Ok(Some(Value::Empty));
         };
-        module.finalize_definitions().map_err(|error| invalid(error.to_string()))?;
+        module
+            .finalize_definitions()
+            .map_err(|error| invalid(error.to_string()))?;
         let code = module.get_finalized_function(func.id);
         Ok(Some(unsafe { call(code, plan.output.as_ref()) }))
     }
@@ -81,10 +101,18 @@ impl<'a> Plan<'a> {
             if line.is_some() && line != Some(key) && (key & 0x40000000) != 0 {
                 continue;
             }
-            let Some(record) = session.records.get(&key) else { continue };
-            let Some(Artifact::Analyses(items)) = record.fetch(3) else { continue };
+            let Some(record) = session.records.get(&key) else {
+                continue;
+            };
+            let Some(Artifact::Analyses(items)) = record.fetch(3) else {
+                continue;
+            };
             for item in items {
-                if top(item) { defs.push(item.clone()) } else { body.push(item.clone()) }
+                if top(item) {
+                    defs.push(item.clone())
+                } else {
+                    body.push(item.clone())
+                }
             }
         }
 
@@ -94,13 +122,21 @@ impl<'a> Plan<'a> {
             items.push(wrapper(name, &body, output.clone()));
         }
 
-        Self { name, items, body, output }
+        Self {
+            name,
+            items,
+            body,
+            output,
+        }
     }
 }
 
 fn top(analysis: &Analysis<'_>) -> bool {
     match &analysis.kind {
-        AnalysisKind::Structure(_) | AnalysisKind::Union(_) | AnalysisKind::Function(_) | AnalysisKind::Module(_, _) => true,
+        AnalysisKind::Structure(_)
+        | AnalysisKind::Union(_)
+        | AnalysisKind::Function(_)
+        | AnalysisKind::Module(_, _) => true,
         AnalysisKind::Binding(binding) => binding.kind == BindingKind::Static,
         _ => false,
     }
@@ -109,19 +145,37 @@ fn top(analysis: &Analysis<'_>) -> bool {
 fn wrapper<'a>(name: Str<'a>, body: &[Analysis<'a>], output: Option<Type<'a>>) -> Analysis<'a> {
     let body_type = output.clone().unwrap_or_else(|| Type::from(TypeKind::Void));
     let block = Analysis::new(AnalysisKind::Block(body.to_vec()), Span::void(), body_type);
-    let func = Function::new(name, Vec::new(), Some(Box::new(block)), output, Interface::Axo, false, false);
-    Analysis::new(AnalysisKind::Function(func), Span::void(), Type::from(TypeKind::Unknown))
+    let func = Function::new(
+        name,
+        Vec::new(),
+        Some(Box::new(block)),
+        output,
+        Interface::Axo,
+        false,
+        false,
+    );
+    Analysis::new(
+        AnalysisKind::Function(func),
+        Span::void(),
+        Type::from(TypeKind::Unknown),
+    )
 }
 
 fn build_module() -> Result<JITModule, GenerateError<'static>> {
-    let mut builder = JITBuilder::new(default_libcall_names()).map_err(|error| invalid(error.to_string()))?;
+    let mut builder =
+        JITBuilder::new(default_libcall_names()).map_err(|error| invalid(error.to_string()))?;
     builder.symbol("malloc", libc_malloc as *const u8);
     builder.symbol("free", libc_free as *const u8);
     Ok(JITModule::new(builder))
 }
 
 fn missing(name: Str<'_>) -> GenerateError<'static> {
-    GenerateError::new(ErrorKind::Function(FunctionError::Undefined { name: name.as_str().unwrap_or_default().to_string() }), Span::void())
+    GenerateError::new(
+        ErrorKind::Function(FunctionError::Undefined {
+            name: name.as_str().unwrap_or_default().to_string(),
+        }),
+        Span::void(),
+    )
 }
 
 fn invalid(message: String) -> GenerateError<'static> {
@@ -129,10 +183,20 @@ fn invalid(message: String) -> GenerateError<'static> {
 }
 
 fn fail<'a>(errors: Vec<GenerateError<'a>>) -> GenerateError<'a> {
-    errors.into_iter().next().unwrap_or_else(|| GenerateError::new(ErrorKind::Verification("Cranelift evaluation failed".to_string()), Span::void()))
+    errors.into_iter().next().unwrap_or_else(|| {
+        GenerateError::new(
+            ErrorKind::Verification("Cranelift evaluation failed".to_string()),
+            Span::void(),
+        )
+    })
 }
 
-unsafe extern "C" fn libc_malloc(size: usize) -> *mut u8 { std::alloc::alloc(std::alloc::Layout::from_size_align_unchecked(size.max(1), 8)) }
+unsafe extern "C" fn libc_malloc(size: usize) -> *mut u8 {
+    std::alloc::alloc(std::alloc::Layout::from_size_align_unchecked(
+        size.max(1),
+        8,
+    ))
+}
 unsafe extern "C" fn libc_free(_ptr: *mut u8) {}
 
 unsafe fn call(code: *const u8, output: Option<&Type<'_>>) -> Value {
@@ -142,31 +206,194 @@ unsafe fn call(code: *const u8, output: Option<&Type<'_>>) -> Value {
         return Value::Empty;
     };
     match &resolved(output).kind {
-        TypeKind::Integer { size, signed } => int_call(code, *size, *signed),
-        TypeKind::Float { size } => float_call(code, *size),
+        TypeKind::Integer { size, signed } => int_call(code, *size as u8, *signed),
+        TypeKind::Float { size } => float_call(code, *size as u8),
         TypeKind::Boolean => bool_call(code),
         TypeKind::Character => char_call(code),
         TypeKind::String => text_call(code),
         TypeKind::Pointer { .. } => ptr_call(code),
-        TypeKind::Array { .. } | TypeKind::Tuple { .. } | TypeKind::Structure(_) | TypeKind::Union(_) => indirect_call(code, output),
+        TypeKind::Array { .. }
+        | TypeKind::Tuple { .. }
+        | TypeKind::Structure(_)
+        | TypeKind::Union(_) => indirect_call(code, output),
         _ => Value::Empty,
     }
 }
 
-unsafe fn int_call(code: *const u8, size: u8, signed: bool) -> Value { match size { 1 | 8 => { let f: extern "C" fn() -> i8 = transmute(code); let v = f(); if signed { Value::Integer(v as i64) } else { Value::Integer((v as u8) as i64) } } 16 => { let f: extern "C" fn() -> i16 = transmute(code); let v = f(); if signed { Value::Integer(v as i64) } else { Value::Integer((v as u16) as i64) } } 32 => { let f: extern "C" fn() -> i32 = transmute(code); let v = f(); if signed { Value::Integer(v as i64) } else { Value::Integer((v as u32) as i64) } } _ => { let f: extern "C" fn() -> i64 = transmute(code); Value::Integer(f()) } } }
-unsafe fn float_call(code: *const u8, size: u8) -> Value { if size == 32 { let f: extern "C" fn() -> f32 = transmute(code); Value::Float(f() as f64) } else { let f: extern "C" fn() -> f64 = transmute(code); Value::Float(f()) } }
-unsafe fn bool_call(code: *const u8) -> Value { let f: extern "C" fn() -> i8 = transmute(code); Value::Boolean(f() != 0) }
-unsafe fn char_call(code: *const u8) -> Value { let f: extern "C" fn() -> u32 = transmute(code); Value::Character(char::from_u32(f()).unwrap_or('\0')) }
-unsafe fn text_call(code: *const u8) -> Value { let f: extern "C" fn() -> *const u8 = transmute(code); text(f()) }
-unsafe fn ptr_call(code: *const u8) -> Value { let f: extern "C" fn() -> usize = transmute(code); Value::Integer(f() as i64) }
-unsafe fn indirect_call(code: *const u8, output: &Type<'_>) -> Value { let mut bytes = vec![0u8; layout(output).size as usize]; let f: extern "C" fn(*mut u8) = transmute(code); f(bytes.as_mut_ptr()); decode(output, &bytes, 0) }
-unsafe fn text(ptr: *const u8) -> Value { if ptr.is_null() { Value::String(String::new()) } else { Value::String(CStr::from_ptr(ptr.cast()).to_string_lossy().into_owned()) } }
+unsafe fn int_call(code: *const u8, size: u8, signed: bool) -> Value {
+    match size {
+        1 | 8 => {
+            let f: extern "C" fn() -> i8 = transmute(code);
+            let v = f();
+            if signed {
+                Value::Integer(v as i64)
+            } else {
+                Value::Integer((v as u8) as i64)
+            }
+        }
+        16 => {
+            let f: extern "C" fn() -> i16 = transmute(code);
+            let v = f();
+            if signed {
+                Value::Integer(v as i64)
+            } else {
+                Value::Integer((v as u16) as i64)
+            }
+        }
+        32 => {
+            let f: extern "C" fn() -> i32 = transmute(code);
+            let v = f();
+            if signed {
+                Value::Integer(v as i64)
+            } else {
+                Value::Integer((v as u32) as i64)
+            }
+        }
+        _ => {
+            let f: extern "C" fn() -> i64 = transmute(code);
+            Value::Integer(f())
+        }
+    }
+}
+unsafe fn float_call(code: *const u8, size: u8) -> Value {
+    if size == 32 {
+        let f: extern "C" fn() -> f32 = transmute(code);
+        Value::Float(f() as f64)
+    } else {
+        let f: extern "C" fn() -> f64 = transmute(code);
+        Value::Float(f())
+    }
+}
+unsafe fn bool_call(code: *const u8) -> Value {
+    let f: extern "C" fn() -> i8 = transmute(code);
+    Value::Boolean(f() != 0)
+}
+unsafe fn char_call(code: *const u8) -> Value {
+    let f: extern "C" fn() -> u32 = transmute(code);
+    Value::Character(char::from_u32(f()).unwrap_or('\0'))
+}
+unsafe fn text_call(code: *const u8) -> Value {
+    let f: extern "C" fn() -> *const u8 = transmute(code);
+    text(f())
+}
+unsafe fn ptr_call(code: *const u8) -> Value {
+    let f: extern "C" fn() -> usize = transmute(code);
+    Value::Integer(f() as i64)
+}
+unsafe fn indirect_call(code: *const u8, output: &Type<'_>) -> Value {
+    let mut bytes = vec![0u8; layout(output).size as usize];
+    let f: extern "C" fn(*mut u8) = transmute(code);
+    f(bytes.as_mut_ptr());
+    decode(output, &bytes, 0)
+}
+unsafe fn text(ptr: *const u8) -> Value {
+    if ptr.is_null() {
+        Value::String(String::new())
+    } else {
+        Value::String(CStr::from_ptr(ptr.cast()).to_string_lossy().into_owned())
+    }
+}
 
-fn decode(typing: &Type<'_>, bytes: &[u8], offset: usize) -> Value { match &resolved(typing).kind { TypeKind::Integer { size, signed } => Value::Integer(match *size { 1 | 8 => { let value = bytes[offset] as i64; if *signed { (value as i8) as i64 } else { value } } 16 => { let value = u16::from_ne_bytes(load::<2>(bytes, offset)); if *signed { (value as i16) as i64 } else { value as i64 } } 32 => { let value = u32::from_ne_bytes(load::<4>(bytes, offset)); if *signed { (value as i32) as i64 } else { value as i64 } } _ => i64::from_ne_bytes(load::<8>(bytes, offset)), }), TypeKind::Float { size } => if *size == 32 { Value::Float(f32::from_ne_bytes(load::<4>(bytes, offset)) as f64) } else { Value::Float(f64::from_ne_bytes(load::<8>(bytes, offset))) }, TypeKind::Boolean => Value::Boolean(bytes[offset] != 0), TypeKind::Character => { let value = u32::from_ne_bytes(load::<4>(bytes, offset)); Value::Character(char::from_u32(value).unwrap_or('\0')) } TypeKind::String => { let ptr = usize::from_ne_bytes(load::<8>(bytes, offset)) as *const u8; unsafe { text(ptr) } } TypeKind::Pointer { .. } => Value::Integer(usize::from_ne_bytes(load::<8>(bytes, offset)) as i64), TypeKind::Array { member, size } => decode_array(member, *size, bytes, offset), TypeKind::Tuple { members } => decode_fields(typing, members.len(), bytes, offset), TypeKind::Structure(value) => decode_fields(typing, value.members.len(), bytes, offset), TypeKind::Union(value) => decode_union(typing, value.members.len(), bytes, offset), _ => Value::Empty } }
+fn decode(typing: &Type<'_>, bytes: &[u8], offset: usize) -> Value {
+    match &resolved(typing).kind {
+        TypeKind::Integer { size, signed } => Value::Integer(match *size {
+            1 | 8 => {
+                let value = bytes[offset] as i64;
+                if *signed {
+                    (value as i8) as i64
+                } else {
+                    value
+                }
+            }
+            16 => {
+                let value = u16::from_ne_bytes(load::<2>(bytes, offset));
+                if *signed {
+                    (value as i16) as i64
+                } else {
+                    value as i64
+                }
+            }
+            32 => {
+                let value = u32::from_ne_bytes(load::<4>(bytes, offset));
+                if *signed {
+                    (value as i32) as i64
+                } else {
+                    value as i64
+                }
+            }
+            _ => i64::from_ne_bytes(load::<8>(bytes, offset)),
+        }),
+        TypeKind::Float { size } => {
+            if *size == 32 {
+                Value::Float(f32::from_ne_bytes(load::<4>(bytes, offset)) as f64)
+            } else {
+                Value::Float(f64::from_ne_bytes(load::<8>(bytes, offset)))
+            }
+        }
+        TypeKind::Boolean => Value::Boolean(bytes[offset] != 0),
+        TypeKind::Character => {
+            let value = u32::from_ne_bytes(load::<4>(bytes, offset));
+            Value::Character(char::from_u32(value).unwrap_or('\0'))
+        }
+        TypeKind::String => {
+            let ptr = usize::from_ne_bytes(load::<8>(bytes, offset)) as *const u8;
+            unsafe { text(ptr) }
+        }
+        TypeKind::Pointer { .. } => {
+            Value::Integer(usize::from_ne_bytes(load::<8>(bytes, offset)) as i64)
+        }
+        TypeKind::Array { member, size } => decode_array(member, *size as u32, bytes, offset),
+        TypeKind::Tuple { members } => decode_fields(typing, members.len(), bytes, offset),
+        TypeKind::Structure(value) => decode_fields(typing, value.members.len(), bytes, offset),
+        TypeKind::Union(value) => decode_union(typing, value.members.len(), bytes, offset),
+        _ => Value::Empty,
+    }
+}
 
-fn decode_array(typing: &Type<'_>, size: u32, bytes: &[u8], offset: usize) -> Value { let item = layout(typing); let step = stride(item.size, item.align); let mut values = Vec::new(); for index in 0..size as usize { values.push(decode(typing, bytes, offset + index * step)); } Value::Sequence(values) }
-fn decode_fields(typing: &Type<'_>, len: usize, bytes: &[u8], offset: usize) -> Value { let mut values = Vec::new(); for index in 0..len { if let Some(item) = field_type(typing, index) { let shift = field_offset(typing, index).unwrap_or(0) as usize; values.push(decode(&item, bytes, offset + shift)); } } Value::Composite(values) }
-fn decode_union(typing: &Type<'_>, len: usize, bytes: &[u8], offset: usize) -> Value { let mut values = Vec::new(); for index in 0..len { if let Some(item) = field_type(typing, index) { values.push(decode(&item, bytes, offset)); } } Value::Composite(values) }
+fn decode_array(typing: &Type<'_>, size: u32, bytes: &[u8], offset: usize) -> Value {
+    let item = layout(typing);
+    let step = stride(item.size, item.align);
+    let mut values = Vec::new();
+    for index in 0..size as usize {
+        values.push(decode(typing, bytes, offset + index * step));
+    }
+    Value::Sequence(values)
+}
+fn decode_fields(typing: &Type<'_>, len: usize, bytes: &[u8], offset: usize) -> Value {
+    let mut values = Vec::new();
+    for index in 0..len {
+        if let Some(item) = field_type(typing, index) {
+            let shift = field_offset(typing, index).unwrap_or(0) as usize;
+            values.push(decode(&item, bytes, offset + shift));
+        }
+    }
+    Value::Composite(values)
+}
+fn decode_union(typing: &Type<'_>, len: usize, bytes: &[u8], offset: usize) -> Value {
+    let mut values = Vec::new();
+    for index in 0..len {
+        if let Some(item) = field_type(typing, index) {
+            values.push(decode(&item, bytes, offset));
+        }
+    }
+    Value::Composite(values)
+}
 
-fn stride(size: u32, align: u8) -> usize { let align = align.max(1) as usize; let size = size as usize; let rest = size % align; if rest == 0 { size } else { size + align - rest } }
-fn load<const N: usize>(bytes: &[u8], offset: usize) -> [u8; N] { let mut value = [0u8; N]; let end = offset + N; if end <= bytes.len() { value.copy_from_slice(&bytes[offset..end]); } value }
+fn stride(size: u32, align: u8) -> usize {
+    let align = align.max(1) as usize;
+    let size = size as usize;
+    let rest = size % align;
+    if rest == 0 {
+        size
+    } else {
+        size + align - rest
+    }
+}
+fn load<const N: usize>(bytes: &[u8], offset: usize) -> [u8; N] {
+    let mut value = [0u8; N];
+    let end = offset + N;
+    if end <= bytes.len() {
+        value.copy_from_slice(&bytes[offset..end]);
+    }
+    value
+}

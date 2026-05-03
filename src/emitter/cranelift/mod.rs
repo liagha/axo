@@ -91,8 +91,13 @@ pub(crate) fn lower<'a, M: Module>(
     let mut keep = Vec::new();
     for analysis in plan {
         match &analysis.kind {
-            AnalysisKind::Structure(_) | AnalysisKind::Union(_) | AnalysisKind::Function(_) | AnalysisKind::Module(_, _) => keep.push(analysis),
-            AnalysisKind::Binding(value) if value.kind == BindingKind::Static => keep.push(analysis),
+            AnalysisKind::Structure(_)
+            | AnalysisKind::Union(_)
+            | AnalysisKind::Function(_)
+            | AnalysisKind::Module(_, _) => keep.push(analysis),
+            AnalysisKind::Binding(value) if value.kind == BindingKind::Static => {
+                keep.push(analysis)
+            }
             _ => body.push(analysis),
         }
     }
@@ -100,8 +105,20 @@ pub(crate) fn lower<'a, M: Module>(
         let output = body.last().map(|value| value.typing.clone());
         let body_type = output.clone().unwrap_or_else(|| Type::from(TypeKind::Void));
         let block = Analysis::new(AnalysisKind::Block(body), Span::void(), body_type);
-        let func = Function::new(Str::from("main"), Vec::new(), Some(Box::new(block)), output, Interface::C, true, false);
-        keep.push(Analysis::new(AnalysisKind::Function(func), Span::void(), Type::from(TypeKind::Unknown)));
+        let func = Function::new(
+            Str::from("main"),
+            Vec::new(),
+            Some(Box::new(block)),
+            output,
+            Interface::C,
+            true,
+            false,
+        );
+        keep.push(Analysis::new(
+            AnalysisKind::Function(func),
+            Span::void(),
+            Type::from(TypeKind::Unknown),
+        ));
     }
     plan = keep;
 
@@ -140,13 +157,17 @@ pub(crate) fn lower<'a, M: Module>(
             AnalysisKind::Function(value) => {
                 if value.entry {
                     entry = Some((value, analysis.span));
-                } else if let Err(error) = define_function(module, pointer, &entities, value, analysis.span) {
+                } else if let Err(error) =
+                    define_function(module, pointer, &entities, value, analysis.span)
+                {
                     errors.push(error);
                 }
             }
             AnalysisKind::Binding(value) => {
                 if value.kind == BindingKind::Static {
-                    if let Err(error) = define_static(module, pointer, &entities, value, analysis.span) {
+                    if let Err(error) =
+                        define_static(module, pointer, &entities, value, analysis.span)
+                    {
                         errors.push(error);
                     }
                 }
@@ -265,7 +286,12 @@ fn declare_function<'a, M: Module>(
         .declare_function(value.target.as_str().unwrap_or_default(), linkage, &sig)
         .map_err(|error| error.to_string())?;
 
-    Ok(FuncData { id, sig, output, indirect: use_memory })
+    Ok(FuncData {
+        id,
+        sig,
+        output,
+        indirect: use_memory,
+    })
 }
 
 fn define_static<'a, M: Module>(
@@ -963,7 +989,9 @@ fn symbol<'a>(analysis: &Analysis<'a>) -> Option<Str<'a>> {
 }
 
 fn member_index<'a>(typing: &Type<'a>, name: Str<'a>) -> Option<usize> {
-    member_names_of(typing).iter().position(|item| *item == name)
+    member_names_of(typing)
+        .iter()
+        .position(|item| *item == name)
 }
 
 fn member_names_of<'a>(typing: &Type<'a>) -> Vec<Str<'a>> {

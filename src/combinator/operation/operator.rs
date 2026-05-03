@@ -8,8 +8,6 @@ use crate::{
     },
 };
 
-
-
 struct Cache;
 
 impl Cache {
@@ -29,10 +27,12 @@ impl Cache {
     }
 }
 
-
 impl Resolve {
     #[inline]
-    pub fn run<'source, Store: Clone + Send + Sync>(operator: &mut Operator<Store>, operation: &mut Operation<'source, Store>) {
+    pub fn run<'source, Store: Clone + Send + Sync>(
+        operator: &mut Operator<Store>,
+        operation: &mut Operation<'source, Store>,
+    ) {
         let combinator = operation.combinator.clone();
         combinator.combinator(operator, operation);
     }
@@ -40,7 +40,10 @@ impl Resolve {
 
 impl Depend {
     #[inline]
-    pub fn run<'source, Store: Clone + Send + Sync>(operator: &mut Operator<Store>, operation: &mut Operation<'source, Store>) -> bool {
+    pub fn run<'source, Store: Clone + Send + Sync>(
+        operator: &mut Operator<Store>,
+        operation: &mut Operation<'source, Store>,
+    ) -> bool {
         for dependency in &operation.depends {
             if let Some(status) = operator.cache.get(dependency) {
                 if !matches!(status, Status::Resolved(_)) {
@@ -90,7 +93,11 @@ impl<Store: Clone + Send + Sync> Operator<Store> {
         Resolve::run(self, operation);
 
         if !operation.is_pending() {
-            Cache::put(&mut self.cache, operation.identity, operation.status.clone());
+            Cache::put(
+                &mut self.cache,
+                operation.identity,
+                operation.status.clone(),
+            );
         }
     }
 

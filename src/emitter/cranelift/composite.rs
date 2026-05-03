@@ -1,7 +1,11 @@
 use super::*;
 
 impl<'a, 'b, M: Module> Lower<'a, 'b, M> {
-    pub(super) fn string(&mut self, value: Str<'b>, span: Span) -> Result<Value, GenerateError<'b>> {
+    pub(super) fn string(
+        &mut self,
+        value: Str<'b>,
+        span: Span,
+    ) -> Result<Value, GenerateError<'b>> {
         let text = value.as_str().unwrap_or_default();
         let name = format!(".str.{}", self.builder.func.dfg.num_values());
         let id = self

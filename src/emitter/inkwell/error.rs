@@ -1,6 +1,6 @@
 pub use crate::generator::{
-    AlignmentError, BuilderError, ControlFlowError, ErrorKind,
-    FunctionError, OrderingError, VariableError,
+    AlignmentError, BuilderError, ControlFlowError, ErrorKind, FunctionError, OrderingError,
+    VariableError,
 };
 
 impl From<inkwell::builder::BuilderError> for BuilderError {

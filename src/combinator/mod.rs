@@ -32,7 +32,6 @@ pub struct Multiple<'a, 'source, Host, State> {
     pub combinators: Vec<Arc<dyn Combinator<'a, Host, State> + Send + Sync + 'source>>,
 }
 
-
 pub struct Resolve;
 
 pub struct Depend;

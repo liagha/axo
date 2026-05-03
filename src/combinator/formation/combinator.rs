@@ -1,6 +1,6 @@
 use crate::combinator::{
-    Alternative, Combinator, Deferred, Fail, Form, Formable, Formation, Former, Ignore, Literal,
-    Cache, Memo, Multiple, Optional, Outcome, Panic, Predicate, Recover, Repetition, Sequence,
+    Alternative, Cache, Combinator, Deferred, Fail, Form, Formable, Formation, Former, Ignore,
+    Literal, Memo, Multiple, Optional, Outcome, Panic, Predicate, Recover, Repetition, Sequence,
     Skip, Transform,
 };
 use crate::data::{
@@ -8,8 +8,6 @@ use crate::data::{
     Identity, Offset, Scale,
 };
 use crate::tracker::Peekable;
-
-
 
 struct Recall<'a, Source, Input, Output, Failure>
 where
@@ -133,7 +131,9 @@ impl Store {
         former.build(&mut child);
 
         let forms = former.forms[base.2 as usize..].to_vec().into_boxed_slice();
-        let inputs = former.consumed[base.3 as usize..].to_vec().into_boxed_slice();
+        let inputs = former.consumed[base.3 as usize..]
+            .to_vec()
+            .into_boxed_slice();
         let consumed = child.consumed[base.0..].to_vec().into_boxed_slice();
         let stack = child.stack[base.1..].to_vec().into_boxed_slice();
 
