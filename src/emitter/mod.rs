@@ -190,6 +190,7 @@ fn generate_cranelift<'source>(
                     .map(|value| value.to_string())
                     .unwrap_or_else(|| "module".to_string()),
                 target.as_deref(),
+                matches!(record.fetch(4), Some(Artifact::Output(_))),
             ) {
                 Ok(bytes) => {
                     if discard {

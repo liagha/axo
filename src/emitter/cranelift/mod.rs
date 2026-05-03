@@ -81,6 +81,7 @@ struct Lower<'a, 'b, M: Module> {
 pub(crate) fn lower<'a, M: Module>(
     module: &mut M,
     analyses: Vec<Analysis<'a>>,
+    force_main: bool,
 ) -> Result<Map<Str<'a>, Entity<'a>>, Vec<GenerateError<'a>>> {
     let pointer = module.target_config().pointer_type();
     let mut entities = Map::new();
@@ -99,7 +100,7 @@ pub(crate) fn lower<'a, M: Module>(
             _ => body.push(analysis),
         }
     }
-    if !body.is_empty() {
+    if force_main || !body.is_empty() {
         let output = body.last().map(|value| value.typing.clone());
         let body_type = output.clone().unwrap_or_else(|| Type::from(TypeKind::Void));
         let block = Analysis::new(AnalysisKind::Block(body), Span::void(), body_type);
@@ -199,6 +200,7 @@ pub fn compile<'a>(
     analyses: Vec<Analysis<'a>>,
     stem: &str,
     target: Option<&str>,
+    force_main: bool,
 ) -> Result<Vec<u8>, Vec<GenerateError<'a>>> {
     let isa = match build_isa(target) {
         Ok(isa) => isa,
@@ -221,7 +223,7 @@ pub fn compile<'a>(
     };
 
     let mut module = ObjectModule::new(builder);
-    lower(&mut module, analyses)?;
+    lower(&mut module, analyses, force_main)?;
 
     match module.finish().emit() {
         Ok(bytes) => Ok(bytes),
