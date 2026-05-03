@@ -94,10 +94,8 @@ pub(crate) fn lower<'a, M: Module>(
             AnalysisKind::Structure(_)
             | AnalysisKind::Union(_)
             | AnalysisKind::Function(_)
-            | AnalysisKind::Module(_, _) => keep.push(analysis),
-            AnalysisKind::Binding(value) if value.kind == BindingKind::Static => {
-                keep.push(analysis)
-            }
+            | AnalysisKind::Module(_, _)
+            | AnalysisKind::Binding(_) => keep.push(analysis),
             _ => body.push(analysis),
         }
     }
