@@ -101,7 +101,6 @@ fn generate_with<'source, B: Backend<'source>>(
 }
 
 struct Inkwell<'a> {
-    context: Context,
     generator: Generator<'a>,
     triple: TargetMachine,
 }
@@ -111,7 +110,6 @@ impl<'a> Inkwell<'a> {
         let context = Context::create();
         let reference = unsafe { ContextRef::new(context.raw()) };
         Self {
-            context,
             generator: Generator::new(reference),
             triple: TargetMachine::get_default_triple(),
         }
@@ -204,7 +202,7 @@ impl<'source> Backend<'source> for Cranelift {
                 items.clone(),
                 &location.stem().map(|value| value.to_string()).unwrap_or_else(|| "module".to_string()),
                 target.as_deref(),
-                force,
+                matches!(record.fetch(4), Some(Artifact::Output(_))),
             ) {
                 Ok(bytes) => {
                     if discard {
