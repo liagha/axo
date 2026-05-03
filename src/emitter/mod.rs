@@ -28,6 +28,14 @@ pub type GenerateError<'source> = Error<'source, ErrorKind<'source>>;
 
 pub struct GenerateCombinator;
 
+trait Backend<'source> {
+    fn process(
+        &mut self,
+        session: &mut Session<'source>,
+        key: crate::data::Identity,
+    ) -> Result<(), Vec<SessionError<'source>>>;
+}
+
 fn use_cranelift<'source>(session: &Session<'source>) -> bool {
     CRANELIFT.load(Ordering::Relaxed) || session.get_directive(Str::from("Cranelift")).is_some()
 }
@@ -50,27 +58,21 @@ impl<'source>
         drop(guard);
 
         if cranelift {
-            generate_cranelift(operator, operation);
+            generate_with(operator, operation, Cranelift::new());
         } else {
-            generate_inkwell(operator, operation);
+            generate_with(operator, operation, Inkwell::new());
         }
         Session::trace("generate:end");
     }
 }
 
-fn generate_inkwell<'source>(
+fn generate_with<'source, B: Backend<'source>>(
     operator: &mut Operator<Arc<Lock<Session<'source>>>>,
     operation: &mut Operation<'source, Arc<Lock<Session<'source>>>>,
+    mut backend: B,
 ) {
     let mut guard = operator.store.write().unwrap();
     let session = &mut *guard;
-
-    let context = Context::create();
-    let reference = unsafe { ContextRef::new(context.raw()) };
-    let mut generator = Generator::new(reference);
-
-    let triple = TargetMachine::get_default_triple();
-    let base = session.base();
 
     let mut keys: Vec<_> = session
         .records
@@ -85,160 +87,159 @@ fn generate_inkwell<'source>(
         .collect();
     keys.sort();
 
-    let discard = session.get_directive(Str::from("Discard")).is_some();
-
     for &key in &keys {
+        if let Err(errors) = backend.process(session, key) {
+            session.errors.extend(errors);
+        }
+    }
+
+    if session.errors.is_empty() {
+        operation.set_resolve(Vec::new());
+    } else {
+        operation.set_reject();
+    }
+}
+
+struct Inkwell<'a> {
+    context: Context,
+    generator: Generator<'a>,
+    triple: TargetMachine,
+}
+
+impl<'a> Inkwell<'a> {
+    fn new() -> Self {
+        let context = Context::create();
+        let reference = unsafe { ContextRef::new(context.raw()) };
+        Self {
+            context,
+            generator: Generator::new(reference),
+            triple: TargetMachine::get_default_triple(),
+        }
+    }
+}
+
+impl<'source> Backend<'source> for Inkwell<'source> {
+    fn process(
+        &mut self,
+        session: &mut Session<'source>,
+        key: crate::data::Identity,
+    ) -> Result<(), Vec<SessionError<'source>>> {
+        let base = session.base();
+        let discard = session.get_directive(Str::from("Discard")).is_some();
         let record = session.records.get_mut(&key).unwrap();
         let location = record.location;
         let schema = Session::schema(&base, location);
-
         let stem = Str::from(location.stem().unwrap().to_string());
-
         if let Some(Artifact::Analyses(analysis_ref)) = record.fetch(3) {
             let analysis = analysis_ref.clone();
-            let module = generator.context.create_module(stem.as_str().unwrap());
-
-            module.set_triple(&triple);
-
-            generator.modules.insert(stem, module);
-            generator.current_module = stem;
-
-            generator.generate(analysis);
-
+            let module = self.generator.context.create_module(stem.as_str().unwrap());
+            module.set_triple(&self.triple);
+            self.generator.modules.insert(stem, module);
+            self.generator.current_module = stem;
+            self.generator.generate(analysis);
             if discard {
-                continue;
+                return Ok(());
             }
-
             match schema.as_path() {
                 Ok(path) => {
                     let parent = path.parent().unwrap();
                     _ = create_dir_all(parent);
-
                     match crate::internal::platform::File::create(&path) {
                         Ok(mut file) => {
                             use crate::internal::platform::Write;
-                            let string = generator.current_module().print_to_string().to_string();
+                            let string = self.generator.current_module().print_to_string().to_string();
                             if let Err(error) = file.write_all(string.as_bytes()) {
                                 let kind = crate::tracker::ErrorKind::from_io(error, schema);
                                 let track = TrackError::new(kind, Span::void());
-                                session.errors.push(SessionError::Track(track));
-                                operation.set_reject();
-                                return;
+                                return Err(vec![SessionError::Track(track)]);
                             }
                             record.store(4, Artifact::Output(schema));
                         }
                         Err(error) => {
                             let kind = crate::tracker::ErrorKind::from_io(error, schema);
                             let track = TrackError::new(kind, Span::void());
-                            session.errors.push(SessionError::Track(track));
+                            return Err(vec![SessionError::Track(track)]);
                         }
                     }
                 }
-                Err(error) => session.errors.push(SessionError::Track(error)),
+                Err(error) => return Err(vec![SessionError::Track(error)]),
             }
         }
-    }
-
-    session.errors.extend(
-        generator
-            .errors
-            .iter()
-            .map(|error| SessionError::Generate(error.clone())),
-    );
-
-    if session.errors.is_empty() {
-        operation.set_resolve(Vec::new());
-    } else {
-        operation.set_reject();
+        if self.generator.errors.is_empty() {
+            Ok(())
+        } else {
+            let errors = self
+                .generator
+                .errors
+                .drain(..)
+                .map(SessionError::Generate)
+                .collect();
+            Err(errors)
+        }
     }
 }
 
-fn generate_cranelift<'source>(
-    operator: &mut Operator<Arc<Lock<Session<'source>>>>,
-    operation: &mut Operation<'source, Arc<Lock<Session<'source>>>>,
-) {
-    let mut guard = operator.store.write().unwrap();
-    let session = &mut *guard;
-    let base = session.base();
-    let target = session
-        .get_target()
-        .map(|value| value.as_str().unwrap_or_default().to_string());
-    let discard = session.get_directive(Str::from("Discard")).is_some();
+struct Cranelift;
+impl Cranelift {
+    fn new() -> Self {
+        Self
+    }
+}
 
-    let mut keys: Vec<_> = session
-        .records
-        .iter()
-        .filter_map(|(&key, record)| {
-            if record.kind == RecordKind::Source && record.fetch(0).is_some() {
-                Some(key)
-            } else {
-                None
-            }
-        })
-        .collect();
-    keys.sort();
-
-    for &key in &keys {
+impl<'source> Backend<'source> for Cranelift {
+    fn process(
+        &mut self,
+        session: &mut Session<'source>,
+        key: crate::data::Identity,
+    ) -> Result<(), Vec<SessionError<'source>>> {
+        let base = session.base();
+        let target = session.get_target().map(|value| value.as_str().unwrap_or_default().to_string());
+        let discard = session.get_directive(Str::from("Discard")).is_some();
         let record = session.records.get_mut(&key).unwrap();
         let location = record.location;
-
         if let Some(Artifact::Analyses(items)) = record.fetch(3) {
+            let name = location.to_string();
+            let force = !name.starts_with("./base/") && !name.starts_with("base/") && !name.contains("/base/");
             match cranelift::compile(
                 items.clone(),
-                &location
-                    .stem()
-                    .map(|value| value.to_string())
-                    .unwrap_or_else(|| "module".to_string()),
+                &location.stem().map(|value| value.to_string()).unwrap_or_else(|| "module".to_string()),
                 target.as_deref(),
+                force,
             ) {
                 Ok(bytes) => {
                     if discard {
-                        continue;
+                        return Ok(());
                     }
-
                     let object = Session::object(&base, location, &record.kind, None);
                     match object.as_path() {
                         Ok(path) => {
                             if let Some(parent) = path.parent() {
                                 _ = create_dir_all(parent);
                             }
-
                             match crate::internal::platform::File::create(&path) {
                                 Ok(mut file) => {
                                     use crate::internal::platform::Write;
                                     if let Err(error) = file.write_all(&bytes) {
-                                        let kind =
-                                            crate::tracker::ErrorKind::from_io(error, object);
+                                        let kind = crate::tracker::ErrorKind::from_io(error, object);
                                         let track = TrackError::new(kind, Span::void());
-                                        session.errors.push(SessionError::Track(track));
-                                        operation.set_reject();
-                                        return;
+                                        return Err(vec![SessionError::Track(track)]);
                                     }
                                     record.store(5, Artifact::Object(object));
                                 }
                                 Err(error) => {
                                     let kind = crate::tracker::ErrorKind::from_io(error, object);
                                     let track = TrackError::new(kind, Span::void());
-                                    session.errors.push(SessionError::Track(track));
+                                    return Err(vec![SessionError::Track(track)]);
                                 }
                             }
                         }
-                        Err(error) => session.errors.push(SessionError::Track(error)),
+                        Err(error) => return Err(vec![SessionError::Track(error)]),
                     }
                 }
-                Err(errors) => {
-                    session
-                        .errors
-                        .extend(errors.into_iter().map(SessionError::Generate));
-                }
+                Err(errors) => return Err(errors.into_iter().map(SessionError::Generate).collect()),
             }
         }
-    }
-
-    if session.errors.is_empty() {
-        operation.set_resolve(Vec::new());
-    } else {
-        operation.set_reject();
+        Ok(())
     }
 }
 
