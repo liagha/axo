@@ -52,7 +52,7 @@ impl<'a> Engine<'a> {
             return Ok(());
         }
         let mut module = build_module()?;
-        lower(&mut module, plan.items).map_err(fail)?;
+        lower(&mut module, plan.items, false).map_err(fail)?;
         Ok(())
     }
 
@@ -66,7 +66,7 @@ impl<'a> Engine<'a> {
             return Ok(None);
         }
         let mut module = build_module()?;
-        let entities = lower(&mut module, plan.items).map_err(fail)?;
+        let entities = lower(&mut module, plan.items, false).map_err(fail)?;
         let entity = entities
             .get(&plan.name)
             .cloned()
