@@ -45,7 +45,7 @@ where
         let Some(record) = record else {
             return (message, Str::from(""));
         };
-        let Some(content) = record.content.as_ref() else {
+        let Some(content) = record.content() else {
             return (message, Str::from(""));
         };
 

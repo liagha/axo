@@ -7,7 +7,7 @@ use crate::{
         time::Instant,
         Record, RecordKind, Session,
     },
-    parser::Symbol,
+    parser::Parser,
     resolver::Resolver,
     scanner::Scanner,
     tracker::Location,
@@ -16,7 +16,6 @@ use crossterm::{
     event::{read, Event, KeyCode, KeyEvent, KeyModifiers},
     terminal::{disable_raw_mode, enable_raw_mode},
 };
-use crate::parser::Parser;
 
 pub struct Dialog {
     pub history: Vec<String>,
@@ -166,7 +165,6 @@ impl Dialog {
 
     pub fn refresh(session: &mut Session, keys: &[Identity]) {
         session.errors.clear();
-        session.bootstrap();
         if !session.prepare() {
             session.report_all();
             return;
@@ -197,8 +195,7 @@ impl Dialog {
         session.report_all();
     }
 
-    pub fn start(directives: Vec<Symbol>, flag: Str) {
-        let mut session = Session::create(directives, Vec::new(), flag);
+    pub fn start(mut session: Session) {
         let mut core = CraneliftEngine::new();
 
         let mut keys: Vec<_> = session

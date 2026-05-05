@@ -108,7 +108,11 @@ impl<'scanner> Scanner<'scanner> {
     fn process(session: &mut Session<'scanner>, key: Identity) {
         let (kind, location, content) = {
             let record = session.records.get(&key).unwrap();
-            (record.kind.clone(), record.location, record.content.clone())
+            (
+                record.kind.clone(),
+                record.location,
+                record.content().cloned(),
+            )
         };
 
         if kind != RecordKind::Source {

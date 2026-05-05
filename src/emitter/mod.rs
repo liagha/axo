@@ -28,7 +28,7 @@ pub type GenerateError<'source> = Error<'source, ErrorKind<'source>>;
 
 pub struct GenerateCombinator;
 
-fn use_cranelift<'source>(session: &Session<'source>) -> bool {
+fn use_cranelift(session: &Session) -> bool {
     CRANELIFT.load(Ordering::Relaxed) || session.get_directive(Str::from("Cranelift")).is_some()
 }
 
@@ -44,17 +44,21 @@ Combinator<
         operator: &mut Operator<Arc<Lock<Session<'source>>>>,
         operation: &mut Operation<'source, Arc<Lock<Session<'source>>>>,
     ) {
-        Session::trace("generate:start");
         let guard = operator.store.read().unwrap();
+        let has_input = guard.has_input();
         let cranelift = use_cranelift(&guard);
         drop(guard);
+
+        if !has_input {
+            operation.set_resolve(Vec::new());
+            return;
+        }
 
         if cranelift {
             generate_cranelift(operator, operation);
         } else {
             generate_inkwell(operator, operation);
         }
-        Session::trace("generate:end");
     }
 }
 
@@ -125,7 +129,7 @@ fn generate_inkwell<'source>(
                                 operation.set_reject();
                                 return;
                             }
-                            session.records.get_mut(&key).unwrap().artifacts.insert(4, Artifact::Output(schema));
+                            session.records.get_mut(&key).unwrap().artifacts.insert(4, Artifact::Schema(schema));
                         }
                         Err(error) => {
                             let kind = crate::tracker::ErrorKind::from_io(error, schema);
@@ -256,9 +260,8 @@ Combinator<
         operator: &mut Operator<Arc<Lock<Session<'source>>>>,
         operation: &mut Operation<'source, Arc<Lock<Session<'source>>>>,
     ) {
-        Session::trace("emit:start");
         let mut session = operator.store.write().unwrap();
-        if session.get_directive(Str::from("Discard")).is_some() {
+        if !session.has_input() || session.get_directive(Str::from("Discard")).is_some() {
             if session.errors.is_empty() {
                 operation.set_resolve(Vec::new());
             } else {
@@ -288,7 +291,7 @@ Combinator<
                 RecordKind::Source => {
                     if record.fetch(5).is_some() {
                         None
-                    } else if let Some(Artifact::Output(location)) = record.fetch(4) {
+                    } else if let Some(Artifact::Schema(location)) = record.fetch(4) {
                         Some(location.to_string())
                     } else {
                         None
@@ -296,7 +299,7 @@ Combinator<
                 }
                 RecordKind::Schema => Some(record.location.to_string()),
                 RecordKind::C => {
-                    if let Some(content) = &record.content {
+                    if let Some(content) = record.content() {
                         let path = record.location.to_path().unwrap();
                         let name = path.file_name().unwrap();
                         let build = base.join("build").join("base");
@@ -320,6 +323,7 @@ Combinator<
                     None
                 }
                 RecordKind::Flag => None,
+                RecordKind::Executable => None,
             };
 
             if let Some(path) = path {
@@ -328,7 +332,7 @@ Combinator<
                 _ = create_dir_all(&parent);
 
                 session.records.get_mut(&key).unwrap().artifacts.insert(5, Artifact::Object(object));
-                
+
                 let mut command = Command::new("clang");
                 if let Some(t) = &target {
                     command.arg("-target").arg(t);
@@ -382,16 +386,15 @@ Combinator<
         }
 
         let key = *keys.last().expect("missing");
-
         let record = session.records.get(&key).unwrap();
 
-        let location = if let Some(Artifact::Output(location)) = record.fetch(4) {
+        let location = if let Some(Artifact::Schema(location)) = record.fetch(4) {
             *location
         } else {
             record.location
         };
 
-        let executable = Session::executable(&base, location, None);
+        let executable = Session::executable_path(&base, location, None);
 
         if msvc {
             link.arg(format!("/Fe{}", executable));
@@ -407,10 +410,9 @@ Combinator<
             panic!("emitter failed: {}", status);
         }
 
-        session.target = Some(executable);
+        session.set_executable(executable);
 
         if session.errors.is_empty() {
-            Session::trace("emit:end");
             operation.set_resolve(Vec::new());
         } else {
             operation.set_reject();
@@ -432,9 +434,8 @@ Combinator<
         operator: &mut Operator<Arc<Lock<Session<'source>>>>,
         operation: &mut Operation<'source, Arc<Lock<Session<'source>>>>,
     ) {
-        Session::trace("run:start");
         let session = operator.store.write().unwrap();
-        if session.get_directive(Str::from("Discard")).is_some() {
+        if !session.has_input() || session.get_directive(Str::from("Discard")).is_some() {
             if session.errors.is_empty() {
                 operation.set_resolve(Vec::new());
             } else {
@@ -443,7 +444,7 @@ Combinator<
             return;
         }
 
-        let executable = session.target.unwrap();
+        let executable = session.get_executable().unwrap();
 
         session.report_execute(&executable.to_string());
 
@@ -456,7 +457,6 @@ Combinator<
         }
 
         if session.errors.is_empty() {
-            Session::trace("run:end");
             operation.set_resolve(Vec::new());
         } else {
             operation.set_reject();

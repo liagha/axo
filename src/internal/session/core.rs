@@ -12,7 +12,7 @@ use {
             SessionError,
         },
         literal,
-        parser::{Element, ElementKind, Symbol, SymbolKind},
+        parser::{Element, ElementKind, SymbolKind},
         reporter::Error,
         resolver::Resolver,
         scanner::{Token, TokenKind},
@@ -52,6 +52,8 @@ pub const BASE: &[(&str, &str)] = &[
     ("./base/vector.c", include_str!("../../../base/vector.c")),
 ];
 
+pub const EXECUTABLE_ID: Identity = 0x7FFFFFFF;
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum RecordKind {
     Source,
@@ -59,6 +61,7 @@ pub enum RecordKind {
     Object,
     C,
     Flag,
+    Executable,
 }
 
 impl RecordKind {
@@ -83,6 +86,7 @@ impl RecordKind {
             RecordKind::Object => "o",
             RecordKind::C => "c",
             RecordKind::Flag => "",
+            RecordKind::Executable => "",
         }
     }
 }
@@ -92,14 +96,14 @@ pub enum Artifact<'session> {
     Tokens(Vec<Token<'session>>),
     Elements(Vec<Element<'session>>),
     Analyses(Vec<Analysis<'session>>),
-    Output(Location<'session>),
+    Schema(Location<'session>),
     Object(Location<'session>),
+    Content(Str<'session>),
 }
 
 pub struct Record<'session> {
     pub kind: RecordKind,
     pub location: Location<'session>,
-    pub content: Option<Str<'session>>,
     pub artifacts: Map<u8, Artifact<'session>>,
 }
 
@@ -108,13 +112,19 @@ impl<'session> Record<'session> {
         Self {
             kind,
             location,
-            content: None,
             artifacts: Map::default(),
         }
     }
 
+    pub fn content(&self) -> Option<&Str<'session>> {
+        self.artifacts.get(&6).and_then(|artifact| match artifact {
+            Artifact::Content(content) => Some(content),
+            _ => None,
+        })
+    }
+
     pub fn set_content(&mut self, content: Str<'session>) {
-        self.content = Some(content);
+        self.artifacts.insert(6, Artifact::Content(content));
     }
 
     pub fn fetch(&self, key: u8) -> Option<&Artifact<'session>> {
@@ -126,7 +136,7 @@ impl<'session> Record<'session> {
     }
 
     pub fn offset_to_line_column(&self, offset: Offset) -> Option<(usize, usize)> {
-        let text = self.content.as_ref()?;
+        let text = self.content()?;
         let mut line = 0;
         let mut col = 0;
         for (i, byte) in text.bytes().enumerate() {
@@ -149,8 +159,7 @@ impl<'session> Record<'session> {
 
     pub fn span(&self, identity: Identity) -> Span {
         let end = self
-            .content
-            .as_ref()
+            .content()
             .map(|value| value.len() as Offset)
             .unwrap_or(0);
         Span::range(identity, 0, end)
@@ -162,28 +171,13 @@ pub struct Session<'session> {
     pub laps: Vec<Duration>,
     pub records: Map<Identity, Record<'session>>,
     pub resolver: Resolver<'session>,
-    pub directives: Vec<Symbol<'session>>,
     pub errors: Vec<SessionError<'session>>,
-    pub target: Option<Location<'session>>,
-    pub pipeline: Map<Identity, usize>,
-    pub buffers: Vec<Vec<u8>>,
 }
 
 impl<'session> Session<'session> {
-    pub fn create(
-        directives: Vec<Symbol<'session>>,
-        failures: Vec<SessionError<'session>>,
-        flag: Str<'session>,
-    ) -> Self {
+    pub fn new() -> Self {
         let timer = Instant::now();
-        let mut laps = Vec::new();
-
-        let resolver = Resolver::new();
         let mut records = Map::new();
-
-        let mut record = Record::new(RecordKind::Flag, Location::from("flag"));
-        record.set_content(flag);
-        records.insert(0, record);
 
         for &(path, content) in BASE {
             if let Some(kind) = RecordKind::from_path(path) {
@@ -198,19 +192,19 @@ impl<'session> Session<'session> {
             }
         }
 
-        laps.push(timer.elapsed());
-
         Self {
             timer,
-            laps,
+            laps: vec![timer.elapsed()],
             records,
-            resolver,
-            directives,
-            errors: failures,
-            target: None,
-            pipeline: Map::default(),
-            buffers: Vec::new(),
+            resolver: Resolver::new(),
+            errors: Vec::new(),
         }
+    }
+
+    pub fn has_input(&self) -> bool {
+        self.records.iter().any(|(&id, record)| {
+            record.kind == RecordKind::Source && (id & 0x40000000) != 0
+        })
     }
 
     pub fn arguments() -> Str<'static> {
@@ -290,6 +284,17 @@ impl<'session> Session<'session> {
 
     pub fn is_active(&self) -> bool {
         self.get_stencil().is_some()
+    }
+
+    pub fn get_executable(&self) -> Option<Location<'session>> {
+        self.records
+            .get(&EXECUTABLE_ID)
+            .map(|record| record.location)
+    }
+
+    pub fn set_executable(&mut self, location: Location<'session>) {
+        let record = Record::new(RecordKind::Executable, location);
+        self.records.insert(EXECUTABLE_ID, record);
     }
 
     pub fn report_start(&self, stage: &str) {
@@ -451,7 +456,7 @@ impl<'session> Session<'session> {
         Location::from(target)
     }
 
-    pub fn executable(
+    pub fn executable_path(
         base: &PathBuf,
         location: Location<'session>,
         custom: Option<Str<'session>>,
