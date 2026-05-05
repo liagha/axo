@@ -27,7 +27,8 @@ use {
         ir::{
             condcodes::{FloatCC, IntCC},
             types, AbiParam, Block, Function as IrFunction, InstBuilder, MemFlags, Signature,
-            StackSlot, StackSlotData, StackSlotKind, Type as IrType, UserFuncName, Value,
+            StackSlot, StackSlotData, StackSlotKind, TrapCode, Type as IrType, UserFuncName,
+            Value,
         },
         isa, settings,
     },
@@ -85,44 +86,8 @@ pub(crate) fn lower<'a, M: Module>(
     let pointer = module.target_config().pointer_type();
     let mut entities = Map::new();
     let mut errors = Vec::new();
-    let mut plan = analyses;
 
-    let mut body = Vec::new();
-    let mut keep = Vec::new();
-    for analysis in plan {
-        match &analysis.kind {
-            AnalysisKind::Structure(_)
-            | AnalysisKind::Union(_)
-            | AnalysisKind::Function(_)
-            | AnalysisKind::Module(_, _) => keep.push(analysis),
-            AnalysisKind::Binding(value) if value.kind == BindingKind::Static => {
-                keep.push(analysis)
-            }
-            _ => body.push(analysis),
-        }
-    }
-    if !body.is_empty() {
-        let output = body.last().map(|value| value.typing.clone());
-        let body_type = output.clone().unwrap_or_else(|| Type::from(TypeKind::Void));
-        let block = Analysis::new(AnalysisKind::Block(body), Span::void(), body_type);
-        let func = Function::new(
-            Str::from("main"),
-            Vec::new(),
-            Some(Box::new(block)),
-            output,
-            Interface::C,
-            true,
-            false,
-        );
-        keep.push(Analysis::new(
-            AnalysisKind::Function(func),
-            Span::void(),
-            Type::from(TypeKind::Unknown),
-        ));
-    }
-    plan = keep;
-
-    for analysis in &plan {
+    for analysis in &analyses {
         match &analysis.kind {
             AnalysisKind::Structure(value) => {
                 entities.insert(value.target, Entity::Structure);
@@ -152,7 +117,7 @@ pub(crate) fn lower<'a, M: Module>(
 
     let mut entry = None;
 
-    for analysis in plan {
+    for analysis in analyses {
         match analysis.kind {
             AnalysisKind::Function(value) => {
                 if value.entry {
@@ -598,6 +563,287 @@ impl<'a, 'b, M: Module> Lower<'a, 'b, M> {
         }
     }
 
+    fn trap_if(&mut self, cond: Value, code: TrapCode) {
+        self.builder.ins().trapnz(cond, code);
+    }
+
+    pub(super) fn expr(&mut self, analysis: Analysis<'b>) -> Result<Value, GenerateError<'b>> {
+        let span = analysis.span;
+        let typing = analysis.typing.clone();
+        match analysis.kind {
+            AnalysisKind::Integer { value, size, .. } => self.integer(value, size),
+            AnalysisKind::Float { value, size } => self.float(value, size, span),
+            AnalysisKind::Boolean { value } => self.boolean(value),
+            AnalysisKind::Character { value } => self.character(value),
+            AnalysisKind::String { value } => self.string(value, span),
+            AnalysisKind::Array(values) => self.array(&typing, values),
+            AnalysisKind::Tuple(values) => self.tuple(&typing, values),
+            AnalysisKind::Negate(value) => self.negate(*value, span),
+            AnalysisKind::SizeOf(value) => Ok(self
+                .builder
+                .ins()
+                .iconst(types::I64, layout(&value).size as i64)),
+            AnalysisKind::Add(left, right) => self.add(*left, *right, span),
+            AnalysisKind::Subtract(left, right) => self.subtract(*left, *right, span),
+            AnalysisKind::Multiply(left, right) => self.multiply(*left, *right, span),
+            AnalysisKind::Divide(left, right) => self.divide(*left, *right, span),
+            AnalysisKind::Modulus(left, right) => self.modulus(*left, *right, span),
+            AnalysisKind::LogicalAnd(left, right) => self.logical_and(*left, *right),
+            AnalysisKind::LogicalOr(left, right) => self.logical_or(*left, *right),
+            AnalysisKind::LogicalNot(value) => {
+                let value = self.expr(*value)?;
+                let value = self.truth(value);
+                let value = self.builder.ins().bnot(value);
+                Ok(self.cast_bool(value))
+            }
+            AnalysisKind::LogicalXOr(left, right) => {
+                let left = self.expr(*left)?;
+                let left = self.truth(left);
+                let right = self.expr(*right)?;
+                let right = self.truth(right);
+                let value = self.builder.ins().bxor(left, right);
+                Ok(self.cast_bool(value))
+            }
+            AnalysisKind::BitwiseAnd(left, right) => {
+                self.bitwise(*left, *right, span, |this, left, right| {
+                    this.builder.ins().band(left, right)
+                })
+            }
+            AnalysisKind::BitwiseOr(left, right) => {
+                self.bitwise(*left, *right, span, |this, left, right| {
+                    this.builder.ins().bor(left, right)
+                })
+            }
+            AnalysisKind::BitwiseNot(value) => {
+                let value = self.expr(*value)?;
+                let kind = self.builder.func.dfg.value_type(value);
+                if kind.is_float() {
+                    return Err(self.error(ErrorKind::Normalize, span));
+                }
+                Ok(self.builder.ins().bnot(value))
+            }
+            AnalysisKind::BitwiseXOr(left, right) => {
+                self.bitwise(*left, *right, span, |this, left, right| {
+                    this.builder.ins().bxor(left, right)
+                })
+            }
+            AnalysisKind::ShiftLeft(left, right) => {
+                let left_val = self.expr(*left)?;
+                let right_val = self.expr(*right)?;
+                let kind = self.builder.func.dfg.value_type(left_val);
+                if kind != self.builder.func.dfg.value_type(right_val) || kind.is_float() {
+                    return Err(self.error(ErrorKind::Normalize, span));
+                }
+                let limit = self.builder.ins().iconst(kind, kind.bits() as i64);
+                let cond = self
+                    .builder
+                    .ins()
+                    .icmp(IntCC::UnsignedGreaterThanOrEqual, right_val, limit);
+                self.trap_if(cond, TrapCode::user(1).unwrap());
+                Ok(self.builder.ins().ishl(left_val, right_val))
+            }
+            AnalysisKind::ShiftRight(left, right) => {
+                let sign = signed(&left.typing) && signed(&right.typing);
+                let left_val = self.expr(*left)?;
+                let right_val = self.expr(*right)?;
+                let kind = self.builder.func.dfg.value_type(left_val);
+                if kind != self.builder.func.dfg.value_type(right_val) || kind.is_float() {
+                    return Err(self.error(ErrorKind::Normalize, span));
+                }
+                let limit = self.builder.ins().iconst(kind, kind.bits() as i64);
+                let cond = self
+                    .builder
+                    .ins()
+                    .icmp(IntCC::UnsignedGreaterThanOrEqual, right_val, limit);
+                self.trap_if(cond, TrapCode::user(1).unwrap());
+                Ok(if sign {
+                    self.builder.ins().sshr(left_val, right_val)
+                } else {
+                    self.builder.ins().ushr(left_val, right_val)
+                })
+            }
+            AnalysisKind::AddressOf(value) => Ok(self.place(&value)?.0),
+            AnalysisKind::Dereference(value) => {
+                let addr = self.expr(*value)?;
+                if indirect(&typing) {
+                    Ok(addr)
+                } else {
+                    self.load(addr, &typing)
+                }
+            }
+            AnalysisKind::Equal(left, right) => self.compare(
+                *left,
+                *right,
+                span,
+                FloatCC::Equal,
+                IntCC::Equal,
+                IntCC::Equal,
+            ),
+            AnalysisKind::NotEqual(left, right) => self.compare(
+                *left,
+                *right,
+                span,
+                FloatCC::NotEqual,
+                IntCC::NotEqual,
+                IntCC::NotEqual,
+            ),
+            AnalysisKind::Less(left, right) => self.ordered(
+                *left,
+                *right,
+                span,
+                FloatCC::LessThan,
+                IntCC::SignedLessThan,
+                IntCC::UnsignedLessThan,
+            ),
+            AnalysisKind::LessOrEqual(left, right) => self.ordered(
+                *left,
+                *right,
+                span,
+                FloatCC::LessThanOrEqual,
+                IntCC::SignedLessThanOrEqual,
+                IntCC::UnsignedLessThanOrEqual,
+            ),
+            AnalysisKind::Greater(left, right) => self.ordered(
+                *left,
+                *right,
+                span,
+                FloatCC::GreaterThan,
+                IntCC::SignedGreaterThan,
+                IntCC::UnsignedGreaterThan,
+            ),
+            AnalysisKind::GreaterOrEqual(left, right) => self.ordered(
+                *left,
+                *right,
+                span,
+                FloatCC::GreaterThanOrEqual,
+                IntCC::SignedGreaterThanOrEqual,
+                IntCC::UnsignedGreaterThanOrEqual,
+            ),
+            AnalysisKind::Index(value) => {
+                let (addr, item) = self.index_place(&value, span)?;
+                if indirect(&item) {
+                    Ok(addr)
+                } else {
+                    self.load(addr, &item)
+                }
+            }
+            AnalysisKind::Usage(name) => self.read(name, span),
+            AnalysisKind::Symbol(target) => self.read(target.name, span),
+            AnalysisKind::Access(target, member) => {
+                let (addr, item) = self.place(&Analysis::new(
+                    AnalysisKind::Access(target, member),
+                    span,
+                    typing.clone(),
+                ))?;
+                if indirect(&item) {
+                    Ok(addr)
+                } else {
+                    self.load(addr, &item)
+                }
+            }
+            AnalysisKind::Slot(target, index) => {
+                let (addr, item) = self.slot_place(&target, index, span)?;
+                if indirect(&item) {
+                    Ok(addr)
+                } else {
+                    self.load(addr, &item)
+                }
+            }
+            AnalysisKind::Constructor(value) => self.constructor(&typing, value, span),
+            AnalysisKind::Pack(target, values) => self.pack(&typing, target, values, span),
+            AnalysisKind::Assign(name, value) => self.assign(name, *value, span),
+            AnalysisKind::Write(target, value) => self.write_target(target, *value, span),
+            AnalysisKind::Store(target, value) => self.store_target(*target, *value, span),
+            AnalysisKind::Binding(value) => self.bind(value, span),
+            AnalysisKind::Structure(_)
+            | AnalysisKind::Union(_)
+            | AnalysisKind::Composite(_)
+            | AnalysisKind::Module(_, _)
+            | AnalysisKind::Function(_) => Ok(self.builder.ins().iconst(types::I64, 0)),
+            AnalysisKind::Block(values) => self.block(values),
+            AnalysisKind::Conditional(condition, truth, fall) => {
+                self.conditional(*condition, *truth, fall.map(|item| *item), span)
+            }
+            AnalysisKind::While(condition, body) => self.loop_expr(typing, *condition, *body),
+            AnalysisKind::Invoke(_) => Err(self.error(
+                ErrorKind::Verification("unexpected invoke".to_string()),
+                span,
+            )),
+            AnalysisKind::Call(target, values) => self.call(target, values, &typing, span),
+            AnalysisKind::Return(value) => self.return_value(value.map(|item| *item), span),
+            AnalysisKind::Break(value) => self.break_value(value.map(|item| *item), span),
+            AnalysisKind::Continue(value) => self.continue_value(value.map(|item| *item), span),
+        }
+    }
+
+    fn load(&mut self, addr: Value, typing: &Type<'b>) -> Result<Value, GenerateError<'b>> {
+        let kind = scalar_type(typing, self.pointer)
+            .ok_or_else(|| self.error(ErrorKind::Normalize, Span::void()))?;
+        let value = self.builder.ins().load(kind, MemFlags::new(), addr, 0);
+        if matches!(resolved(typing).kind, TypeKind::Boolean) {
+            let zero = self.builder.ins().iconst(types::I8, 0);
+            let value = self.builder.ins().icmp(IntCC::NotEqual, value, zero);
+            Ok(self.cast_bool(value))
+        } else {
+            Ok(value)
+        }
+    }
+
+    fn store(&mut self, addr: Value, typing: &Type<'b>, value: Value) {
+        let value = match scalar_type(typing, self.pointer) {
+            Some(kind) if self.builder.func.dfg.value_type(value) != kind => {
+                self.extend(value, kind, signed(typing))
+            }
+            _ => value,
+        };
+        self.builder.ins().store(MemFlags::new(), value, addr, 0);
+    }
+
+    fn write(&mut self, addr: Value, typing: &Type<'b>, value: Value) {
+        if indirect(typing) {
+            self.copy(typing, value, addr);
+        } else {
+            self.store(addr, typing, value);
+        }
+    }
+
+    fn copy(&mut self, typing: &Type<'b>, src: Value, dst: Value) {
+        let size = layout(typing).size;
+        for offset in 0..size {
+            let value = self
+                .builder
+                .ins()
+                .load(types::I8, MemFlags::new(), src, offset as i32);
+            self.builder
+                .ins()
+                .store(MemFlags::new(), value, dst, offset as i32);
+        }
+    }
+
+    fn extend(&mut self, value: Value, kind: IrType, sign: bool) -> Value {
+        let from = self.builder.func.dfg.value_type(value);
+        if from == kind {
+            return value;
+        }
+        if from.is_int() && kind.is_int() {
+            if from.bits() > kind.bits() {
+                self.builder.ins().ireduce(kind, value)
+            } else if sign {
+                self.builder.ins().sextend(kind, value)
+            } else {
+                self.builder.ins().uextend(kind, value)
+            }
+        } else if from.is_float() && kind.is_float() {
+            if from.bits() > kind.bits() {
+                self.builder.ins().fdemote(kind, value)
+            } else {
+                self.builder.ins().fpromote(kind, value)
+            }
+        } else {
+            value
+        }
+    }
+
     fn place(&mut self, analysis: &Analysis<'b>) -> Result<(Value, Type<'b>), GenerateError<'b>> {
         match &analysis.kind {
             AnalysisKind::Symbol(target) => match self.entities.get(&target.name).cloned() {
@@ -719,263 +965,6 @@ impl<'a, 'b, M: Module> Lower<'a, 'b, M> {
                 Ok((self.expr(target.clone())?, (*inner.clone()).clone()))
             }
             _ => self.place(target),
-        }
-    }
-
-    fn expr(&mut self, analysis: Analysis<'b>) -> Result<Value, GenerateError<'b>> {
-        let span = analysis.span;
-        let typing = analysis.typing.clone();
-        match analysis.kind {
-            AnalysisKind::Integer { value, size, .. } => self.integer(value, size),
-            AnalysisKind::Float { value, size } => self.float(value, size, span),
-            AnalysisKind::Boolean { value } => self.boolean(value),
-            AnalysisKind::Character { value } => self.character(value),
-            AnalysisKind::String { value } => self.string(value, span),
-            AnalysisKind::Array(values) => self.array(&typing, values),
-            AnalysisKind::Tuple(values) => self.tuple(&typing, values),
-            AnalysisKind::Negate(value) => self.negate(*value, span),
-            AnalysisKind::SizeOf(value) => Ok(self
-                .builder
-                .ins()
-                .iconst(types::I64, layout(&value).size as i64)),
-            AnalysisKind::Add(left, right) => self.add(*left, *right, span),
-            AnalysisKind::Subtract(left, right) => self.subtract(*left, *right, span),
-            AnalysisKind::Multiply(left, right) => self.multiply(*left, *right, span),
-            AnalysisKind::Divide(left, right) => self.divide(*left, *right, span),
-            AnalysisKind::Modulus(left, right) => self.modulus(*left, *right, span),
-            AnalysisKind::LogicalAnd(left, right) => self.logical_and(*left, *right),
-            AnalysisKind::LogicalOr(left, right) => self.logical_or(*left, *right),
-            AnalysisKind::LogicalNot(value) => {
-                let value = self.expr(*value)?;
-                let value = self.truth(value);
-                let value = self.builder.ins().bnot(value);
-                Ok(self.cast_bool(value))
-            }
-            AnalysisKind::LogicalXOr(left, right) => {
-                let left = self.expr(*left)?;
-                let left = self.truth(left);
-                let right = self.expr(*right)?;
-                let right = self.truth(right);
-                let value = self.builder.ins().bxor(left, right);
-                Ok(self.cast_bool(value))
-            }
-            AnalysisKind::BitwiseAnd(left, right) => {
-                self.bitwise(*left, *right, span, |this, left, right| {
-                    this.builder.ins().band(left, right)
-                })
-            }
-            AnalysisKind::BitwiseOr(left, right) => {
-                self.bitwise(*left, *right, span, |this, left, right| {
-                    this.builder.ins().bor(left, right)
-                })
-            }
-            AnalysisKind::BitwiseNot(value) => {
-                let value = self.expr(*value)?;
-                let kind = self.builder.func.dfg.value_type(value);
-                if kind.is_float() {
-                    return Err(self.error(ErrorKind::Normalize, span));
-                }
-                Ok(self.builder.ins().bnot(value))
-            }
-            AnalysisKind::BitwiseXOr(left, right) => {
-                self.bitwise(*left, *right, span, |this, left, right| {
-                    this.builder.ins().bxor(left, right)
-                })
-            }
-            AnalysisKind::ShiftLeft(left, right) => {
-                self.bitwise(*left, *right, span, |this, left, right| {
-                    this.builder.ins().ishl(left, right)
-                })
-            }
-            AnalysisKind::ShiftRight(left, right) => {
-                let sign = signed(&left.typing) && signed(&right.typing);
-                self.bitwise(*left, *right, span, move |this, left, right| {
-                    if sign {
-                        this.builder.ins().sshr(left, right)
-                    } else {
-                        this.builder.ins().ushr(left, right)
-                    }
-                })
-            }
-            AnalysisKind::AddressOf(value) => Ok(self.place(&value)?.0),
-            AnalysisKind::Dereference(value) => {
-                let addr = self.expr(*value)?;
-                if indirect(&typing) {
-                    Ok(addr)
-                } else {
-                    self.load(addr, &typing)
-                }
-            }
-            AnalysisKind::Equal(left, right) => self.compare(
-                *left,
-                *right,
-                span,
-                FloatCC::Equal,
-                IntCC::Equal,
-                IntCC::Equal,
-            ),
-            AnalysisKind::NotEqual(left, right) => self.compare(
-                *left,
-                *right,
-                span,
-                FloatCC::NotEqual,
-                IntCC::NotEqual,
-                IntCC::NotEqual,
-            ),
-            AnalysisKind::Less(left, right) => self.ordered(
-                *left,
-                *right,
-                span,
-                FloatCC::LessThan,
-                IntCC::SignedLessThan,
-                IntCC::UnsignedLessThan,
-            ),
-            AnalysisKind::LessOrEqual(left, right) => self.ordered(
-                *left,
-                *right,
-                span,
-                FloatCC::LessThanOrEqual,
-                IntCC::SignedLessThanOrEqual,
-                IntCC::UnsignedLessThanOrEqual,
-            ),
-            AnalysisKind::Greater(left, right) => self.ordered(
-                *left,
-                *right,
-                span,
-                FloatCC::GreaterThan,
-                IntCC::SignedGreaterThan,
-                IntCC::UnsignedGreaterThan,
-            ),
-            AnalysisKind::GreaterOrEqual(left, right) => self.ordered(
-                *left,
-                *right,
-                span,
-                FloatCC::GreaterThanOrEqual,
-                IntCC::SignedGreaterThanOrEqual,
-                IntCC::UnsignedGreaterThanOrEqual,
-            ),
-            AnalysisKind::Index(value) => {
-                let (addr, item) = self.index_place(&value, span)?;
-                if indirect(&item) {
-                    Ok(addr)
-                } else {
-                    self.load(addr, &item)
-                }
-            }
-            AnalysisKind::Usage(name) => self.read(name, span),
-            AnalysisKind::Symbol(target) => self.read(target.name, span),
-            AnalysisKind::Access(target, member) => {
-                let (addr, item) = self.place(&Analysis::new(
-                    AnalysisKind::Access(target, member),
-                    span,
-                    typing.clone(),
-                ))?;
-                if indirect(&item) {
-                    Ok(addr)
-                } else {
-                    self.load(addr, &item)
-                }
-            }
-            AnalysisKind::Slot(target, index) => {
-                let (addr, item) = self.slot_place(&target, index, span)?;
-                if indirect(&item) {
-                    Ok(addr)
-                } else {
-                    self.load(addr, &item)
-                }
-            }
-            AnalysisKind::Constructor(value) => self.constructor(&typing, value, span),
-            AnalysisKind::Pack(target, values) => self.pack(&typing, target, values, span),
-            AnalysisKind::Assign(name, value) => self.assign(name, *value, span),
-            AnalysisKind::Write(target, value) => self.write_target(target, *value, span),
-            AnalysisKind::Store(target, value) => self.store_target(*target, *value, span),
-            AnalysisKind::Binding(value) => self.bind(value, span),
-            AnalysisKind::Structure(_)
-            | AnalysisKind::Union(_)
-            | AnalysisKind::Composite(_)
-            | AnalysisKind::Module(_, _)
-            | AnalysisKind::Function(_) => Ok(self.builder.ins().iconst(types::I64, 0)),
-            AnalysisKind::Block(values) => self.block(values),
-            AnalysisKind::Conditional(condition, truth, fall) => {
-                self.conditional(typing, *condition, *truth, fall.map(|item| *item), span)
-            }
-            AnalysisKind::While(condition, body) => self.loop_expr(typing, *condition, *body),
-            AnalysisKind::Invoke(_) => Err(self.error(
-                ErrorKind::Verification("unexpected invoke".to_string()),
-                span,
-            )),
-            AnalysisKind::Call(target, values) => self.call(target, values, &typing, span),
-            AnalysisKind::Return(value) => self.return_value(value.map(|item| *item), span),
-            AnalysisKind::Break(value) => self.break_value(value.map(|item| *item), span),
-            AnalysisKind::Continue(_) => self.continue_value(span),
-        }
-    }
-
-    fn load(&mut self, addr: Value, typing: &Type<'b>) -> Result<Value, GenerateError<'b>> {
-        let kind = scalar_type(typing, self.pointer)
-            .ok_or_else(|| self.error(ErrorKind::Normalize, Span::void()))?;
-        let value = self.builder.ins().load(kind, MemFlags::new(), addr, 0);
-        if matches!(resolved(typing).kind, TypeKind::Boolean) {
-            let zero = self.builder.ins().iconst(types::I8, 0);
-            let value = self.builder.ins().icmp(IntCC::NotEqual, value, zero);
-            Ok(self.cast_bool(value))
-        } else {
-            Ok(value)
-        }
-    }
-
-    fn store(&mut self, addr: Value, typing: &Type<'b>, value: Value) {
-        let value = match scalar_type(typing, self.pointer) {
-            Some(kind) if self.builder.func.dfg.value_type(value) != kind => {
-                self.extend(value, kind, signed(typing))
-            }
-            _ => value,
-        };
-        self.builder.ins().store(MemFlags::new(), value, addr, 0);
-    }
-
-    fn write(&mut self, addr: Value, typing: &Type<'b>, value: Value) {
-        if indirect(typing) {
-            self.copy(typing, value, addr);
-        } else {
-            self.store(addr, typing, value);
-        }
-    }
-
-    fn copy(&mut self, typing: &Type<'b>, src: Value, dst: Value) {
-        let size = layout(typing).size;
-        for offset in 0..size {
-            let value = self
-                .builder
-                .ins()
-                .load(types::I8, MemFlags::new(), src, offset as i32);
-            self.builder
-                .ins()
-                .store(MemFlags::new(), value, dst, offset as i32);
-        }
-    }
-
-    fn extend(&mut self, value: Value, kind: IrType, sign: bool) -> Value {
-        let from = self.builder.func.dfg.value_type(value);
-        if from == kind {
-            return value;
-        }
-        if from.is_int() && kind.is_int() {
-            if from.bits() > kind.bits() {
-                self.builder.ins().ireduce(kind, value)
-            } else if sign {
-                self.builder.ins().sextend(kind, value)
-            } else {
-                self.builder.ins().uextend(kind, value)
-            }
-        } else if from.is_float() && kind.is_float() {
-            if from.bits() > kind.bits() {
-                self.builder.ins().fdemote(kind, value)
-            } else {
-                self.builder.ins().fpromote(kind, value)
-            }
-        } else {
-            value
         }
     }
 }

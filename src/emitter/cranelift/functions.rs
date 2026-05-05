@@ -14,7 +14,6 @@ impl<'a, 'b, M: Module> Lower<'a, 'b, M> {
 
     pub(super) fn conditional(
         &mut self,
-        typing: Type<'b>,
         condition: Analysis<'b>,
         truth: Analysis<'b>,
         fall: Option<Analysis<'b>>,
@@ -27,44 +26,16 @@ impl<'a, 'b, M: Module> Lower<'a, 'b, M> {
         let join = self.builder.create_block();
         self.builder.ins().brif(check, pass, &[], fail, &[]);
 
-        let mut slot = None;
-        let mut var = None;
-
-        if indirect(&typing) {
-            slot = Some(self.stack(&typing));
-        } else if let Some(kind) = scalar_type(&typing, self.pointer) {
-            var = Some(self.builder.declare_var(kind));
-        }
-
         self.builder.switch_to_block(pass);
-        let left = self.expr(truth)?;
-        if let Some(slot) = slot {
-            let addr = self.addr(slot);
-            self.write(addr, &typing, left);
-        }
-        if let Some(var) = var {
-            self.builder.def_var(var, left);
-        }
+        let _ = self.expr(truth)?;
         if !self.done() {
             self.builder.ins().jump(join, &[]);
         }
         self.builder.seal_block(pass);
 
         self.builder.switch_to_block(fail);
-        let right = if let Some(fall) = fall {
-            self.expr(fall)?
-        } else if indirect(&typing) {
-            let slot = self.stack(&typing);
-            self.addr(slot)
-        } else {
-            self.zero(&typing)
-        };
-        if let Some(slot) = slot {
-            let addr = self.addr(slot);
-            self.write(addr, &typing, right);
-        }
-        if let Some(var) = var {
-            self.builder.def_var(var, right);
+        if let Some(fall) = fall {
+            let _ = self.expr(fall)?;
         }
         if !self.done() {
             self.builder.ins().jump(join, &[]);
@@ -73,14 +44,7 @@ impl<'a, 'b, M: Module> Lower<'a, 'b, M> {
 
         self.builder.switch_to_block(join);
         self.builder.seal_block(join);
-
-        if let Some(slot) = slot {
-            Ok(self.addr(slot))
-        } else if let Some(var) = var {
-            Ok(self.builder.use_var(var))
-        } else {
-            Ok(self.zero(&typing))
-        }
+        Ok(self.builder.ins().iconst(types::I64, 0))
     }
 
     pub(super) fn loop_expr(
@@ -219,13 +183,22 @@ impl<'a, 'b, M: Module> Lower<'a, 'b, M> {
         Ok(self.builder.ins().iconst(types::I64, 0))
     }
 
-    pub(super) fn continue_value(&mut self, span: Span) -> Result<Value, GenerateError<'b>> {
+    pub(super) fn continue_value(
+        &mut self,
+        value: Option<Analysis<'b>>,
+        span: Span,
+    ) -> Result<Value, GenerateError<'b>> {
         let looped = self.loops.last().copied().ok_or_else(|| {
             self.error(
                 ErrorKind::ControlFlow(ControlFlowError::ContinueOutsideLoop),
                 span,
             )
         })?;
+        if let (Some(value), Some(slot)) = (value, looped.slot) {
+            let value = self.expr(value)?;
+            let addr = self.addr(slot);
+            self.builder.ins().store(MemFlags::new(), value, addr, 0);
+        }
         if !self.done() {
             self.builder.ins().jump(looped.head, &[]);
         }

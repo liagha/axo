@@ -69,15 +69,44 @@ impl<'a, 'b, M: Module> Lower<'a, 'b, M> {
         span: Span,
     ) -> Result<Value, GenerateError<'b>> {
         let sign = signed(&left.typing) && signed(&right.typing);
-        self.numeric(left, right, span, move |this, left, right, float| {
-            if float {
-                this.builder.ins().fdiv(left, right)
-            } else if sign {
-                this.builder.ins().sdiv(left, right)
-            } else {
-                this.builder.ins().udiv(left, right)
-            }
-        })
+        let left_val = self.expr(left)?;
+        let right_val = self.expr(right)?;
+        let kind = self.builder.func.dfg.value_type(left_val);
+        if kind != self.builder.func.dfg.value_type(right_val) {
+            return Err(self.error(ErrorKind::Normalize, span));
+        }
+
+        if kind.is_float() {
+            return Ok(self.builder.ins().fdiv(left_val, right_val));
+        }
+
+        let zero = self.builder.ins().iconst(kind, 0);
+        let is_zero = self
+            .builder
+            .ins()
+            .icmp(IntCC::Equal, right_val, zero);
+        self.trap_if(is_zero, TrapCode::INTEGER_DIVISION_BY_ZERO);
+
+        if sign {
+            let minus_one = self.builder.ins().iconst(kind, -1);
+            let is_neg = self
+                .builder
+                .ins()
+                .icmp(IntCC::Equal, right_val, minus_one);
+            let bitwidth = kind.bits() as u8;
+            let min_shift = self.builder.ins().iconst(types::I8, (bitwidth - 1) as i64);
+            let one = self.builder.ins().iconst(kind, 1);
+            let min_val = self.builder.ins().ishl(one, min_shift);
+            let is_min = self
+                .builder
+                .ins()
+                .icmp(IntCC::Equal, left_val, min_val);
+            let overflow = self.builder.ins().band(is_neg, is_min);
+            self.trap_if(overflow, TrapCode::INTEGER_OVERFLOW);
+            Ok(self.builder.ins().sdiv(left_val, right_val))
+        } else {
+            Ok(self.builder.ins().udiv(left_val, right_val))
+        }
     }
 
     pub(super) fn modulus(
@@ -87,17 +116,40 @@ impl<'a, 'b, M: Module> Lower<'a, 'b, M> {
         span: Span,
     ) -> Result<Value, GenerateError<'b>> {
         let sign = signed(&left.typing) && signed(&right.typing);
-        let left = self.expr(left)?;
-        let right = self.expr(right)?;
-        let kind = self.builder.func.dfg.value_type(left);
-        if kind != self.builder.func.dfg.value_type(right) || kind.is_float() {
+        let left_val = self.expr(left)?;
+        let right_val = self.expr(right)?;
+        let kind = self.builder.func.dfg.value_type(left_val);
+        if kind != self.builder.func.dfg.value_type(right_val) || kind.is_float() {
             return Err(self.error(ErrorKind::Normalize, span));
         }
-        Ok(if sign {
-            self.builder.ins().srem(left, right)
+
+        let zero = self.builder.ins().iconst(kind, 0);
+        let is_zero = self
+            .builder
+            .ins()
+            .icmp(IntCC::Equal, right_val, zero);
+        self.trap_if(is_zero, TrapCode::INTEGER_DIVISION_BY_ZERO);
+
+        if sign {
+            let minus_one = self.builder.ins().iconst(kind, -1);
+            let is_neg = self
+                .builder
+                .ins()
+                .icmp(IntCC::Equal, right_val, minus_one);
+            let bitwidth = kind.bits() as u8;
+            let min_shift = self.builder.ins().iconst(types::I8, (bitwidth - 1) as i64);
+            let one = self.builder.ins().iconst(kind, 1);
+            let min_val = self.builder.ins().ishl(one, min_shift);
+            let is_min = self
+                .builder
+                .ins()
+                .icmp(IntCC::Equal, left_val, min_val);
+            let overflow = self.builder.ins().band(is_neg, is_min);
+            self.trap_if(overflow, TrapCode::INTEGER_OVERFLOW);
+            Ok(self.builder.ins().srem(left_val, right_val))
         } else {
-            self.builder.ins().urem(left, right)
-        })
+            Ok(self.builder.ins().urem(left_val, right_val))
+        }
     }
 
     pub(super) fn numeric<F>(
