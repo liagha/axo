@@ -1,7 +1,7 @@
 use crate::{
     analyzer::Analyzer,
     data::{Identity, Str},
-    generator::{CraneliftEngine, CraneliftValue},
+    emitter::{CraneliftEngine, CraneliftValue},
     internal::{
         platform::{read_dir, set_current_dir, stdin, stdout, IsTerminal, Write},
         session::{ANALYZE_STAGE, PARSE_STAGE, RESOLVE_STAGE, SCAN_STAGE},

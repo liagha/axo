@@ -1,7 +1,7 @@
 use {
     crate::{
         analyzer::Analysis,
-        generator::{BuilderError, ErrorKind, GenerateError, Generator},
+        emitter::{BuilderError, ErrorKind, GenerateError, Generator},
         tracker::Span,
     },
     inkwell::values::{BasicValueEnum, IntValue},

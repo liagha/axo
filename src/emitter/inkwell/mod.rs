@@ -20,7 +20,7 @@ use {
     crate::{
         analyzer::{Analysis, AnalysisKind},
         data::{NonZeroU32, Str},
-        generator::GenerateError,
+        emitter::GenerateError,
         internal::hash::Map,
         resolver::{Type, TypeKind},
         tracker::Span,

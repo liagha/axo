@@ -3,7 +3,7 @@ use {
         analyzer::{Analysis, AnalysisKind, Target},
         data::Str,
         data::*,
-        generator::{
+        emitter::{
             inkwell::{error::VariableError, Entity},
             ErrorKind, GenerateError, Generator,
         },

@@ -1,7 +1,7 @@
 use {
     crate::{
         data::{Boolean, Char, Float, Integer, NonZeroU32, Scale, Str},
-        generator::{ErrorKind, GenerateError, Generator},
+        emitter::{ErrorKind, GenerateError, Generator},
         tracker::Span,
     },
     inkwell::values::BasicValueEnum,

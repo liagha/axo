@@ -57,8 +57,8 @@ pub mod foreign {
 }
 
 use crate::analyzer::AnalyzeError;
-#[cfg(feature = "generator")]
-use crate::generator::GenerateError;
+#[cfg(feature = "emitter")]
+use crate::emitter::GenerateError;
 use crate::initializer::InitializeError;
 use crate::parser::ParseError;
 use crate::resolver::ResolveError;
@@ -71,7 +71,7 @@ pub enum SessionError<'error> {
     Parse(ParseError<'error>),
     Resolve(ResolveError<'error>),
     Analyze(AnalyzeError<'error>),
-    #[cfg(feature = "generator")]
+    #[cfg(feature = "emitter")]
     Generate(GenerateError<'error>),
     Track(TrackError<'error>),
 }

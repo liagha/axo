@@ -67,7 +67,7 @@ fn generate_inkwell<'source>(
 
     let context = Context::create();
     let reference = unsafe { ContextRef::new(context.raw()) };
-    let mut generator = Generator::new(reference);
+    let mut emitter = Generator::new(reference);
 
     let triple = TargetMachine::get_default_triple();
     let base = session.base();
@@ -96,14 +96,14 @@ fn generate_inkwell<'source>(
 
         if let Some(Artifact::Analyses(analysis_ref)) = record.fetch(3) {
             let analysis = analysis_ref.clone();
-            let module = generator.context.create_module(stem.as_str().unwrap());
+            let module = emitter.context.create_module(stem.as_str().unwrap());
 
             module.set_triple(&triple);
 
-            generator.modules.insert(stem, module);
-            generator.current_module = stem;
+            emitter.modules.insert(stem, module);
+            emitter.current_module = stem;
 
-            generator.generate(analysis);
+            emitter.generate(analysis);
 
             if discard {
                 continue;
@@ -117,7 +117,7 @@ fn generate_inkwell<'source>(
                     match crate::internal::platform::File::create(&path) {
                         Ok(mut file) => {
                             use crate::internal::platform::Write;
-                            let string = generator.current_module().print_to_string().to_string();
+                            let string = emitter.current_module().print_to_string().to_string();
                             if let Err(error) = file.write_all(string.as_bytes()) {
                                 let kind = crate::tracker::ErrorKind::from_io(error, schema);
                                 let track = TrackError::new(kind, Span::void());
@@ -140,7 +140,7 @@ fn generate_inkwell<'source>(
     }
 
     session.errors.extend(
-        generator
+        emitter
             .errors
             .iter()
             .map(|error| SessionError::Generate(error.clone())),

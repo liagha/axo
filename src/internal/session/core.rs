@@ -400,7 +400,7 @@ impl<'session> Session<'session> {
                 SessionError::Resolve(error) => self.report_error(error),
                 SessionError::Analyze(error) => self.report_error(error),
                 SessionError::Track(error) => self.report_error(error),
-                #[cfg(feature = "generator")]
+                #[cfg(feature = "emitter")]
                 SessionError::Generate(error) => self.report_error(error),
             }
         }

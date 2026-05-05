@@ -1,4 +1,4 @@
-pub use crate::generator::{
+pub use crate::emitter::{
     AlignmentError, BuilderError, ControlFlowError, ErrorKind, FunctionError, OrderingError,
     VariableError,
 };

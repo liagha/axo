@@ -15,8 +15,8 @@ scanner = ["combinator"]
 parser = ["combinator", "scanner"]
 resolver = ["combinator", "scanner", "parser"]
 analyzer = ["combinator", "parser", "resolver"]
-generator = ["combinator", "analyzer", "resolver", "inkwell"]
-dialog = ["generator"]
+emitter = ["combinator", "analyzer", "resolver", "inkwell"]
+dialog = ["emitter"]
 
 [dependencies]
 broccli = { version = "0.0.22" }

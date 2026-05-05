@@ -2,7 +2,7 @@ use {
     crate::{
         analyzer::{Analysis, AnalysisKind},
         data::{BindingKind, Function, Identity, Interface, Str},
-        generator::{
+        emitter::{
             cranelift::{field_offset, field_type, layout, lower, resolved, Entity},
             ErrorKind, FunctionError, GenerateError,
         },

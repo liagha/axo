@@ -1,5 +1,3 @@
-// src/combinator/mod.rs
-
 use crate::data::{
     memory::Arc,
     sync::{AtomicUsize, Ordering},
@@ -122,4 +120,15 @@ pub struct Repetition<State> {
 pub struct Cycle<State> {
     pub state: Box<State>,
     pub keep: fn(&State) -> bool,
+}
+
+#[derive(Clone)]
+pub struct Memoize<C> {
+    pub inner: C,
+}
+
+impl<C> Memoize<C> {
+    pub fn new(inner: C) -> Self {
+        Self { inner }
+    }
 }

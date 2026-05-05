@@ -2,7 +2,7 @@ use {
     crate::{
         analyzer::{Analysis, AnalysisKind, Target},
         data::*,
-        generator::{
+        emitter::{
             inkwell::{
                 error::{ControlFlowError, FunctionError},
                 Entity,

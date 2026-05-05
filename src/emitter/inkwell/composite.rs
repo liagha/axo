@@ -2,7 +2,7 @@ use {
     crate::{
         analyzer::{Analysis, AnalysisKind, Target},
         data::{Aggregate, Index, Scale, Str},
-        generator::{
+        emitter::{
             inkwell::{Entity, GenerateError, Generator},
             BuilderError, DataStructureError, ErrorKind,
         },

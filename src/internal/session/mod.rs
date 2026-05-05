@@ -22,10 +22,10 @@ use crate::{
 };
 
 #[cfg(feature = "dialog")]
-use crate::{generator::CraneliftEngine, internal::SessionError};
+use crate::{emitter::CraneliftEngine, internal::SessionError};
 
-#[cfg(feature = "generator")]
-use crate::generator::{EmitCombinator, GenerateCombinator, RunCombinator};
+#[cfg(feature = "emitter")]
+use crate::emitter::{EmitCombinator, GenerateCombinator, RunCombinator};
 
 pub struct Prepare;
 pub struct Bootstrap;
@@ -641,7 +641,7 @@ impl<'session> Session<'session> {
         keys: Vec<Identity>,
         #[cfg(feature = "dialog")] engine: Option<Arc<Lock<CraneliftEngine<'session>>>>,
     ) -> Operation<'session, Arc<Lock<Session<'session>>>> {
-        #[cfg(feature = "generator")]
+        #[cfg(feature = "emitter")]
         let mut states = vec![
             Operation::new(Arc::new(Bootstrap)),
             Operation::new(Arc::new(Prepare)),
@@ -691,7 +691,7 @@ impl<'session> Session<'session> {
             ]),
         ];
 
-        #[cfg(not(feature = "generator"))]
+        #[cfg(not(feature = "emitter"))]
         let states = vec![
             Operation::new(Arc::new(Bootstrap)),
             Operation::new(Arc::new(Prepare)),
@@ -741,7 +741,7 @@ impl<'session> Session<'session> {
             ]),
         ];
 
-        #[cfg(feature = "generator")]
+        #[cfg(feature = "emitter")]
         {
             states.push(Operation::new(Arc::new(GenerateCombinator)));
             states.push(Operation::new(Arc::new(EmitCombinator)));

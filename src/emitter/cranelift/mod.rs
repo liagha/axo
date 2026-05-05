@@ -15,7 +15,7 @@ use {
     crate::{
         analyzer::{Analysis, AnalysisKind, Target},
         data::{Aggregate, Binding, BindingKind, Function, Index, Interface, Scale, Str},
-        generator::{
+        emitter::{
             ControlFlowError, DataStructureError, ErrorKind, FunctionError, GenerateError,
             VariableError,
         },

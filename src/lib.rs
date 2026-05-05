@@ -1,9 +1,7 @@
 #[cfg(feature = "combinator")]
 pub mod combinator;
-#[cfg(feature = "generator")]
+#[cfg(feature = "emitter")]
 pub mod emitter;
-#[cfg(feature = "generator")]
-pub use emitter as generator;
 #[cfg(feature = "analyzer")]
 pub mod analyzer;
 #[cfg(feature = "dialog")]
