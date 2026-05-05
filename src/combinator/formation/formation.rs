@@ -1,10 +1,7 @@
-// src/combinator/formation/formation.rs
-// Updated deferred to use Memoize<Deferred> for caching.
-
 use crate::{
     combinator::{
         next_identity, Alternative, Combinator, Deferred, Fail, Formable, Former, Ignore, Literal,
-        Memoize, Multiple, Optional, Outcome, Panic, Predicate, Recover, Repetition, Sequence, Skip,
+        Multiple, Optional, Outcome, Panic, Predicate, Recover, Repetition, Sequence, Skip,
         Transform,
     },
     data::{
@@ -302,7 +299,7 @@ where
 
     #[inline]
     pub fn deferred(factory: fn() -> Self) -> Self {
-        Self::new(Arc::new(Memoize::new(Deferred { factory })), 0, Default::default())
+        Self::new(Arc::new(Deferred { factory }), 0, Default::default())
     }
 
     #[inline]
