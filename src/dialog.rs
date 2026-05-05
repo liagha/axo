@@ -4,11 +4,10 @@ use crate::{
     emitter::{CraneliftEngine, CraneliftValue},
     internal::{
         platform::{read_dir, set_current_dir, stdin, stdout, IsTerminal, Write},
-        session::{ANALYZE_STAGE, PARSE_STAGE, RESOLVE_STAGE, SCAN_STAGE},
         time::Instant,
         Record, RecordKind, Session,
     },
-    parser::{Parser, Symbol},
+    parser::Symbol,
     resolver::Resolver,
     scanner::Scanner,
     tracker::Location,
@@ -17,6 +16,7 @@ use crossterm::{
     event::{read, Event, KeyCode, KeyEvent, KeyModifiers},
     terminal::{disable_raw_mode, enable_raw_mode},
 };
+use crate::parser::Parser;
 
 pub struct Dialog {
     pub history: Vec<String>,
@@ -66,18 +66,18 @@ impl Dialog {
 
         loop {
             if let Ok(Event::Key(KeyEvent {
-                code, modifiers, ..
-            })) = read()
+                                     code, modifiers, ..
+                                 })) = read()
             {
                 match code {
                     KeyCode::Enter => break,
                     KeyCode::Char('c') | KeyCode::Char('d')
-                        if modifiers.contains(KeyModifiers::CONTROL) =>
-                    {
-                        let _ = disable_raw_mode();
-                        println!();
-                        return None;
-                    }
+                    if modifiers.contains(KeyModifiers::CONTROL) =>
+                        {
+                            let _ = disable_raw_mode();
+                            println!();
+                            return None;
+                        }
                     KeyCode::Char('l') if modifiers.contains(KeyModifiers::CONTROL) => {
                         print!("\x1B[2J\x1B[1;1H");
                         render(&buffer, cursor);
@@ -164,11 +164,7 @@ impl Dialog {
         Some(buffer.into_iter().collect())
     }
 
-    pub fn refresh<'a>(
-        session: &mut Session<'a>,
-        core: Option<&mut CraneliftEngine<'a>>,
-        keys: &[Identity],
-    ) {
+    pub fn refresh(session: &mut Session, keys: &[Identity]) {
         session.errors.clear();
         session.bootstrap();
         if !session.prepare() {
@@ -176,99 +172,25 @@ impl Dialog {
             return;
         }
 
-        loop {
-            let mut changed = false;
-
-            for key in session.source_keys(keys) {
-                let signature = session.scan_signature(key);
-                if session.stage_value(SCAN_STAGE, key) != signature
-                    || session.records.get(&key).unwrap().fetch(1).is_none()
-                {
-                    let before = session
-                        .records
-                        .get(&key)
-                        .map(|record| record.artifact_version(1))
-                        .unwrap_or(0);
-                    Scanner::execute(session, &[key]);
-                    let after = session
-                        .records
-                        .get(&key)
-                        .map(|record| record.artifact_version(1))
-                        .unwrap_or(0);
-                    session.set_stage(SCAN_STAGE, key, signature);
-                    changed |= before != after;
-                }
-            }
-
-            for key in session.source_keys(keys) {
-                let signature = session.parse_signature(key);
-                if session.stage_value(PARSE_STAGE, key) != signature
-                    || session.records.get(&key).unwrap().fetch(2).is_none()
-                {
-                    let before = session
-                        .records
-                        .get(&key)
-                        .map(|record| record.artifact_version(2))
-                        .unwrap_or(0);
-                    Parser::execute(session, &[key]);
-                    let after = session
-                        .records
-                        .get(&key)
-                        .map(|record| record.artifact_version(2))
-                        .unwrap_or(0);
-                    session.set_stage(PARSE_STAGE, key, signature);
-                    changed |= before != after;
-                }
-            }
-
-            let targets = session.all_source_keys();
-            let resolve = session.resolve_signature(&targets);
-            if session.stage_value(RESOLVE_STAGE, 0) != resolve {
-                let before = session.resolver.registry.len();
-                Resolver::execute(session, &targets);
-                let after = session.resolver.registry.len();
-                session.set_stage(RESOLVE_STAGE, 0, resolve);
-                changed |= before != after;
-            }
-
-            let analyze = session.analyze_signature(&targets);
-            if session.stage_value(ANALYZE_STAGE, 0) != analyze
-                || targets
-                    .iter()
-                    .any(|key| session.records.get(key).unwrap().fetch(3).is_none())
-            {
-                let before = targets
-                    .iter()
-                    .map(|key| {
-                        session
-                            .records
-                            .get(key)
-                            .map(|record| record.artifact_version(3))
-                            .unwrap_or(0)
-                    })
-                    .sum::<usize>();
-                Analyzer::execute(session, &targets);
-                let after = targets
-                    .iter()
-                    .map(|key| {
-                        session
-                            .records
-                            .get(key)
-                            .map(|record| record.artifact_version(3))
-                            .unwrap_or(0)
-                    })
-                    .sum::<usize>();
-                session.set_stage(ANALYZE_STAGE, 0, analyze);
-                changed |= before != after;
-            }
-
-            let _ = core;
-
-            if !changed || !session.errors.is_empty() {
-                break;
-            }
+        Scanner::execute(session, keys);
+        if !session.errors.is_empty() {
+            session.report_all();
+            return;
         }
 
+        Parser::execute(session, keys);
+        if !session.errors.is_empty() {
+            session.report_all();
+            return;
+        }
+
+        Resolver::execute(session, keys);
+        if !session.errors.is_empty() {
+            session.report_all();
+            return;
+        }
+
+        Analyzer::execute(session, keys);
         session.report_tokens(keys);
         session.report_elements(keys);
         session.report_analyses(keys);
@@ -286,7 +208,7 @@ impl Dialog {
             .collect();
         keys.sort();
 
-        Self::refresh(&mut session, None, &keys);
+        Self::refresh(&mut session, &keys);
 
         let mut terminal = Self::new();
         let mut timing = false;
@@ -390,7 +312,7 @@ impl Dialog {
             record.set_content(Str::from(content));
             session.records.insert(identity, record);
 
-            Self::refresh(&mut session, None, &[identity]);
+            Self::refresh(&mut session, &[identity]);
 
             if session.errors.is_empty() {
                 let start = Instant::now();

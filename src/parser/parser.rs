@@ -123,7 +123,7 @@ impl<'a: 'source, 'source> Parser<'a> {
                             | TokenKind::Comment(_)
                     )
                 })
-                .with_ignore(),
+                    .with_ignore(),
                 Formation::predicate(|token: &Token| {
                     !matches!(
                         token.kind,
@@ -211,6 +211,6 @@ impl<'a: 'source, 'source> Parser<'a> {
             .extend(parser.errors.into_iter().map(SessionError::Parse));
 
         let record = session.records.get_mut(&key).unwrap();
-        record.store(2, Artifact::Elements(parser.output));
+        record.artifacts.insert(2, Artifact::Elements(parser.output));
     }
 }

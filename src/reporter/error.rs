@@ -48,31 +48,42 @@ where
         let Some(content) = record.content.as_ref() else {
             return (message, Str::from(""));
         };
-        let Some(rows) = record.rows.as_ref() else {
-            return (message, Str::from(""));
-        };
 
         let mut details = String::new();
-        let start = self.span.start.min(content.len() as u32) as usize;
-        let end = self.span.end.min(content.len() as u32) as usize;
-        let (start_line, start_column, _, _) = locate(content, rows, start);
-        let (end_line, end_column, _, _) = locate(content, rows, end);
-        let surround = 3usize;
-        let first = start_line.saturating_sub(surround).max(1);
-        let last = (end_line + surround).min(rows.len());
-        let max = (rows.len().digit_count() + 2) as usize;
+        let start_offset = self.span.start.min(content.len() as u32) as usize;
+        let end_offset = self.span.end.min(content.len() as u32) as usize;
+
+        let start_lc = record.offset_to_line_column(start_offset as u32);
+        let end_lc = record.offset_to_line_column(end_offset as u32);
+
+        let (start_line, start_column) = start_lc.unwrap_or((0, 0));
+        let (end_line, end_column) = end_lc.unwrap_or((0, 0));
 
         details.push_str(
-            &format!(" --> {}:{}:{}\n", record.location, start_line, start_column)
+            &format!(" --> {}:{}:{}\n", record.location, start_line + 1, start_column + 1)
                 .colorize(Color::Blue),
         );
 
-        for number in first..=last {
-            let line = line_text(content, rows, number);
-            let label = format!("{: ^max$}", number).colorize(Color::Blue);
-            details.push_str(&format!("{}|  {}\n", label, line));
+        let surround = 3;
+        let first = start_line.saturating_sub(surround);
+        let total_lines = content.bytes().filter(|b| **b == b'\n').count();
+        let last = (end_line + surround).min(total_lines);
 
-            let mark = highlight(line, number, start_line, start_column, end_line, end_column);
+        let max = ((total_lines + 1).digit_count() + 2) as usize;
+
+        for line_num in first..=last {
+            let line_text = get_line(content, line_num);
+            let label = format!("{: >max$}", line_num + 1).colorize(Color::Blue);
+            details.push_str(&format!("{}|  {}\n", label, line_text));
+
+            let mark = highlight(
+                line_text,
+                line_num,
+                start_line,
+                start_column,
+                end_line,
+                end_column,
+            );
             if !mark.is_empty() {
                 details.push_str(&format!(
                     "{}|  {}\n",
@@ -86,39 +97,38 @@ where
     }
 }
 
-fn locate(content: &str, rows: &[u32], offset: usize) -> (usize, usize, usize, usize) {
-    let line = rows
-        .partition_point(|value| *value as usize <= offset)
-        .saturating_sub(1);
-    let start = rows[line] as usize;
-    let end = if line + 1 < rows.len() {
-        rows[line + 1] as usize - 1
-    } else {
-        content.len()
-    };
-    let slice = &content[start..offset.min(end)];
-    (line + 1, slice.chars().count() + 1, start, end)
-}
-
-fn line_text<'a>(content: &'a str, rows: &[u32], number: usize) -> &'a str {
-    let start = rows[number - 1] as usize;
-    let end = if number < rows.len() {
-        rows[number] as usize - 1
-    } else {
-        content.len()
-    };
+fn get_line(content: &str, line_num: usize) -> &str {
+    let mut current_line = 0;
+    let mut start = 0;
+    for (i, byte) in content.bytes().enumerate() {
+        if current_line == line_num {
+            start = i;
+            break;
+        }
+        if byte == b'\n' {
+            current_line += 1;
+            if current_line == line_num {
+                start = i + 1;
+                break;
+            }
+        }
+    }
+    let end = content[start..]
+        .find('\n')
+        .map(|pos| start + pos)
+        .unwrap_or(content.len());
     &content[start..end]
 }
 
 fn highlight(
     line: &str,
-    number: usize,
+    line_num: usize,
     start_line: usize,
     start_column: usize,
     end_line: usize,
     end_column: usize,
 ) -> String {
-    if number < start_line || number > end_line {
+    if line_num < start_line || line_num > end_line {
         return String::new();
     }
 
@@ -128,21 +138,21 @@ fn highlight(
         let count = (end_column.saturating_sub(start_column)).max(1);
         return format!(
             "{}{}",
-            " ".repeat(start_column.saturating_sub(1)),
+            " ".repeat(start_column.saturating_sub(0)),
             "^".repeat(count)
         );
     }
 
-    if number == start_line {
+    if line_num == start_line {
         return format!(
             "{}{}",
-            " ".repeat(start_column.saturating_sub(1)),
-            "^".repeat(width.saturating_sub(start_column.saturating_sub(1)).max(1))
+            " ".repeat(start_column.saturating_sub(0)),
+            "^".repeat(width.saturating_sub(start_column.saturating_sub(0)).max(1))
         );
     }
 
-    if number == end_line {
-        return "^".repeat(end_column.saturating_sub(1).max(1));
+    if line_num == end_line {
+        return "^".repeat(end_column.saturating_sub(0).max(1));
     }
 
     "^".repeat(width)

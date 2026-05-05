@@ -227,7 +227,7 @@ impl<'a> Resolver<'a> {
             ElementKind::literal(Token::new(TokenKind::identifier(name), span)),
             span,
         )
-        .into();
+            .into();
 
         let mut symbol = Symbol::new(SymbolKind::module(Module::new(head)), span);
         symbol.identity = identity;
@@ -249,16 +249,16 @@ impl<'a> Resolver<'a> {
                         .find_map(|(&target, symbol)| {
                             (matches!(symbol.kind, SymbolKind::Module(_))
                                 && symbol.target() == Some(name.clone()))
-                            .then_some(target)
+                                .then_some(target)
                         })
                 {
-                    record.store(0, Artifact::Module(target));
+                    record.artifacts.insert(0, Artifact::Module(target));
                     return None;
                 }
 
                 let span = record.span(identity);
                 let symbol = Self::module_symbol(identity, name, span);
-                record.store(0, Artifact::Module(identity));
+                record.artifacts.insert(0, Artifact::Module(identity));
                 Some(symbol)
             })
             .collect::<Vec<_>>();

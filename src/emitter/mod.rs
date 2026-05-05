@@ -33,11 +33,11 @@ fn use_cranelift<'source>(session: &Session<'source>) -> bool {
 }
 
 impl<'source>
-    Combinator<
-        'static,
-        Operator<Arc<Lock<Session<'source>>>>,
-        Operation<'source, Arc<Lock<Session<'source>>>>,
-    > for GenerateCombinator
+Combinator<
+    'static,
+    Operator<Arc<Lock<Session<'source>>>>,
+    Operation<'source, Arc<Lock<Session<'source>>>>,
+> for GenerateCombinator
 {
     fn combinator(
         &self,
@@ -125,7 +125,7 @@ fn generate_inkwell<'source>(
                                 operation.set_reject();
                                 return;
                             }
-                            record.store(4, Artifact::Output(schema));
+                            session.records.get_mut(&key).unwrap().artifacts.insert(4, Artifact::Output(schema));
                         }
                         Err(error) => {
                             let kind = crate::tracker::ErrorKind::from_io(error, schema);
@@ -214,7 +214,7 @@ fn generate_cranelift<'source>(
                                         operation.set_reject();
                                         return;
                                     }
-                                    record.store(5, Artifact::Object(object));
+                                    session.records.get_mut(&key).unwrap().artifacts.insert(5, Artifact::Object(object));
                                 }
                                 Err(error) => {
                                     let kind = crate::tracker::ErrorKind::from_io(error, object);
@@ -245,11 +245,11 @@ fn generate_cranelift<'source>(
 pub struct EmitCombinator;
 
 impl<'source>
-    Combinator<
-        'static,
-        Operator<Arc<Lock<Session<'source>>>>,
-        Operation<'source, Arc<Lock<Session<'source>>>>,
-    > for EmitCombinator
+Combinator<
+    'static,
+    Operator<Arc<Lock<Session<'source>>>>,
+    Operation<'source, Arc<Lock<Session<'source>>>>,
+> for EmitCombinator
 {
     fn combinator(
         &self,
@@ -327,8 +327,8 @@ impl<'source>
                 let parent = object.to_path().unwrap().parent().unwrap().to_path_buf();
                 _ = create_dir_all(&parent);
 
-                record.store(5, Artifact::Object(object));
-
+                session.records.get_mut(&key).unwrap().artifacts.insert(5, Artifact::Object(object));
+                
                 let mut command = Command::new("clang");
                 if let Some(t) = &target {
                     command.arg("-target").arg(t);
@@ -421,11 +421,11 @@ impl<'source>
 pub struct RunCombinator;
 
 impl<'source>
-    Combinator<
-        'static,
-        Operator<Arc<Lock<Session<'source>>>>,
-        Operation<'source, Arc<Lock<Session<'source>>>>,
-    > for RunCombinator
+Combinator<
+    'static,
+    Operator<Arc<Lock<Session<'source>>>>,
+    Operation<'source, Arc<Lock<Session<'source>>>>,
+> for RunCombinator
 {
     fn combinator(
         &self,

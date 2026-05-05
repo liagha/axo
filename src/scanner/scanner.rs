@@ -143,6 +143,6 @@ impl<'scanner> Scanner<'scanner> {
         );
 
         let record = session.records.get_mut(&key).unwrap();
-        record.store(1, Artifact::Tokens(scanner.output));
+        record.artifacts.insert(1, Artifact::Tokens(scanner.output));
     }
 }

@@ -363,13 +363,11 @@ impl<'backend> Generator<'backend> {
             .build_conditional_branch(flag, pass, fail)
             .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
 
-        // --- THEN branch ---
         self.builder.position_at_end(pass);
         let left = self.analysis(truth)?;
         let left_end = self.builder.get_insert_block().unwrap_or(pass);
         let left_terminated = left_end.get_terminator().is_some();
 
-        // --- ELSE branch ---
         self.builder.position_at_end(fail);
         let right = if let Some(expression) = fall {
             self.analysis(expression)?
@@ -387,7 +385,6 @@ impl<'backend> Generator<'backend> {
         let right_end = self.builder.get_insert_block().unwrap_or(fail);
         let right_terminated = right_end.get_terminator().is_some();
 
-        // If we don't need the result (statement context), we must not create a merge block.
         if !needed {
             if !left_terminated || !right_terminated {
                 let continue_block = self.context.append_basic_block(parent, "continue");
@@ -422,7 +419,6 @@ impl<'backend> Generator<'backend> {
             return Ok(self.context.i64_type().const_zero().into());
         }
 
-        // --- Expression context: we need a phi node ---
         let merge = self.context.append_basic_block(parent, "merge");
 
         let mut edges: Vec<(&dyn BasicValue, BasicBlock)> = Vec::new();
@@ -444,7 +440,6 @@ impl<'backend> Generator<'backend> {
         self.builder.position_at_end(merge);
 
         if edges.is_empty() {
-            // Both branches terminated, no value to phi.
             self.builder
                 .build_unreachable()
                 .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;

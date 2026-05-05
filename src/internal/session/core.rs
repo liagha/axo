@@ -100,12 +100,6 @@ pub struct Record<'session> {
     pub kind: RecordKind,
     pub location: Location<'session>,
     pub content: Option<Str<'session>>,
-    pub rows: Option<Vec<Offset>>,
-    pub hash: u64,
-    pub dirty: bool,
-    pub version: usize,
-    pub source_version: usize,
-    pub artifacts_version: Map<u8, usize>,
     pub artifacts: Map<u8, Artifact<'session>>,
 }
 
@@ -115,27 +109,12 @@ impl<'session> Record<'session> {
             kind,
             location,
             content: None,
-            rows: None,
-            hash: 0,
-            dirty: true,
-            version: 0,
-            source_version: 0,
-            artifacts_version: Map::default(),
             artifacts: Map::default(),
         }
     }
 
     pub fn set_content(&mut self, content: Str<'session>) {
-        self.rows = Some(Self::rows(&content));
         self.content = Some(content);
-        self.source_version += 1;
-        self.version += 1;
-    }
-
-    pub fn store(&mut self, key: u8, artifact: Artifact<'session>) {
-        self.artifacts.insert(key, artifact);
-        *self.artifacts_version.entry(key).or_insert(0) += 1;
-        self.version += 1;
     }
 
     pub fn fetch(&self, key: u8) -> Option<&Artifact<'session>> {
@@ -143,31 +122,28 @@ impl<'session> Record<'session> {
     }
 
     pub fn fetch_mut(&mut self, key: u8) -> Option<&mut Artifact<'session>> {
-        self.version += 1;
         self.artifacts.get_mut(&key)
     }
 
-    pub fn artifact_version(&self, key: u8) -> usize {
-        self.artifacts_version.get(&key).copied().unwrap_or(0)
-    }
-
-    pub fn rows(content: &str) -> Vec<Offset> {
-        let mut rows = vec![0];
-
-        for (index, byte) in content.bytes().enumerate() {
-            if byte == b'\n' {
-                rows.push(index as Offset + 1);
+    pub fn offset_to_line_column(&self, offset: Offset) -> Option<(usize, usize)> {
+        let text = self.content.as_ref()?;
+        let mut line = 0;
+        let mut col = 0;
+        for (i, byte) in text.bytes().enumerate() {
+            if i == offset as usize {
+                return Some((line, col));
+            }
+            if *byte == b'\n' {
+                line += 1;
+                col = 0;
+            } else {
+                col += 1;
             }
         }
-
-        rows
-    }
-
-    pub fn sync_rows(&mut self) {
-        if self.rows.is_none() {
-            if let Some(content) = &self.content {
-                self.rows = Some(Self::rows(content));
-            }
+        if offset as usize == text.len() {
+            Some((line, col))
+        } else {
+            None
         }
     }
 
@@ -279,9 +255,9 @@ impl<'session> Session<'session> {
     pub fn get_stencil(&self) -> Option<Stencil> {
         match self.get_directive(Str::from("Verbosity")) {
             Some(Token {
-                kind: TokenKind::Integer(_),
-                ..
-            }) => Some(Stencil::default()),
+                     kind: TokenKind::Integer(_),
+                     ..
+                 }) => Some(Stencil::default()),
             _ => None,
         }
     }
@@ -301,13 +277,13 @@ impl<'session> Session<'session> {
     pub fn get_target(&self) -> Option<Str<'session>> {
         match self.get_directive(Str::from("Target")) {
             Some(Token {
-                kind: TokenKind::Identifier(value),
-                ..
-            }) => Some(*value),
+                     kind: TokenKind::Identifier(value),
+                     ..
+                 }) => Some(*value),
             Some(Token {
-                kind: TokenKind::String(value),
-                ..
-            }) => Some(*value),
+                     kind: TokenKind::String(value),
+                     ..
+                 }) => Some(*value),
             _ => None,
         }
     }
