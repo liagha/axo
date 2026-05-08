@@ -190,4 +190,71 @@ mod tests {
             Some(OperatorKind::At)
         ));
     }
+
+    #[test]
+    fn valid_corpus_has_no_scan_errors() {
+        let corpus = [
+            "let a = 1 + 2 * 3",
+            "let s = \"hello\\nworld\"",
+            "let c = '\\u0041'",
+            "func f(x): i32 { x + 1 }",
+            "struct A { let x: i32; let y: i32 }",
+            "union U { let i: i32; let f: f64 }",
+            "a(1,2)[0]{3,4}",
+            "// line\n/* block */ let b = 0",
+        ];
+
+        for source in corpus {
+            let scanner = scan(source);
+            assert!(
+                scanner.errors.is_empty(),
+                "scanner errors for corpus input: {}",
+                source
+            );
+            assert!(!scanner.output.is_empty());
+        }
+    }
+
+    #[test]
+    fn stress_large_input() {
+        let mut source = String::new();
+        for index in 0..3000 {
+            source.push_str("let v");
+            source.push_str(&index.to_string());
+            source.push_str(" = ");
+            source.push_str(&(index % 97).to_string());
+            source.push_str(" + ");
+            source.push_str(&((index + 3) % 89).to_string());
+            source.push('\n');
+        }
+
+        let scanner = scan(Box::leak(source.into_boxed_str()));
+        assert!(scanner.errors.is_empty());
+        assert!(!scanner.output.is_empty());
+    }
+
+    #[test]
+    fn generated_inputs_stay_stable() {
+        let alphabet = [
+            "a", "b", "1", "2", "+", "-", "*", "/", "(", ")", "{", "}", "[", "]", ",", ";",
+            "\"x\"", "'y'", "true", "false", " ",
+        ];
+
+        for seed in 0..120usize {
+            let mut value = seed as u64 + 17;
+            let mut source = String::new();
+
+            for _ in 0..80 {
+                value = value
+                    .wrapping_mul(6364136223846793005)
+                    .wrapping_add(1442695040888963407);
+                let index = (value as usize) % alphabet.len();
+                source.push_str(alphabet[index]);
+            }
+
+            let scanner = scan(Box::leak(source.into_boxed_str()));
+            assert!(scanner.errors.len() <= scanner.input.len());
+            assert!(scanner.output.len() + scanner.errors.len() > 0);
+        }
+    }
 }

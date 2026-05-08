@@ -271,4 +271,87 @@ mod tests {
         assert_eq!(parser.output.len(), 1);
         assert!(matches!(parser.output[0].kind, ElementKind::Binary(_)));
     }
+
+    #[test]
+    fn valid_corpus_has_no_parse_errors() {
+        let corpus = [
+            "1 + 2 * 3",
+            "let a = 1",
+            "let b: i32 = 2",
+            "struct A { let x: i32; let y: i32 }",
+            "union U { let i: i32; let f: f64 }",
+            "func add(x, y): i32 { x + y }",
+            "a(1, 2)[0]{3,4}",
+            "{ let x = 1; let y = x + 2; y }",
+        ];
+
+        for source in corpus {
+            let parser = parse_ok(source);
+            assert!(!parser.output.is_empty());
+        }
+    }
+
+    #[test]
+    fn invalid_corpus_has_parse_errors() {
+        let corpus = [
+            "(",
+            "[1,2",
+            "{1,2",
+            "func",
+            "func f(",
+            "struct",
+            "union",
+            "let",
+        ];
+
+        for source in corpus {
+            let parser = parse(source);
+            assert!(
+                !parser.errors.is_empty(),
+                "expected parse error for input: {}",
+                source
+            );
+        }
+    }
+
+    #[test]
+    fn long_expression_chain_parses() {
+        let mut source = String::from("1");
+        for index in 0..1500 {
+            source.push_str(" + ");
+            source.push_str(&(index % 9 + 1).to_string());
+        }
+
+        let parser = parse_ok(Box::leak(source.into_boxed_str()));
+        assert_eq!(parser.output.len(), 1);
+        assert!(matches!(parser.output[0].kind, ElementKind::Binary(_)));
+    }
+
+    #[test]
+    fn generated_expressions_parse() {
+        for seed in 0..200usize {
+            let mut value = seed as u64 + 5;
+            let mut source = String::new();
+            source.push('(');
+            source.push_str(&(seed % 9 + 1).to_string());
+
+            for _ in 0..40 {
+                value = value
+                    .wrapping_mul(2862933555777941757)
+                    .wrapping_add(3037000493);
+                let operator = match value % 4 {
+                    0 => " + ",
+                    1 => " - ",
+                    2 => " * ",
+                    _ => " / ",
+                };
+                source.push_str(operator);
+                source.push_str(&((value % 9 + 1) as usize).to_string());
+            }
+
+            source.push(')');
+            let parser = parse_ok(Box::leak(source.into_boxed_str()));
+            assert_eq!(parser.output.len(), 1);
+        }
+    }
 }

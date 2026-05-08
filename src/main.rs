@@ -1,4 +1,6 @@
-use axo::{dialog::Dialog, internal::Session};
+use axo::internal::Session;
+#[cfg(feature = "dialog")]
+use axo::dialog::Dialog;
 
 fn main() {
     let session = Session::new().compile();
