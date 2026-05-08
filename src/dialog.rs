@@ -14,7 +14,7 @@ use crate::{
     tracker::Location,
 };
 
-#[cfg(feature = "emitter")]
+#[cfg(feature = "interpreter")]
 use crate::emitter::{Engine, Value};
 
 use crossterm::{
@@ -210,10 +210,10 @@ impl Dialog {
 
         Self::refresh(&mut session, &keys);
 
-        #[cfg(feature = "emitter")]
+        #[cfg(feature = "interpreter")]
         let mut engine = Engine::new();
 
-        #[cfg(feature = "emitter")]
+        #[cfg(feature = "interpreter")]
         {
             let base_keys = session.all_source_keys();
             for key in &base_keys {
@@ -336,7 +336,7 @@ impl Dialog {
             if session.errors.is_empty() {
                 let start = Instant::now();
 
-                #[cfg(feature = "emitter")]
+                #[cfg(feature = "interpreter")]
                 match session.execute_line(&mut engine, identity) {
                     Ok(Some(result)) if !matches!(result, Value::Void) => {
                         println!("{:?}", result);

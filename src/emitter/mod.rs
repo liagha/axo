@@ -1,5 +1,7 @@
 mod error;
+#[cfg(feature = "llvm")]
 mod inkwell;
+#[cfg(feature = "interpreter")]
 mod interpreter;
 
 use {
@@ -18,8 +20,12 @@ use {
 
 pub use {
     error::*,
-    inkwell::{Context, ContextRef, Inkwell, TargetMachine},
     interpreter::{Engine, InterpretError, Value},
+};
+
+#[cfg(feature = "llvm")]
+pub use {
+    inkwell::{Context, ContextRef, Inkwell, TargetMachine},
 };
 
 pub static CRANELIFT: AtomicBool = AtomicBool::new(false);
@@ -32,6 +38,7 @@ fn use_cranelift(session: &Session) -> bool {
     CRANELIFT.load(Ordering::Relaxed) || session.get_directive(Str::from("Cranelift")).is_some()
 }
 
+#[cfg(feature = "llvm")]
 impl<'source>
     Combinator<
         'static,
@@ -61,6 +68,7 @@ impl<'source>
     }
 }
 
+#[cfg(feature = "llvm")]
 fn generate_inkwell<'source>(
     operator: &mut Operator<Arc<Lock<Session<'source>>>>,
     operation: &mut Operation<'source, Arc<Lock<Session<'source>>>>,

@@ -1,6 +1,6 @@
 #[cfg(feature = "combinator")]
 pub mod combinator;
-#[cfg(feature = "emitter")]
+#[cfg(any(feature = "llvm", feature = "interpreter"))]
 pub mod emitter;
 #[cfg(feature = "analyzer")]
 pub mod analyzer;

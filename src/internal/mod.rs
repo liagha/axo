@@ -57,7 +57,7 @@ pub mod foreign {
 }
 
 use crate::analyzer::AnalyzeError;
-#[cfg(feature = "emitter")]
+#[cfg(any(feature = "llvm", feature = "interpreter"))]
 use crate::emitter::GenerateError;
 use crate::initializer::InitializeError;
 use crate::parser::ParseError;
@@ -71,7 +71,7 @@ pub enum SessionError<'error> {
     Parse(ParseError<'error>),
     Resolve(ResolveError<'error>),
     Analyze(AnalyzeError<'error>),
-    #[cfg(feature = "emitter")]
+    #[cfg(any(feature = "llvm", feature = "interpreter"))]
     Generate(GenerateError<'error>),
     Track(TrackError<'error>),
 }

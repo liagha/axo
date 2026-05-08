@@ -381,7 +381,7 @@ impl<'session> Session<'session> {
                 SessionError::Resolve(error) => self.report_error(error),
                 SessionError::Analyze(error) => self.report_error(error),
                 SessionError::Track(error) => self.report_error(error),
-                #[cfg(feature = "emitter")]
+                #[cfg(any(feature = "llvm", feature = "interpreter"))]
                 SessionError::Generate(error) => self.report_error(error),
             }
         }

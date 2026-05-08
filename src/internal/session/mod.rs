@@ -25,8 +25,10 @@ use crate::{
     tracker::{TrackError, ErrorKind as TrackErrorKind},
 };
 
-#[cfg(feature = "emitter")]
-use crate::emitter::{EmitCombinator, Engine, GenerateCombinator, RunCombinator, Value};
+#[cfg(feature = "interpreter")]
+use crate::emitter::{Engine, Value};
+#[cfg(feature = "llvm")]
+use crate::emitter::{EmitCombinator, GenerateCombinator, RunCombinator};
 
 pub struct Initialize {
     pub flag: Str<'static>,
@@ -245,7 +247,7 @@ impl<'session> Session<'session> {
         self.errors.is_empty()
     }
 
-    #[cfg(feature = "emitter")]
+    #[cfg(feature = "interpreter")]
     pub fn execute_line(
         &self,
         engine: &mut Engine<'session>,
@@ -310,7 +312,7 @@ impl<'session> Session<'session> {
             Operation::new(Arc::new(Report)),
         ];
 
-        #[cfg(feature = "emitter")]
+        #[cfg(feature = "llvm")]
         let states = {
             let mut states = states;
             states.push(Operation::new(Arc::new(GenerateCombinator)));
