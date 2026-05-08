@@ -321,7 +321,7 @@ impl<'session> Session<'session> {
 
         Operation::plan(states)
     }
-    
+
     pub fn compile(self) -> Self {
         self.run(Self::pipeline())
     }
