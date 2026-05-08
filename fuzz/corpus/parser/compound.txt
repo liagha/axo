@@ -1,0 +1,2 @@
+struct Pair { let left: i32; let right: i32 }
+let value = Pair{1,2}.left

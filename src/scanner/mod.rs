@@ -257,4 +257,104 @@ mod tests {
             assert!(scanner.output.len() + scanner.errors.len() > 0);
         }
     }
+
+    #[test]
+    fn debug_failing_span() {
+        let source = "a\"\"";
+        let mut scanner = Scanner::new(Position::new(1), crate::data::Str::from(source));
+        scanner.scan();
+
+        let mut previous = 0;
+        for (i, token) in scanner.output.iter().enumerate() {
+            assert!(
+                token.span.start <= token.span.end,
+                "Token [{}] has invalid span: {:?}", i, token.span
+            );
+            assert!(
+                token.span.start >= previous,
+                "Token [{}] starts before previous token ends: {:?} (previous ended at {})",
+                i, token.span, previous
+            );
+            previous = token.span.end;
+        }
+
+        assert_eq!(scanner.output.len(), 2);
+        assert!(matches!(scanner.output[0].kind, TokenKind::Identifier(_)));
+        assert!(matches!(scanner.output[1].kind, TokenKind::String(_)));
+        assert!(scanner.output[0].span.start <= scanner.output[0].span.end);
+        assert!(scanner.output[1].span.start <= scanner.output[1].span.end);
+        assert!(scanner.output[0].span.end <= scanner.output[1].span.start);
+    }
+}
+
+#[cfg(test)]
+mod property {
+    use super::Scanner;
+    use crate::{
+        data::Str,
+        tracker::Position,
+    };
+    use proptest::prelude::*;
+
+    fn scan(source: &str) -> Scanner<'_> {
+        let mut scanner = Scanner::new(Position::new(1), Str(source.as_bytes()));
+        scanner.scan();
+        scanner
+    }
+
+    fn source_strategy() -> impl Strategy<Value = String> {
+        let alphabet = prop_oneof![
+            Just('a'),
+            Just('b'),
+            Just('x'),
+            Just('y'),
+            Just('0'),
+            Just('1'),
+            Just('2'),
+            Just('+'),
+            Just('-'),
+            Just('*'),
+            Just('/'),
+            Just('='),
+            Just('('),
+            Just(')'),
+            Just('['),
+            Just(']'),
+            Just('{'),
+            Just('}'),
+            Just(','),
+            Just(';'),
+            Just('"'),
+            Just('\''),
+            Just('\\'),
+            Just(' '),
+            Just('\n'),
+            Just('\t'),
+        ];
+
+        prop::collection::vec(alphabet, 0..400).prop_map(|chars| chars.into_iter().collect())
+    }
+
+    proptest! {
+        #![proptest_config(ProptestConfig::with_cases(256))]
+
+        #[test]
+        fn scan_never_panics(source in source_strategy()) {
+            let scanner = scan(&source);
+            prop_assert!(scanner.errors.len() <= scanner.input.len());
+            prop_assert!(scanner.output.len() + scanner.errors.len() > 0 || source.is_empty());
+        }
+
+        #[test]
+        fn token_spans_are_ordered(source in source_strategy()) {
+            let scanner = scan(&source);
+            let mut previous = 0;
+
+            for token in &scanner.output {
+                prop_assert!(token.span.start <= token.span.end);
+                prop_assert!(token.span.start >= previous);
+                previous = token.span.end;
+            }
+        }
+    }
 }

@@ -355,3 +355,76 @@ mod tests {
         }
     }
 }
+
+#[cfg(test)]
+mod property {
+    use super::Parser;
+    use crate::{
+        data::Str,
+        scanner::Scanner,
+        tracker::{Peekable, Position},
+    };
+    use proptest::prelude::*;
+
+    fn parse(source: &str) -> Parser<'_> {
+        let mut scanner = Scanner::new(Position::new(1), Str(source.as_bytes()));
+        scanner.scan();
+
+        let mut parser = Parser::new();
+        parser.set_input(scanner.output);
+        parser.parse();
+        parser
+    }
+
+    fn source_strategy() -> impl Strategy<Value = String> {
+        let alphabet = prop_oneof![
+            Just('a'),
+            Just('b'),
+            Just('x'),
+            Just('y'),
+            Just('0'),
+            Just('1'),
+            Just('2'),
+            Just('+'),
+            Just('-'),
+            Just('*'),
+            Just('/'),
+            Just('='),
+            Just(':'),
+            Just('('),
+            Just(')'),
+            Just('['),
+            Just(']'),
+            Just('{'),
+            Just('}'),
+            Just(','),
+            Just(';'),
+            Just('"'),
+            Just('\''),
+            Just('\\'),
+            Just(' '),
+            Just('\n'),
+            Just('\t'),
+        ];
+
+        prop::collection::vec(alphabet, 0..400).prop_map(|chars| chars.into_iter().collect())
+    }
+
+    proptest! {
+        #![proptest_config(ProptestConfig::with_cases(256))]
+
+        #[test]
+        fn parse_never_panics(source in source_strategy()) {
+            let parser = parse(&source);
+            prop_assert!(parser.errors.len() <= parser.input.len().max(1));
+        }
+
+        #[test]
+        fn element_spans_are_valid(source in source_strategy()) {
+            let parser = parse(&source);
+            for element in &parser.output {
+                prop_assert!(element.span.start <= element.span.end);
+            }
+        }
+    }
+}

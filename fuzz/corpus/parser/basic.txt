@@ -1,0 +1,1 @@
+func add(x, y): i32 { x + y }

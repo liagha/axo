@@ -1,0 +1,34 @@
+[package]
+name = "axo-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2021"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dev-dependencies]
+proptest = "1.11.0"
+
+[dependencies]
+libfuzzer-sys = "0.4"
+
+[dependencies.axo]
+path = ".."
+default-features = false
+features = ["scanner", "parser"]
+
+[[bin]]
+name = "scanner"
+path = "fuzz_targets/scanner.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "parser"
+path = "fuzz_targets/parser.rs"
+test = false
+doc = false
+
+[workspace]
+members = ["."]

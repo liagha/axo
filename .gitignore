@@ -12,3 +12,4 @@
 *.elf
 *.wasm
 *.dSYM/
+/fuzz/artifacts

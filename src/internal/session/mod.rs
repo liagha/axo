@@ -244,7 +244,7 @@ impl<'session> Session<'session> {
 
         self.errors.is_empty()
     }
-    
+
     #[cfg(feature = "emitter")]
     pub fn execute_line(
         &self,
@@ -300,7 +300,7 @@ impl<'session> Session<'session> {
     }
 
     pub fn pipeline() -> Operation<'session, Arc<Lock<Session<'session>>>> {
-        let mut states = vec![
+        let states = vec![
             Operation::new(Arc::new(Initialize { flag: Session::arguments() })),
             Operation::new(Arc::new(Prepare)),
             Operation::new(Arc::new(Scanner::default())),
@@ -311,15 +311,17 @@ impl<'session> Session<'session> {
         ];
 
         #[cfg(feature = "emitter")]
-        {
+        let states = {
+            let mut states = states;
             states.push(Operation::new(Arc::new(GenerateCombinator)));
             states.push(Operation::new(Arc::new(EmitCombinator)));
             states.push(Operation::new(Arc::new(RunCombinator)));
-        }
+            states
+        };
 
         Operation::plan(states)
     }
-
+    
     pub fn compile(self) -> Self {
         self.run(Self::pipeline())
     }
