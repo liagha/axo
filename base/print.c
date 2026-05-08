@@ -2,12 +2,12 @@
 #include <stdint.h>
 
 void print_integer(int64_t value) {
-    printf("%ld\n", value);
+    printf("%ld", value);
     fflush(stdout);
 }
 
 void print_float(double value) {
-    printf("%f\n", value);
+    printf("%f", value);
     fflush(stdout);
 }
 
@@ -21,7 +21,7 @@ void print_boolean(int value) {
 }
 
 void print_string(const char* string) {
-    printf("%s\n", string);
+    printf("%s", string);
     fflush(stdout);
 }
 
@@ -30,17 +30,12 @@ void print_character(char character) {
     fflush(stdout);
 }
 
-void print_newline() {
-    putchar('\n');
-    fflush(stdout);
-}
-
 void print_hexadecimal(int64_t value) {
-    printf("0x%lx\n", value);
+    printf("0x%lx", value);
     fflush(stdout);
 }
 
 void print_pointer(void* pointer) {
-    printf("%p\n", pointer);
+    printf("%p", pointer);
     fflush(stdout);
 }
