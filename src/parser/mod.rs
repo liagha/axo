@@ -57,8 +57,9 @@ impl<'source> Default for Parser<'source> {
 mod tests {
     use super::{ErrorKind, Parser};
     use crate::{
+        parser::ElementKind,
         data::Str,
-        scanner::{PunctuationKind, Scanner, TokenKind},
+        scanner::{OperatorKind, PunctuationKind, Scanner, TokenKind},
         tracker::{Peekable, Position},
     };
 
@@ -76,6 +77,17 @@ mod tests {
     fn kind<'a>(parser: &'a Parser<'static>) -> &'a ErrorKind<'static> {
         assert_eq!(parser.errors.len(), 1);
         &parser.errors[0].kind
+    }
+
+    fn parse_ok(source: &'static str) -> Parser<'static> {
+        let parser = parse(source);
+        assert!(
+            parser.errors.is_empty(),
+            "expected no parse error, got {}",
+            parser.errors.len()
+        );
+        assert!(!parser.output.is_empty());
+        parser
     }
 
     #[test]
@@ -192,5 +204,71 @@ mod tests {
                 | ErrorKind::ExpectedBody
                 | ErrorKind::UnexpectedToken(_)
         ));
+    }
+
+    #[test]
+    fn literal_ok() {
+        let parser = parse_ok("42");
+        assert_eq!(parser.output.len(), 1);
+        assert!(matches!(parser.output[0].kind, ElementKind::Literal(_)));
+    }
+
+    #[test]
+    fn binary_precedence() {
+        let parser = parse_ok("1+2*3");
+        let root = &parser.output[0];
+        let ElementKind::Binary(add) = &root.kind else {
+            panic!("expected binary root");
+        };
+        assert!(matches!(
+            add.operator.kind.try_unwrap_operator(),
+            Some(OperatorKind::Plus)
+        ));
+        let ElementKind::Binary(mul) = &add.right.kind else {
+            panic!("expected multiply on right branch");
+        };
+        assert!(matches!(
+            mul.operator.kind.try_unwrap_operator(),
+            Some(OperatorKind::Star)
+        ));
+    }
+
+    #[test]
+    fn suffix_chain() {
+        let parser = parse_ok("a(1)[0]{2}");
+        let root = &parser.output[0];
+        let ElementKind::Construct(construct) = &root.kind else {
+            panic!("expected construct");
+        };
+        assert!(matches!(construct.target.kind, ElementKind::Index(_)));
+        let ElementKind::Index(index) = &construct.target.kind else {
+            panic!("expected index");
+        };
+        assert!(matches!(index.target.kind, ElementKind::Invoke(_)));
+    }
+
+    #[test]
+    fn binding_ok() {
+        let parser = parse_ok("let value = 1");
+        assert!(matches!(parser.output[0].kind, ElementKind::Symbolize(_)));
+    }
+
+    #[test]
+    fn structure_ok() {
+        let parser = parse_ok("struct A { let x: i32 }");
+        assert!(matches!(parser.output[0].kind, ElementKind::Symbolize(_)));
+    }
+
+    #[test]
+    fn function_ok() {
+        let parser = parse_ok("func f(x): i32 { x }");
+        assert!(matches!(parser.output[0].kind, ElementKind::Symbolize(_)));
+    }
+
+    #[test]
+    fn ignores_comment_and_whitespace() {
+        let parser = parse_ok("1 // comment\n + 2");
+        assert_eq!(parser.output.len(), 1);
+        assert!(matches!(parser.output[0].kind, ElementKind::Binary(_)));
     }
 }
