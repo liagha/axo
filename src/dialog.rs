@@ -1,7 +1,8 @@
+// src/dialog.rs
+
 use crate::{
     analyzer::Analyzer,
     data::{Identity, Str},
-    emitter::{CraneliftEngine, CraneliftValue},
     internal::{
         platform::{read_dir, set_current_dir, stdin, stdout, IsTerminal, Write},
         time::Instant,
@@ -12,6 +13,10 @@ use crate::{
     scanner::Scanner,
     tracker::Location,
 };
+
+#[cfg(feature = "emitter")]
+use crate::emitter::{Engine, Value};
+
 use crossterm::{
     event::{read, Event, KeyCode, KeyEvent, KeyModifiers},
     terminal::{disable_raw_mode, enable_raw_mode},
@@ -196,8 +201,6 @@ impl Dialog {
     }
 
     pub fn start(mut session: Session) {
-        let mut core = CraneliftEngine::new();
-
         let mut keys: Vec<_> = session
             .records
             .iter()
@@ -207,12 +210,31 @@ impl Dialog {
 
         Self::refresh(&mut session, &keys);
 
+        #[cfg(feature = "emitter")]
+        let mut engine = Engine::new();
+
+        #[cfg(feature = "emitter")]
+        {
+            let base_keys = session.all_source_keys();
+            for key in &base_keys {
+                if let Some(analyses) = session.records.get(key).and_then(|r| {
+                    if let Some(crate::internal::Artifact::Analyses(a)) = r.fetch(3) {
+                        Some(a.clone())
+                    } else {
+                        None
+                    }
+                }) {
+                    let _ = engine.execute(analyses);
+                }
+            }
+        }
+
         let mut terminal = Self::new();
         let mut timing = false;
 
         let is_closed = |text: &str| -> bool {
-            let mut braces = 0;
-            let mut parens = 0;
+            let mut braces = 0i32;
+            let mut parens = 0i32;
             let mut string = false;
             let mut escape = false;
 
@@ -313,14 +335,19 @@ impl Dialog {
 
             if session.errors.is_empty() {
                 let start = Instant::now();
-                let outcome = core.execute_line(&session, identity);
-                let elapsed = start.elapsed();
 
-                if let Ok(Some(result)) = outcome {
-                    if !matches!(result, CraneliftValue::Empty) {
+                #[cfg(feature = "emitter")]
+                match session.execute_line(&mut engine, identity) {
+                    Ok(Some(result)) if !matches!(result, Value::Void) => {
                         println!("{:?}", result);
                     }
+                    Ok(_) => {}
+                    Err(error) => {
+                        session.report_error(&error);
+                    }
                 }
+
+                let elapsed = start.elapsed();
 
                 if timing {
                     println!("{:?}", elapsed);

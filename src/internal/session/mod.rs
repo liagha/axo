@@ -1,3 +1,5 @@
+// src/internal/session/mod.rs
+
 mod core;
 
 pub use core::*;
@@ -12,8 +14,9 @@ use crate::{
     identifier,
     initializer::Initializer,
     internal::{
-        platform::{Lock},
+        platform::Lock,
         time::{Duration, Instant},
+        SessionError,
     },
     literal, module,
     parser::Parser,
@@ -22,148 +25,110 @@ use crate::{
     tracker::{TrackError, ErrorKind as TrackErrorKind},
 };
 
-#[cfg(feature = "dialog")]
-use crate::{emitter::CraneliftEngine, internal::SessionError};
-
 #[cfg(feature = "emitter")]
-use crate::emitter::{EmitCombinator, GenerateCombinator, RunCombinator};
+use crate::emitter::{EmitCombinator, Engine, GenerateCombinator, RunCombinator, Value};
 
 pub struct Initialize {
     pub flag: Str<'static>,
 }
 
-#[cfg(feature = "dialog")]
-pub struct Interpret<'a> {
-    pub engine: Option<Arc<Lock<CraneliftEngine<'a>>>>,
-}
-
 impl<'source>
 Combinator<
-    'static,
-    Operator<Arc<Lock<Session<'source>>>>,
-    Operation<'source, Arc<Lock<Session<'source>>>>,
+'static,
+Operator<Arc<Lock<Session<'source>>>>,
+Operation<'source, Arc<Lock<Session<'source>>>>,
 > for Initialize
 {
-    fn combinator(
-        &self,
-        operator: &mut Operator<Arc<Lock<Session<'source>>>>,
-        operation: &mut Operation<'source, Arc<Lock<Session<'source>>>>,
-    ) {
-        let mut guard = operator.store.write().unwrap();
-        let session = &mut *guard;
+fn combinator(
+    &self,
+    operator: &mut Operator<Arc<Lock<Session<'source>>>>,
+    operation: &mut Operation<'source, Arc<Lock<Session<'source>>>>,
+) {
+    let mut guard = operator.store.write().unwrap();
+    let session = &mut *guard;
 
-        let mut initializer = Initializer::new(self.flag);
-        let targets = initializer.initialize();
+    let mut initializer = Initializer::new(self.flag);
+    let targets = initializer.initialize();
 
-        for (target, span) in targets {
-            let string = target.to_string();
-            if let Some(kind) = RecordKind::from_path(&string) {
-                let mut hasher = crate::internal::hash::DefaultHasher::new();
-                crate::internal::hash::Hash::hash(&string, &mut hasher);
-                let identity = (crate::internal::hash::Hasher::finish(&hasher) as Identity) | 0x40000000;
-                session.records.insert(identity, Record::new(kind, target));
-            } else {
-                session.errors.push(SessionError::Track(TrackError::new(
-                    TrackErrorKind::UnSupportedInput(target),
-                    span,
-                )));
-            }
-        }
-
-        let directive = module!(Module::new(literal!(identifier!("directive"))))
-            .with_members(initializer.output.clone());
-        for symbol in initializer.output {
-            session.resolver.registry.insert(symbol.identity, symbol);
-        }
-        session.resolver.insert(directive);
-
-        for error in initializer.errors {
-            session.errors.push(SessionError::Initialize(error));
-        }
-
-        if session.errors.is_empty() {
-            operation.set_resolve(Vec::new());
+    for (target, span) in targets {
+        let string = target.to_string();
+        if let Some(kind) = RecordKind::from_path(&string) {
+            let mut hasher = crate::internal::hash::DefaultHasher::new();
+            crate::internal::hash::Hash::hash(&string, &mut hasher);
+            let identity = (crate::internal::hash::Hasher::finish(&hasher) as Identity) | 0x40000000;
+            session.records.insert(identity, Record::new(kind, target));
         } else {
-            operation.set_reject();
+            session.errors.push(SessionError::Track(TrackError::new(
+                TrackErrorKind::UnSupportedInput(target),
+                span,
+            )));
         }
     }
+
+    let directive = module!(Module::new(literal!(identifier!("directive"))))
+        .with_members(initializer.output.clone());
+    for symbol in initializer.output {
+        session.resolver.registry.insert(symbol.identity, symbol);
+    }
+    session.resolver.insert(directive);
+
+    for error in initializer.errors {
+        session.errors.push(SessionError::Initialize(error));
+    }
+
+    if session.errors.is_empty() {
+        operation.set_resolve(Vec::new());
+    } else {
+        operation.set_reject();
+    }
+}
 }
 
 pub struct Prepare;
 
 impl<'source>
 Combinator<
-    'static,
-    Operator<Arc<Lock<Session<'source>>>>,
-    Operation<'source, Arc<Lock<Session<'source>>>>,
+'static,
+Operator<Arc<Lock<Session<'source>>>>,
+Operation<'source, Arc<Lock<Session<'source>>>>,
 > for Prepare
 {
-    fn combinator(
-        &self,
-        operator: &mut Operator<Arc<Lock<Session<'source>>>>,
-        operation: &mut Operation<'source, Arc<Lock<Session<'source>>>>,
-    ) {
-        let mut guard = operator.store.write().unwrap();
-        let session = &mut *guard;
-        if session.prepare() {
-            operation.set_resolve(Vec::new());
-        } else {
-            operation.set_reject();
-        }
+fn combinator(
+    &self,
+    operator: &mut Operator<Arc<Lock<Session<'source>>>>,
+    operation: &mut Operation<'source, Arc<Lock<Session<'source>>>>,
+) {
+    let mut guard = operator.store.write().unwrap();
+    let session = &mut *guard;
+    if session.prepare() {
+        operation.set_resolve(Vec::new());
+    } else {
+        operation.set_reject();
     }
+}
 }
 
 pub struct Report;
 
 impl<'source>
 Combinator<
-    'static,
-    Operator<Arc<Lock<Session<'source>>>>,
-    Operation<'source, Arc<Lock<Session<'source>>>>,
+'static,
+Operator<Arc<Lock<Session<'source>>>>,
+Operation<'source, Arc<Lock<Session<'source>>>>,
 > for Report
 {
-    fn combinator(
-        &self,
-        operator: &mut Operator<Arc<Lock<Session<'source>>>>,
-        operation: &mut Operation<'source, Arc<Lock<Session<'source>>>>,
-    ) {
-        let session = operator.store.read().unwrap();
-        let keys = session.all_source_keys();
-        session.report_tokens(&keys);
-        session.report_elements(&keys);
-        session.report_analyses(&keys);
-        operation.set_resolve(Vec::new());
-    }
+fn combinator(
+    &self,
+    operator: &mut Operator<Arc<Lock<Session<'source>>>>,
+    operation: &mut Operation<'source, Arc<Lock<Session<'source>>>>,
+) {
+    let session = operator.store.read().unwrap();
+    let keys = session.all_source_keys();
+    session.report_tokens(&keys);
+    session.report_elements(&keys);
+    session.report_analyses(&keys);
+    operation.set_resolve(Vec::new());
 }
-
-#[cfg(feature = "dialog")]
-impl<'source>
-Combinator<
-    'static,
-    Operator<Arc<Lock<Session<'source>>>>,
-    Operation<'source, Arc<Lock<Session<'source>>>>,
-> for Interpret<'_>
-{
-    fn combinator(
-        &self,
-        operator: &mut Operator<Arc<Lock<Session<'source>>>>,
-        operation: &mut Operation<'source, Arc<Lock<Session<'source>>>>,
-    ) {
-        let mut session = operator.store.write().unwrap();
-        if let Some(engine) = &self.engine {
-            let mut core = engine.write().unwrap();
-            core.reset();
-            let keys = session.all_source_keys();
-            if let Err(error) = core.process(&session, &keys) {
-                session.errors.push(SessionError::Generate(error));
-            }
-        }
-        if session.errors.is_empty() {
-            operation.set_resolve(Vec::new());
-        } else {
-            operation.set_reject();
-        }
-    }
 }
 
 impl<'session> Session<'session> {
@@ -279,6 +244,25 @@ impl<'session> Session<'session> {
 
         self.errors.is_empty()
     }
+    
+    #[cfg(feature = "emitter")]
+    pub fn execute_line(
+        &self,
+        engine: &mut Engine<'session>,
+        key: Identity,
+    ) -> Result<Option<Value<'session>>, crate::emitter::InterpretError<'session>> {
+        let record = match self.records.get(&key) {
+            Some(r) => r,
+            None => return Ok(None),
+        };
+        let analyses = if let Some(Artifact::Analyses(analyses)) = record.fetch(3) {
+            analyses.clone()
+        } else {
+            return Ok(None);
+        };
+        let result = engine.process(analyses)?;
+        Ok(Some(result))
+    }
 
     pub fn run(mut self, mut pipeline: Operation<'session, Arc<Lock<Session<'session>>>>) -> Self {
         self.timer = Instant::now();
@@ -315,9 +299,7 @@ impl<'session> Session<'session> {
             .unwrap()
     }
 
-    pub fn pipeline(
-        #[cfg(feature = "dialog")] engine: Option<Arc<Lock<CraneliftEngine<'session>>>>,
-    ) -> Operation<'session, Arc<Lock<Session<'session>>>> {
+    pub fn pipeline() -> Operation<'session, Arc<Lock<Session<'session>>>> {
         let mut states = vec![
             Operation::new(Arc::new(Initialize { flag: Session::arguments() })),
             Operation::new(Arc::new(Prepare)),
@@ -325,14 +307,8 @@ impl<'session> Session<'session> {
             Operation::new(Arc::new(Parser::default())),
             Operation::new(Arc::new(Resolver::default())),
             Operation::new(Arc::new(Analyzer::default())),
+            Operation::new(Arc::new(Report)),
         ];
-
-        states.push(Operation::new(Arc::new(Report)));
-
-        #[cfg(feature = "dialog")]
-        states.push(Operation::new(Arc::new(Interpret {
-            engine,
-        })));
 
         #[cfg(feature = "emitter")]
         {
@@ -345,12 +321,6 @@ impl<'session> Session<'session> {
     }
 
     pub fn compile(self) -> Self {
-        #[cfg(feature = "dialog")]
-        let engine: Option<Arc<Lock<CraneliftEngine<'session>>>> = None;
-
-        self.run(Self::pipeline(
-            #[cfg(feature = "dialog")]
-            engine,
-        ))
+        self.run(Self::pipeline())
     }
 }
