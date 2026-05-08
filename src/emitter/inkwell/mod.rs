@@ -52,7 +52,7 @@ pub enum Entity<'backend> {
     Function(FunctionValue<'backend>),
 }
 
-pub struct Generator<'backend> {
+pub struct Inkwell<'backend> {
     pub context: ContextRef<'backend>,
     pub builder: Builder<'backend>,
     pub modules: Map<Str<'backend>, Module<'backend>>,
@@ -66,7 +66,7 @@ pub struct Generator<'backend> {
     loop_results: Vec<Option<PointerValue<'backend>>>,
 }
 
-impl<'backend> Generator<'backend> {
+impl<'backend> Inkwell<'backend> {
     fn value_type(&self, typing: &Type<'backend>) -> Type<'backend> {
         match &typing.kind {
             TypeKind::Binding(binding) => binding
@@ -156,6 +156,14 @@ impl<'backend> Generator<'backend> {
 
     pub fn insert_entity(&mut self, name: Str<'backend>, entity: Entity<'backend>) {
         self.entities.insert(name, entity);
+    }
+
+    pub fn entity_ref(&self, analysis: &Analysis<'backend>) -> Option<&Entity<'backend>> {
+        match &analysis.kind {
+            AnalysisKind::Usage(name) => self.get_entity(name),
+            AnalysisKind::Symbol(target) => self.get_entity(&target.name),
+            _ => None,
+        }
     }
 
     pub fn clear_loops(&mut self) {
@@ -438,17 +446,7 @@ impl<'backend> Generator<'backend> {
     pub fn infer_signedness(&self, analysis: &Analysis<'backend>) -> Option<bool> {
         match &analysis.kind {
             AnalysisKind::Integer { signed, .. } => Some(*signed),
-            AnalysisKind::Usage(identifier) => match self.get_entity(identifier) {
-                Some(Entity::Variable { typing, .. }) => {
-                    if let TypeKind::Integer { signed, .. } = &typing.kind {
-                        Some(*signed)
-                    } else {
-                        None
-                    }
-                }
-                _ => None,
-            },
-            AnalysisKind::Symbol(target) => match self.get_entity(&target.name) {
+            AnalysisKind::Usage(_) | AnalysisKind::Symbol(_) => match self.entity_ref(analysis) {
                 Some(Entity::Variable { typing, .. }) => {
                     if let TypeKind::Integer { signed, .. } = &typing.kind {
                         Some(*signed)

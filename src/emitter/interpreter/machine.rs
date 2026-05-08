@@ -1,40 +1,30 @@
-// src/emitter/interpreter/vm.rs
-
-use {
-    crate::{
-        analyzer::{Analysis, AnalysisKind},
-        data::{Function, Str},
-        emitter::{
-            interpreter::{
-                compiler::{Chunk, Compiler},
-                error::InterpretError,
-                foreign::Foreign,
-                op::Op,
-                value::Value,
-            },
-            BitwiseError, ControlFlowError, DataStructureError, ErrorKind, FunctionError,
-            VariableError,
+use crate::{
+    analyzer::{Analysis, AnalysisKind},
+    data::{Function, Str},
+    emitter::{
+        interpreter::{
+            compiler::{Chunk, Compiler},
+            error::InterpretError,
+            instruction::Instruction,
+            value::Value,
+            Foreign,
         },
-        internal::hash::Map,
-        resolver::{Type, TypeKind},
-        tracker::Span,
+        BitwiseError, DataStructureError, ErrorKind, FunctionError, VariableError,
     },
+    internal::hash::Map,
+    resolver::Type,
+    tracker::Span,
 };
 
-type AxoFn<'a> = Function<
-Str<'a>,
-Analysis<'a>,
-Option<Box<Analysis<'a>>>,
-Option<Type<'a>>,
->;
+type AxoFn<'a> = Function<Str<'a>, Analysis<'a>, Option<Box<Analysis<'a>>>, Option<Type<'a>>>;
 
 enum Signal<'a> {
     Return(Value<'a>),
-    Break(Value<'a>),
-    Continue(Value<'a>),
+    Break,
+    Continue,
 }
 
-pub struct Vm<'a> {
+pub struct Machine<'a> {
     stack: Vec<Value<'a>>,
     globals: Map<Str<'a>, Value<'a>>,
     functions: Map<Str<'a>, AxoFn<'a>>,
@@ -43,7 +33,7 @@ pub struct Vm<'a> {
     signal: Option<Signal<'a>>,
 }
 
-impl<'a> Vm<'a> {
+impl<'a> Machine<'a> {
     pub fn new() -> Self {
         Self {
             stack: Vec::new(),
@@ -76,34 +66,34 @@ impl<'a> Vm<'a> {
 
         let result = loop {
             if ip >= chunk.ops.len() {
-                break Value::Void;
+                break self.stack.pop().unwrap_or(Value::Void);
             }
 
             let op = chunk.ops[ip].clone();
             ip += 1;
 
             match op {
-                Op::Void => self.stack.push(Value::Void),
-                Op::Integer(n) => self.stack.push(Value::Integer(n)),
-                Op::Float(f) => self.stack.push(Value::Float(f)),
-                Op::Boolean(b) => self.stack.push(Value::Boolean(b)),
-                Op::Character(c) => self.stack.push(Value::Character(c)),
-                Op::String(s) => self.stack.push(Value::String(s)),
+                Instruction::Void => self.stack.push(Value::Void),
+                Instruction::Integer(n) => self.stack.push(Value::Integer(n)),
+                Instruction::Float(f) => self.stack.push(Value::Float(f)),
+                Instruction::Boolean(b) => self.stack.push(Value::Boolean(b)),
+                Instruction::Character(c) => self.stack.push(Value::Character(c)),
+                Instruction::String(s) => self.stack.push(Value::String(s)),
 
-                Op::Pop => {
+                Instruction::Pop => {
                     self.stack.pop();
                 }
-                Op::Dup => {
+                Instruction::Dup => {
                     let top = self.stack.last().cloned().unwrap_or(Value::Void);
                     self.stack.push(top);
                 }
 
-                Op::Load(slot) => {
+                Instruction::Load(slot) => {
                     let base = *self.frames.last().unwrap_or(&0);
                     let value = self.stack.get(base + slot).cloned().unwrap_or(Value::Void);
                     self.stack.push(value);
                 }
-                Op::Store(slot) => {
+                Instruction::Store(slot) => {
                     let base = *self.frames.last().unwrap_or(&0);
                     let value = self.stack.last().cloned().unwrap_or(Value::Void);
                     let target = base + slot;
@@ -112,23 +102,23 @@ impl<'a> Vm<'a> {
                     }
                     self.stack[target] = value;
                 }
-                Op::LoadGlobal(name) => {
+                Instruction::LoadGlobal(name) => {
                     let value = self.globals.get(&name).cloned().unwrap_or(Value::Void);
                     self.stack.push(value);
                 }
-                Op::StoreGlobal(name) => {
+                Instruction::StoreGlobal(name) => {
                     let value = self.stack.last().cloned().unwrap_or(Value::Void);
                     self.globals.insert(name, value);
                 }
-                Op::DefineGlobal(name) => {
+                Instruction::DefineGlobal(name) => {
                     let value = self.stack.last().cloned().unwrap_or(Value::Void);
                     self.globals.insert(name, value);
                 }
 
-                Op::EnterBlock => {}
-                Op::LeaveBlock => {}
+                Instruction::EnterBlock => {}
+                Instruction::LeaveBlock => {}
 
-                Op::Negate => {
+                Instruction::Negate => {
                     let v = self.stack.pop().unwrap_or(Value::Void);
                     let result = match v {
                         Value::Integer(n) => Value::Integer(n.wrapping_neg()),
@@ -137,7 +127,7 @@ impl<'a> Vm<'a> {
                     };
                     self.stack.push(result);
                 }
-                Op::Not => {
+                Instruction::Not => {
                     let v = self.stack.pop().unwrap_or(Value::Void);
                     let result = match v {
                         Value::Boolean(b) => Value::Boolean(!b),
@@ -145,36 +135,40 @@ impl<'a> Vm<'a> {
                     };
                     self.stack.push(result);
                 }
-                Op::BitwiseNot => {
+                Instruction::BitwiseNot => {
                     let v = self.stack.pop().unwrap_or(Value::Void);
                     let result = match v {
                         Value::Integer(n) => Value::Integer(!n),
-                        _ => return Err(self.err(
-                            ErrorKind::Bitwise(BitwiseError::InvalidOperandType {
-                                instruction: String::from("not"),
-                            }),
-                            Span::void(),
-                        )),
+                        _ => {
+                            return Err(self.err(
+                                ErrorKind::Bitwise(BitwiseError::InvalidOperandType {
+                                    instruction: String::from("not"),
+                                }),
+                                Span::void(),
+                            ))
+                        }
                     };
                     self.stack.push(result);
                 }
-                Op::AddressOf => {
+                Instruction::AddressOf => {
                     let v = self.stack.pop().unwrap_or(Value::Void);
                     self.stack.push(Value::Pointer(Box::new(v)));
                 }
-                Op::Deref => {
+                Instruction::Deref => {
                     let v = self.stack.pop().unwrap_or(Value::Void);
                     let inner = match v {
                         Value::Pointer(inner) => *inner,
-                        _ => return Err(self.err(
-                            ErrorKind::Variable(VariableError::DereferenceNonPointer),
-                            Span::void(),
-                        )),
+                        _ => {
+                            return Err(self.err(
+                                ErrorKind::Variable(VariableError::DereferenceNonPointer),
+                                Span::void(),
+                            ))
+                        }
                     };
                     self.stack.push(inner);
                 }
 
-                Op::Add => {
+                Instruction::Add => {
                     let r = self.stack.pop().unwrap_or(Value::Void);
                     let l = self.stack.pop().unwrap_or(Value::Void);
                     let result = match (l, r) {
@@ -184,7 +178,7 @@ impl<'a> Vm<'a> {
                     };
                     self.stack.push(result);
                 }
-                Op::Subtract => {
+                Instruction::Subtract => {
                     let r = self.stack.pop().unwrap_or(Value::Void);
                     let l = self.stack.pop().unwrap_or(Value::Void);
                     let result = match (l, r) {
@@ -194,7 +188,7 @@ impl<'a> Vm<'a> {
                     };
                     self.stack.push(result);
                 }
-                Op::Multiply => {
+                Instruction::Multiply => {
                     let r = self.stack.pop().unwrap_or(Value::Void);
                     let l = self.stack.pop().unwrap_or(Value::Void);
                     let result = match (l, r) {
@@ -204,13 +198,17 @@ impl<'a> Vm<'a> {
                     };
                     self.stack.push(result);
                 }
-                Op::Divide => {
+                Instruction::Divide => {
                     let r = self.stack.pop().unwrap_or(Value::Void);
                     let l = self.stack.pop().unwrap_or(Value::Void);
                     let result = match (l, r) {
                         (Value::Integer(a), Value::Integer(b)) => {
-                            if b == 0 { panic!("division by zero"); }
-                            if b == -1 && a == i64::MIN { panic!("integer overflow"); }
+                            if b == 0 {
+                                panic!("division by zero");
+                            }
+                            if b == -1 && a == i64::MIN {
+                                panic!("integer overflow");
+                            }
                             Value::Integer(a / b)
                         }
                         (Value::Float(a), Value::Float(b)) => Value::Float(a / b),
@@ -218,13 +216,17 @@ impl<'a> Vm<'a> {
                     };
                     self.stack.push(result);
                 }
-                Op::Modulus => {
+                Instruction::Modulus => {
                     let r = self.stack.pop().unwrap_or(Value::Void);
                     let l = self.stack.pop().unwrap_or(Value::Void);
                     let result = match (l, r) {
                         (Value::Integer(a), Value::Integer(b)) => {
-                            if b == 0 { panic!("modulus by zero"); }
-                            if b == -1 && a == i64::MIN { panic!("integer overflow"); }
+                            if b == 0 {
+                                panic!("modulus by zero");
+                            }
+                            if b == -1 && a == i64::MIN {
+                                panic!("integer overflow");
+                            }
                             Value::Integer(a % b)
                         }
                         (Value::Float(a), Value::Float(b)) => Value::Float(a % b),
@@ -232,7 +234,7 @@ impl<'a> Vm<'a> {
                     };
                     self.stack.push(result);
                 }
-                Op::And => {
+                Instruction::And => {
                     let r = self.stack.pop().unwrap_or(Value::Void);
                     let l = self.stack.pop().unwrap_or(Value::Void);
                     let result = match (l, r) {
@@ -241,7 +243,7 @@ impl<'a> Vm<'a> {
                     };
                     self.stack.push(result);
                 }
-                Op::Or => {
+                Instruction::Or => {
                     let r = self.stack.pop().unwrap_or(Value::Void);
                     let l = self.stack.pop().unwrap_or(Value::Void);
                     let result = match (l, r) {
@@ -250,7 +252,7 @@ impl<'a> Vm<'a> {
                     };
                     self.stack.push(result);
                 }
-                Op::Xor => {
+                Instruction::Xor => {
                     let r = self.stack.pop().unwrap_or(Value::Void);
                     let l = self.stack.pop().unwrap_or(Value::Void);
                     let result = match (l, r) {
@@ -259,84 +261,98 @@ impl<'a> Vm<'a> {
                     };
                     self.stack.push(result);
                 }
-                Op::BitwiseAnd => {
+                Instruction::BitwiseAnd => {
                     let r = self.stack.pop().unwrap_or(Value::Void);
                     let l = self.stack.pop().unwrap_or(Value::Void);
                     let result = match (l, r) {
                         (Value::Integer(a), Value::Integer(b)) => Value::Integer(a & b),
-                        _ => return Err(self.err(
-                            ErrorKind::Bitwise(BitwiseError::InvalidOperandType {
-                                instruction: String::from("and"),
-                            }),
-                            Span::void(),
-                        )),
+                        _ => {
+                            return Err(self.err(
+                                ErrorKind::Bitwise(BitwiseError::InvalidOperandType {
+                                    instruction: String::from("and"),
+                                }),
+                                Span::void(),
+                            ))
+                        }
                     };
                     self.stack.push(result);
                 }
-                Op::BitwiseOr => {
+                Instruction::BitwiseOr => {
                     let r = self.stack.pop().unwrap_or(Value::Void);
                     let l = self.stack.pop().unwrap_or(Value::Void);
                     let result = match (l, r) {
                         (Value::Integer(a), Value::Integer(b)) => Value::Integer(a | b),
-                        _ => return Err(self.err(
-                            ErrorKind::Bitwise(BitwiseError::InvalidOperandType {
-                                instruction: String::from("or"),
-                            }),
-                            Span::void(),
-                        )),
+                        _ => {
+                            return Err(self.err(
+                                ErrorKind::Bitwise(BitwiseError::InvalidOperandType {
+                                    instruction: String::from("or"),
+                                }),
+                                Span::void(),
+                            ))
+                        }
                     };
                     self.stack.push(result);
                 }
-                Op::BitwiseXor => {
+                Instruction::BitwiseXor => {
                     let r = self.stack.pop().unwrap_or(Value::Void);
                     let l = self.stack.pop().unwrap_or(Value::Void);
                     let result = match (l, r) {
                         (Value::Integer(a), Value::Integer(b)) => Value::Integer(a ^ b),
-                        _ => return Err(self.err(
-                            ErrorKind::Bitwise(BitwiseError::InvalidOperandType {
-                                instruction: String::from("xor"),
-                            }),
-                            Span::void(),
-                        )),
+                        _ => {
+                            return Err(self.err(
+                                ErrorKind::Bitwise(BitwiseError::InvalidOperandType {
+                                    instruction: String::from("xor"),
+                                }),
+                                Span::void(),
+                            ))
+                        }
                     };
                     self.stack.push(result);
                 }
-                Op::ShiftLeft => {
+                Instruction::ShiftLeft => {
                     let r = self.stack.pop().unwrap_or(Value::Void);
                     let l = self.stack.pop().unwrap_or(Value::Void);
                     let result = match (l, r) {
                         (Value::Integer(a), Value::Integer(b)) => {
-                            if b < 0 || b >= 64 { panic!("shift out of range"); }
+                            if b < 0 || b >= 64 {
+                                panic!("shift out of range");
+                            }
                             Value::Integer(a << b)
                         }
-                        _ => return Err(self.err(
-                            ErrorKind::Bitwise(BitwiseError::InvalidOperandType {
-                                instruction: String::from("shift"),
-                            }),
-                            Span::void(),
-                        )),
+                        _ => {
+                            return Err(self.err(
+                                ErrorKind::Bitwise(BitwiseError::InvalidOperandType {
+                                    instruction: String::from("shift"),
+                                }),
+                                Span::void(),
+                            ))
+                        }
                     };
                     self.stack.push(result);
                 }
-                Op::ShiftRight => {
+                Instruction::ShiftRight => {
                     let r = self.stack.pop().unwrap_or(Value::Void);
                     let l = self.stack.pop().unwrap_or(Value::Void);
                     let result = match (l, r) {
                         (Value::Integer(a), Value::Integer(b)) => {
-                            if b < 0 || b >= 64 { panic!("shift out of range"); }
+                            if b < 0 || b >= 64 {
+                                panic!("shift out of range");
+                            }
                             Value::Integer(a >> b)
                         }
-                        _ => return Err(self.err(
-                            ErrorKind::Bitwise(BitwiseError::InvalidOperandType {
-                                instruction: String::from("shift"),
-                            }),
-                            Span::void(),
-                        )),
+                        _ => {
+                            return Err(self.err(
+                                ErrorKind::Bitwise(BitwiseError::InvalidOperandType {
+                                    instruction: String::from("shift"),
+                                }),
+                                Span::void(),
+                            ))
+                        }
                     };
                     self.stack.push(result);
                 }
 
-                Op::Equal => {
+                Instruction::Equal => {
                     let r = self.stack.pop().unwrap_or(Value::Void);
                     let l = self.stack.pop().unwrap_or(Value::Void);
                     let lv = l.tag();
@@ -351,7 +367,7 @@ impl<'a> Vm<'a> {
                     };
                     self.stack.push(result);
                 }
-                Op::NotEqual => {
+                Instruction::NotEqual => {
                     let r = self.stack.pop().unwrap_or(Value::Void);
                     let l = self.stack.pop().unwrap_or(Value::Void);
                     let lv = l.tag();
@@ -366,7 +382,7 @@ impl<'a> Vm<'a> {
                     };
                     self.stack.push(result);
                 }
-                Op::Less => {
+                Instruction::Less => {
                     let r = self.stack.pop().unwrap_or(Value::Void);
                     let l = self.stack.pop().unwrap_or(Value::Void);
                     let result = match (l, r) {
@@ -376,7 +392,7 @@ impl<'a> Vm<'a> {
                     };
                     self.stack.push(result);
                 }
-                Op::LessOrEqual => {
+                Instruction::LessOrEqual => {
                     let r = self.stack.pop().unwrap_or(Value::Void);
                     let l = self.stack.pop().unwrap_or(Value::Void);
                     let result = match (l, r) {
@@ -386,7 +402,7 @@ impl<'a> Vm<'a> {
                     };
                     self.stack.push(result);
                 }
-                Op::Greater => {
+                Instruction::Greater => {
                     let r = self.stack.pop().unwrap_or(Value::Void);
                     let l = self.stack.pop().unwrap_or(Value::Void);
                     let result = match (l, r) {
@@ -396,7 +412,7 @@ impl<'a> Vm<'a> {
                     };
                     self.stack.push(result);
                 }
-                Op::GreaterOrEqual => {
+                Instruction::GreaterOrEqual => {
                     let r = self.stack.pop().unwrap_or(Value::Void);
                     let l = self.stack.pop().unwrap_or(Value::Void);
                     let result = match (l, r) {
@@ -407,27 +423,27 @@ impl<'a> Vm<'a> {
                     self.stack.push(result);
                 }
 
-                Op::MakeArray(count) => {
+                Instruction::MakeArray(count) => {
                     let start = self.stack.len().saturating_sub(count);
                     let items: Vec<Value<'a>> = self.stack.drain(start..).collect();
                     self.stack.push(Value::Array(items));
                 }
-                Op::MakeTuple(count) => {
+                Instruction::MakeTuple(count) => {
                     let start = self.stack.len().saturating_sub(count);
                     let items: Vec<Value<'a>> = self.stack.drain(start..).collect();
                     self.stack.push(Value::Tuple(items));
                 }
-                Op::MakeStruct(name, count) => {
+                Instruction::MakeStruct(name, count) => {
                     let start = self.stack.len().saturating_sub(count);
                     let fields: Vec<Value<'a>> = self.stack.drain(start..).collect();
                     self.stack.push(Value::Structure(name, fields));
                 }
-                Op::MakeUnion(name) => {
+                Instruction::MakeUnion(name) => {
                     let value = self.stack.pop().unwrap_or(Value::Void);
                     self.stack.push(Value::Union(name, Box::new(value)));
                 }
 
-                Op::GetField(index) => {
+                Instruction::GetField(index) => {
                     let value = self.stack.pop().unwrap_or(Value::Void);
                     let result = match value {
                         Value::Structure(_, fields) => {
@@ -436,14 +452,12 @@ impl<'a> Vm<'a> {
                         Value::Tuple(fields) => {
                             fields.into_iter().nth(index).unwrap_or(Value::Void)
                         }
-                        Value::Array(items) => {
-                            items.into_iter().nth(index).unwrap_or(Value::Void)
-                        }
+                        Value::Array(items) => items.into_iter().nth(index).unwrap_or(Value::Void),
                         _ => Value::Void,
                     };
                     self.stack.push(result);
                 }
-                Op::GetIndex => {
+                Instruction::GetIndex => {
                     let idx = self.stack.pop().unwrap_or(Value::Void);
                     let base = self.stack.pop().unwrap_or(Value::Void);
                     let Value::Integer(i) = idx else {
@@ -463,56 +477,58 @@ impl<'a> Vm<'a> {
                             fields.into_iter().nth(i as usize).unwrap_or(Value::Void)
                         }
                         Value::Pointer(inner) => *inner,
-                        _ => return Err(self.err(
-                            ErrorKind::DataStructure(DataStructureError::NotIndexable),
-                            Span::void(),
-                        )),
+                        _ => {
+                            return Err(self.err(
+                                ErrorKind::DataStructure(DataStructureError::NotIndexable),
+                                Span::void(),
+                            ))
+                        }
                     };
                     self.stack.push(result);
                 }
-                Op::SetIndex => {
-                    let target = self.stack.pop().unwrap_or(Value::Void);
+                Instruction::SetIndex => {
+                    let _target = self.stack.pop().unwrap_or(Value::Void);
                     let value = self.stack.pop().unwrap_or(Value::Void);
                     self.stack.push(value);
                 }
 
-                Op::SizeOf(size) => {
+                Instruction::SizeOf(size) => {
                     self.stack.push(Value::Integer(size as i64));
                 }
 
-                Op::Jump(dest) => {
+                Instruction::Jump(dest) => {
                     ip = dest;
                 }
-                Op::JumpIf(dest) => {
+                Instruction::JumpIf(dest) => {
                     let top = self.stack.last().cloned().unwrap_or(Value::Void);
                     if top.is_truthy() {
                         ip = dest;
                     }
                 }
-                Op::JumpIfNot(dest) => {
+                Instruction::JumpIfNot(dest) => {
                     let top = self.stack.last().cloned().unwrap_or(Value::Void);
                     if !top.is_truthy() {
                         ip = dest;
                     }
                 }
 
-                Op::ReturnSignal => {
+                Instruction::ReturnSignal => {
                     let v = self.stack.pop().unwrap_or(Value::Void);
                     self.signal = Some(Signal::Return(v.clone()));
                     break v;
                 }
-                Op::BreakSignal => {
+                Instruction::BreakSignal => {
                     let v = self.stack.pop().unwrap_or(Value::Void);
-                    self.signal = Some(Signal::Break(v.clone()));
+                    self.signal = Some(Signal::Break);
                     break v;
                 }
-                Op::ContinueSignal => {
+                Instruction::ContinueSignal => {
                     let v = self.stack.pop().unwrap_or(Value::Void);
-                    self.signal = Some(Signal::Continue(v.clone()));
+                    self.signal = Some(Signal::Continue);
                     break v;
                 }
 
-                Op::Call(name, arity) => {
+                Instruction::Call(name, arity) => {
                     let start = self.stack.len().saturating_sub(arity);
                     let args: Vec<Value<'a>> = self.stack.drain(start..).collect();
 
@@ -537,7 +553,7 @@ impl<'a> Vm<'a> {
                     }
                 }
 
-                Op::CallForeign(name, arity) => {
+                Instruction::CallForeign(name, arity) => {
                     let start = self.stack.len().saturating_sub(arity);
                     let args: Vec<Value<'a>> = self.stack.drain(start..).collect();
 
@@ -554,7 +570,7 @@ impl<'a> Vm<'a> {
                     }
                 }
 
-                Op::Return => {
+                Instruction::Return => {
                     break self.stack.pop().unwrap_or(Value::Void);
                 }
             }
@@ -562,7 +578,8 @@ impl<'a> Vm<'a> {
 
         self.frames.pop();
         let frame_base = self.frames.last().copied().unwrap_or(0);
-        self.stack.truncate(frame_base.max(self.stack.len().saturating_sub(0)));
+        self.stack
+            .truncate(frame_base.max(self.stack.len().saturating_sub(0)));
 
         Ok(result)
     }
@@ -581,7 +598,7 @@ impl<'a> Vm<'a> {
 
         let mut compiler = Compiler::new();
 
-        for (param, value) in function.members.iter().zip(args.iter()) {
+        for param in &function.members {
             if let AnalysisKind::Binding(binding) = &param.kind {
                 let name = match &binding.target.kind {
                     AnalysisKind::Usage(n) => *n,
@@ -620,18 +637,22 @@ impl<'a> Vm<'a> {
 
         let result = loop {
             if ip >= chunk.ops.len() {
-                break Value::Void;
+                break self.stack.pop().unwrap_or(Value::Void);
             }
 
             let op = chunk.ops[ip].clone();
             ip += 1;
 
             match &op {
-                Op::Load(slot) => {
-                    let value = self.stack.get(frame_base + slot).cloned().unwrap_or(Value::Void);
+                Instruction::Load(slot) => {
+                    let value = self
+                        .stack
+                        .get(frame_base + slot)
+                        .cloned()
+                        .unwrap_or(Value::Void);
                     self.stack.push(value);
                 }
-                Op::Store(slot) => {
+                Instruction::Store(slot) => {
                     let value = self.stack.last().cloned().unwrap_or(Value::Void);
                     let target = frame_base + slot;
                     while self.stack.len() <= target {
@@ -639,31 +660,37 @@ impl<'a> Vm<'a> {
                     }
                     self.stack[target] = value;
                 }
-                Op::Jump(dest) => { ip = *dest; }
-                Op::JumpIf(dest) => {
-                    let top = self.stack.last().cloned().unwrap_or(Value::Void);
-                    if top.is_truthy() { ip = *dest; }
+                Instruction::Jump(dest) => {
+                    ip = *dest;
                 }
-                Op::JumpIfNot(dest) => {
+                Instruction::JumpIf(dest) => {
                     let top = self.stack.last().cloned().unwrap_or(Value::Void);
-                    if !top.is_truthy() { ip = *dest; }
+                    if top.is_truthy() {
+                        ip = *dest;
+                    }
                 }
-                Op::ReturnSignal => {
+                Instruction::JumpIfNot(dest) => {
+                    let top = self.stack.last().cloned().unwrap_or(Value::Void);
+                    if !top.is_truthy() {
+                        ip = *dest;
+                    }
+                }
+                Instruction::ReturnSignal => {
                     let v = self.stack.pop().unwrap_or(Value::Void);
                     self.signal = Some(Signal::Return(v.clone()));
                     break v;
                 }
-                Op::BreakSignal => {
+                Instruction::BreakSignal => {
                     let v = self.stack.pop().unwrap_or(Value::Void);
-                    self.signal = Some(Signal::Break(v.clone()));
+                    self.signal = Some(Signal::Break);
                     break v;
                 }
-                Op::ContinueSignal => {
+                Instruction::ContinueSignal => {
                     let v = self.stack.pop().unwrap_or(Value::Void);
-                    self.signal = Some(Signal::Continue(v.clone()));
+                    self.signal = Some(Signal::Continue);
                     break v;
                 }
-                Op::Call(name, arity) => {
+                Instruction::Call(name, arity) => {
                     let name = *name;
                     let arity = *arity;
                     let start = self.stack.len().saturating_sub(arity);
@@ -697,63 +724,67 @@ impl<'a> Vm<'a> {
         Ok(result)
     }
 
-    fn dispatch(&mut self, op: Op<'a>) -> Result<(), InterpretError<'a>> {
+    fn dispatch(&mut self, op: Instruction<'a>) -> Result<(), InterpretError<'a>> {
         match op {
-            Op::Void => self.stack.push(Value::Void),
-            Op::Integer(n) => self.stack.push(Value::Integer(n)),
-            Op::Float(f) => self.stack.push(Value::Float(f)),
-            Op::Boolean(b) => self.stack.push(Value::Boolean(b)),
-            Op::Character(c) => self.stack.push(Value::Character(c)),
-            Op::String(s) => self.stack.push(Value::String(s)),
-            Op::Pop => { self.stack.pop(); }
-            Op::Dup => {
+            Instruction::Void => self.stack.push(Value::Void),
+            Instruction::Integer(n) => self.stack.push(Value::Integer(n)),
+            Instruction::Float(f) => self.stack.push(Value::Float(f)),
+            Instruction::Boolean(b) => self.stack.push(Value::Boolean(b)),
+            Instruction::Character(c) => self.stack.push(Value::Character(c)),
+            Instruction::String(s) => self.stack.push(Value::String(s)),
+            Instruction::Pop => {
+                self.stack.pop();
+            }
+            Instruction::Dup => {
                 let top = self.stack.last().cloned().unwrap_or(Value::Void);
                 self.stack.push(top);
             }
-            Op::LoadGlobal(name) => {
+            Instruction::LoadGlobal(name) => {
                 let value = self.globals.get(&name).cloned().unwrap_or(Value::Void);
                 self.stack.push(value);
             }
-            Op::StoreGlobal(name) => {
+            Instruction::StoreGlobal(name) => {
                 let value = self.stack.last().cloned().unwrap_or(Value::Void);
                 self.globals.insert(name, value);
             }
-            Op::DefineGlobal(name) => {
+            Instruction::DefineGlobal(name) => {
                 let value = self.stack.last().cloned().unwrap_or(Value::Void);
                 self.globals.insert(name, value);
             }
-            Op::EnterBlock | Op::LeaveBlock => {}
-            Op::SizeOf(size) => self.stack.push(Value::Integer(size as i64)),
-            Op::MakeArray(count) => {
+            Instruction::EnterBlock | Instruction::LeaveBlock => {}
+            Instruction::SizeOf(size) => self.stack.push(Value::Integer(size as i64)),
+            Instruction::MakeArray(count) => {
                 let start = self.stack.len().saturating_sub(count);
                 let items: Vec<Value<'a>> = self.stack.drain(start..).collect();
                 self.stack.push(Value::Array(items));
             }
-            Op::MakeTuple(count) => {
+            Instruction::MakeTuple(count) => {
                 let start = self.stack.len().saturating_sub(count);
                 let items: Vec<Value<'a>> = self.stack.drain(start..).collect();
                 self.stack.push(Value::Tuple(items));
             }
-            Op::MakeStruct(name, count) => {
+            Instruction::MakeStruct(name, count) => {
                 let start = self.stack.len().saturating_sub(count);
                 let fields: Vec<Value<'a>> = self.stack.drain(start..).collect();
                 self.stack.push(Value::Structure(name, fields));
             }
-            Op::MakeUnion(name) => {
+            Instruction::MakeUnion(name) => {
                 let value = self.stack.pop().unwrap_or(Value::Void);
                 self.stack.push(Value::Union(name, Box::new(value)));
             }
-            Op::GetField(index) => {
+            Instruction::GetField(index) => {
                 let value = self.stack.pop().unwrap_or(Value::Void);
                 let result = match value {
-                    Value::Structure(_, fields) => fields.into_iter().nth(index).unwrap_or(Value::Void),
+                    Value::Structure(_, fields) => {
+                        fields.into_iter().nth(index).unwrap_or(Value::Void)
+                    }
                     Value::Tuple(fields) => fields.into_iter().nth(index).unwrap_or(Value::Void),
                     Value::Array(items) => items.into_iter().nth(index).unwrap_or(Value::Void),
                     _ => Value::Void,
                 };
                 self.stack.push(result);
             }
-            Op::GetIndex => {
+            Instruction::GetIndex => {
                 let idx = self.stack.pop().unwrap_or(Value::Void);
                 let base = self.stack.pop().unwrap_or(Value::Void);
                 let Value::Integer(i) = idx else {
@@ -764,24 +795,30 @@ impl<'a> Vm<'a> {
                 };
                 let result = match base {
                     Value::Array(items) => {
-                        if i < 0 || i as usize >= items.len() { panic!("index out of bounds"); }
+                        if i < 0 || i as usize >= items.len() {
+                            panic!("index out of bounds");
+                        }
                         items.into_iter().nth(i as usize).unwrap_or(Value::Void)
                     }
-                    Value::Tuple(fields) => fields.into_iter().nth(i as usize).unwrap_or(Value::Void),
+                    Value::Tuple(fields) => {
+                        fields.into_iter().nth(i as usize).unwrap_or(Value::Void)
+                    }
                     Value::Pointer(inner) => *inner,
-                    _ => return Err(self.err(
-                        ErrorKind::DataStructure(DataStructureError::NotIndexable),
-                        Span::void(),
-                    )),
+                    _ => {
+                        return Err(self.err(
+                            ErrorKind::DataStructure(DataStructureError::NotIndexable),
+                            Span::void(),
+                        ))
+                    }
                 };
                 self.stack.push(result);
             }
-            Op::SetIndex => {
+            Instruction::SetIndex => {
                 let _target = self.stack.pop();
                 let value = self.stack.pop().unwrap_or(Value::Void);
                 self.stack.push(value);
             }
-            Op::Negate => {
+            Instruction::Negate => {
                 let v = self.stack.pop().unwrap_or(Value::Void);
                 let result = match v {
                     Value::Integer(n) => Value::Integer(n.wrapping_neg()),
@@ -790,38 +827,44 @@ impl<'a> Vm<'a> {
                 };
                 self.stack.push(result);
             }
-            Op::Not => {
+            Instruction::Not => {
                 let v = self.stack.pop().unwrap_or(Value::Void);
                 match v {
                     Value::Boolean(b) => self.stack.push(Value::Boolean(!b)),
                     _ => return Err(self.err(ErrorKind::Boolean, Span::void())),
                 }
             }
-            Op::BitwiseNot => {
+            Instruction::BitwiseNot => {
                 let v = self.stack.pop().unwrap_or(Value::Void);
                 match v {
                     Value::Integer(n) => self.stack.push(Value::Integer(!n)),
-                    _ => return Err(self.err(
-                        ErrorKind::Bitwise(BitwiseError::InvalidOperandType { instruction: String::from("not") }),
-                        Span::void(),
-                    )),
+                    _ => {
+                        return Err(self.err(
+                            ErrorKind::Bitwise(BitwiseError::InvalidOperandType {
+                                instruction: String::from("not"),
+                            }),
+                            Span::void(),
+                        ))
+                    }
                 }
             }
-            Op::AddressOf => {
+            Instruction::AddressOf => {
                 let v = self.stack.pop().unwrap_or(Value::Void);
                 self.stack.push(Value::Pointer(Box::new(v)));
             }
-            Op::Deref => {
+            Instruction::Deref => {
                 let v = self.stack.pop().unwrap_or(Value::Void);
                 match v {
                     Value::Pointer(inner) => self.stack.push(*inner),
-                    _ => return Err(self.err(
-                        ErrorKind::Variable(VariableError::DereferenceNonPointer),
-                        Span::void(),
-                    )),
+                    _ => {
+                        return Err(self.err(
+                            ErrorKind::Variable(VariableError::DereferenceNonPointer),
+                            Span::void(),
+                        ))
+                    }
                 }
             }
-            Op::Add => {
+            Instruction::Add => {
                 let r = self.stack.pop().unwrap_or(Value::Void);
                 let l = self.stack.pop().unwrap_or(Value::Void);
                 let result = match (l, r) {
@@ -831,7 +874,7 @@ impl<'a> Vm<'a> {
                 };
                 self.stack.push(result);
             }
-            Op::Subtract => {
+            Instruction::Subtract => {
                 let r = self.stack.pop().unwrap_or(Value::Void);
                 let l = self.stack.pop().unwrap_or(Value::Void);
                 let result = match (l, r) {
@@ -841,7 +884,7 @@ impl<'a> Vm<'a> {
                 };
                 self.stack.push(result);
             }
-            Op::Multiply => {
+            Instruction::Multiply => {
                 let r = self.stack.pop().unwrap_or(Value::Void);
                 let l = self.stack.pop().unwrap_or(Value::Void);
                 let result = match (l, r) {
@@ -851,13 +894,17 @@ impl<'a> Vm<'a> {
                 };
                 self.stack.push(result);
             }
-            Op::Divide => {
+            Instruction::Divide => {
                 let r = self.stack.pop().unwrap_or(Value::Void);
                 let l = self.stack.pop().unwrap_or(Value::Void);
                 let result = match (l, r) {
                     (Value::Integer(a), Value::Integer(b)) => {
-                        if b == 0 { panic!("division by zero"); }
-                        if b == -1 && a == i64::MIN { panic!("integer overflow"); }
+                        if b == 0 {
+                            panic!("division by zero");
+                        }
+                        if b == -1 && a == i64::MIN {
+                            panic!("integer overflow");
+                        }
                         Value::Integer(a / b)
                     }
                     (Value::Float(a), Value::Float(b)) => Value::Float(a / b),
@@ -865,13 +912,17 @@ impl<'a> Vm<'a> {
                 };
                 self.stack.push(result);
             }
-            Op::Modulus => {
+            Instruction::Modulus => {
                 let r = self.stack.pop().unwrap_or(Value::Void);
                 let l = self.stack.pop().unwrap_or(Value::Void);
                 let result = match (l, r) {
                     (Value::Integer(a), Value::Integer(b)) => {
-                        if b == 0 { panic!("modulus by zero"); }
-                        if b == -1 && a == i64::MIN { panic!("integer overflow"); }
+                        if b == 0 {
+                            panic!("modulus by zero");
+                        }
+                        if b == -1 && a == i64::MIN {
+                            panic!("integer overflow");
+                        }
                         Value::Integer(a % b)
                     }
                     (Value::Float(a), Value::Float(b)) => Value::Float(a % b),
@@ -879,92 +930,128 @@ impl<'a> Vm<'a> {
                 };
                 self.stack.push(result);
             }
-            Op::And => {
+            Instruction::And => {
                 let r = self.stack.pop().unwrap_or(Value::Void);
                 let l = self.stack.pop().unwrap_or(Value::Void);
                 match (l, r) {
-                    (Value::Boolean(a), Value::Boolean(b)) => self.stack.push(Value::Boolean(a && b)),
+                    (Value::Boolean(a), Value::Boolean(b)) => {
+                        self.stack.push(Value::Boolean(a && b))
+                    }
                     _ => return Err(self.err(ErrorKind::Boolean, Span::void())),
                 }
             }
-            Op::Or => {
+            Instruction::Or => {
                 let r = self.stack.pop().unwrap_or(Value::Void);
                 let l = self.stack.pop().unwrap_or(Value::Void);
                 match (l, r) {
-                    (Value::Boolean(a), Value::Boolean(b)) => self.stack.push(Value::Boolean(a || b)),
+                    (Value::Boolean(a), Value::Boolean(b)) => {
+                        self.stack.push(Value::Boolean(a || b))
+                    }
                     _ => return Err(self.err(ErrorKind::Boolean, Span::void())),
                 }
             }
-            Op::Xor => {
+            Instruction::Xor => {
                 let r = self.stack.pop().unwrap_or(Value::Void);
                 let l = self.stack.pop().unwrap_or(Value::Void);
                 match (l, r) {
-                    (Value::Boolean(a), Value::Boolean(b)) => self.stack.push(Value::Boolean(a ^ b)),
+                    (Value::Boolean(a), Value::Boolean(b)) => {
+                        self.stack.push(Value::Boolean(a ^ b))
+                    }
                     _ => return Err(self.err(ErrorKind::Boolean, Span::void())),
                 }
             }
-            Op::BitwiseAnd => {
-                let r = self.stack.pop().unwrap_or(Value::Void);
-                let l = self.stack.pop().unwrap_or(Value::Void);
-                match (l, r) {
-                    (Value::Integer(a), Value::Integer(b)) => self.stack.push(Value::Integer(a & b)),
-                    _ => return Err(self.err(
-                        ErrorKind::Bitwise(BitwiseError::InvalidOperandType { instruction: String::from("and") }),
-                        Span::void(),
-                    )),
-                }
-            }
-            Op::BitwiseOr => {
-                let r = self.stack.pop().unwrap_or(Value::Void);
-                let l = self.stack.pop().unwrap_or(Value::Void);
-                match (l, r) {
-                    (Value::Integer(a), Value::Integer(b)) => self.stack.push(Value::Integer(a | b)),
-                    _ => return Err(self.err(
-                        ErrorKind::Bitwise(BitwiseError::InvalidOperandType { instruction: String::from("or") }),
-                        Span::void(),
-                    )),
-                }
-            }
-            Op::BitwiseXor => {
-                let r = self.stack.pop().unwrap_or(Value::Void);
-                let l = self.stack.pop().unwrap_or(Value::Void);
-                match (l, r) {
-                    (Value::Integer(a), Value::Integer(b)) => self.stack.push(Value::Integer(a ^ b)),
-                    _ => return Err(self.err(
-                        ErrorKind::Bitwise(BitwiseError::InvalidOperandType { instruction: String::from("xor") }),
-                        Span::void(),
-                    )),
-                }
-            }
-            Op::ShiftLeft => {
+            Instruction::BitwiseAnd => {
                 let r = self.stack.pop().unwrap_or(Value::Void);
                 let l = self.stack.pop().unwrap_or(Value::Void);
                 match (l, r) {
                     (Value::Integer(a), Value::Integer(b)) => {
-                        if b < 0 || b >= 64 { panic!("shift out of range"); }
+                        self.stack.push(Value::Integer(a & b))
+                    }
+                    _ => {
+                        return Err(self.err(
+                            ErrorKind::Bitwise(BitwiseError::InvalidOperandType {
+                                instruction: String::from("and"),
+                            }),
+                            Span::void(),
+                        ))
+                    }
+                }
+            }
+            Instruction::BitwiseOr => {
+                let r = self.stack.pop().unwrap_or(Value::Void);
+                let l = self.stack.pop().unwrap_or(Value::Void);
+                match (l, r) {
+                    (Value::Integer(a), Value::Integer(b)) => {
+                        self.stack.push(Value::Integer(a | b))
+                    }
+                    _ => {
+                        return Err(self.err(
+                            ErrorKind::Bitwise(BitwiseError::InvalidOperandType {
+                                instruction: String::from("or"),
+                            }),
+                            Span::void(),
+                        ))
+                    }
+                }
+            }
+            Instruction::BitwiseXor => {
+                let r = self.stack.pop().unwrap_or(Value::Void);
+                let l = self.stack.pop().unwrap_or(Value::Void);
+                match (l, r) {
+                    (Value::Integer(a), Value::Integer(b)) => {
+                        self.stack.push(Value::Integer(a ^ b))
+                    }
+                    _ => {
+                        return Err(self.err(
+                            ErrorKind::Bitwise(BitwiseError::InvalidOperandType {
+                                instruction: String::from("xor"),
+                            }),
+                            Span::void(),
+                        ))
+                    }
+                }
+            }
+            Instruction::ShiftLeft => {
+                let r = self.stack.pop().unwrap_or(Value::Void);
+                let l = self.stack.pop().unwrap_or(Value::Void);
+                match (l, r) {
+                    (Value::Integer(a), Value::Integer(b)) => {
+                        if b < 0 || b >= 64 {
+                            panic!("shift out of range");
+                        }
                         self.stack.push(Value::Integer(a << b));
                     }
-                    _ => return Err(self.err(
-                        ErrorKind::Bitwise(BitwiseError::InvalidOperandType { instruction: String::from("shift") }),
-                        Span::void(),
-                    )),
+                    _ => {
+                        return Err(self.err(
+                            ErrorKind::Bitwise(BitwiseError::InvalidOperandType {
+                                instruction: String::from("shift"),
+                            }),
+                            Span::void(),
+                        ))
+                    }
                 }
             }
-            Op::ShiftRight => {
+            Instruction::ShiftRight => {
                 let r = self.stack.pop().unwrap_or(Value::Void);
                 let l = self.stack.pop().unwrap_or(Value::Void);
                 match (l, r) {
                     (Value::Integer(a), Value::Integer(b)) => {
-                        if b < 0 || b >= 64 { panic!("shift out of range"); }
+                        if b < 0 || b >= 64 {
+                            panic!("shift out of range");
+                        }
                         self.stack.push(Value::Integer(a >> b));
                     }
-                    _ => return Err(self.err(
-                        ErrorKind::Bitwise(BitwiseError::InvalidOperandType { instruction: String::from("shift") }),
-                        Span::void(),
-                    )),
+                    _ => {
+                        return Err(self.err(
+                            ErrorKind::Bitwise(BitwiseError::InvalidOperandType {
+                                instruction: String::from("shift"),
+                            }),
+                            Span::void(),
+                        ))
+                    }
                 }
             }
-            Op::Equal => {
+            Instruction::Equal => {
                 let r = self.stack.pop().unwrap_or(Value::Void);
                 let l = self.stack.pop().unwrap_or(Value::Void);
                 let lv = l.tag();
@@ -979,7 +1066,7 @@ impl<'a> Vm<'a> {
                 };
                 self.stack.push(result);
             }
-            Op::NotEqual => {
+            Instruction::NotEqual => {
                 let r = self.stack.pop().unwrap_or(Value::Void);
                 let l = self.stack.pop().unwrap_or(Value::Void);
                 let lv = l.tag();
@@ -994,38 +1081,46 @@ impl<'a> Vm<'a> {
                 };
                 self.stack.push(result);
             }
-            Op::Less => {
+            Instruction::Less => {
                 let r = self.stack.pop().unwrap_or(Value::Void);
                 let l = self.stack.pop().unwrap_or(Value::Void);
                 match (l, r) {
-                    (Value::Integer(a), Value::Integer(b)) => self.stack.push(Value::Boolean(a < b)),
+                    (Value::Integer(a), Value::Integer(b)) => {
+                        self.stack.push(Value::Boolean(a < b))
+                    }
                     (Value::Float(a), Value::Float(b)) => self.stack.push(Value::Boolean(a < b)),
                     _ => return Err(self.err(ErrorKind::Normalize, Span::void())),
                 }
             }
-            Op::LessOrEqual => {
+            Instruction::LessOrEqual => {
                 let r = self.stack.pop().unwrap_or(Value::Void);
                 let l = self.stack.pop().unwrap_or(Value::Void);
                 match (l, r) {
-                    (Value::Integer(a), Value::Integer(b)) => self.stack.push(Value::Boolean(a <= b)),
+                    (Value::Integer(a), Value::Integer(b)) => {
+                        self.stack.push(Value::Boolean(a <= b))
+                    }
                     (Value::Float(a), Value::Float(b)) => self.stack.push(Value::Boolean(a <= b)),
                     _ => return Err(self.err(ErrorKind::Normalize, Span::void())),
                 }
             }
-            Op::Greater => {
+            Instruction::Greater => {
                 let r = self.stack.pop().unwrap_or(Value::Void);
                 let l = self.stack.pop().unwrap_or(Value::Void);
                 match (l, r) {
-                    (Value::Integer(a), Value::Integer(b)) => self.stack.push(Value::Boolean(a > b)),
+                    (Value::Integer(a), Value::Integer(b)) => {
+                        self.stack.push(Value::Boolean(a > b))
+                    }
                     (Value::Float(a), Value::Float(b)) => self.stack.push(Value::Boolean(a > b)),
                     _ => return Err(self.err(ErrorKind::Normalize, Span::void())),
                 }
             }
-            Op::GreaterOrEqual => {
+            Instruction::GreaterOrEqual => {
                 let r = self.stack.pop().unwrap_or(Value::Void);
                 let l = self.stack.pop().unwrap_or(Value::Void);
                 match (l, r) {
-                    (Value::Integer(a), Value::Integer(b)) => self.stack.push(Value::Boolean(a >= b)),
+                    (Value::Integer(a), Value::Integer(b)) => {
+                        self.stack.push(Value::Boolean(a >= b))
+                    }
                     (Value::Float(a), Value::Float(b)) => self.stack.push(Value::Boolean(a >= b)),
                     _ => return Err(self.err(ErrorKind::Normalize, Span::void())),
                 }

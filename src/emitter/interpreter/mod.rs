@@ -2,9 +2,9 @@ mod compiler;
 mod engine;
 mod error;
 mod foreign;
-mod op;
+mod instruction;
+mod machine;
 mod value;
-mod vm;
 
 pub use engine::Engine;
 pub use error::InterpretError;

@@ -1,13 +1,13 @@
 use {
     crate::{
         analyzer::Analysis,
-        emitter::{BitwiseError, ErrorKind, GenerateError, Generator},
+        emitter::{BitwiseError, ErrorKind, GenerateError, Inkwell},
         tracker::Span,
     },
     inkwell::{values::BasicValueEnum, IntPredicate},
 };
 
-impl<'backend> Generator<'backend> {
+impl<'backend> Inkwell<'backend> {
     pub fn bitwise_and(
         &mut self,
         left: Box<Analysis<'backend>>,

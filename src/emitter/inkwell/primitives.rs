@@ -1,13 +1,13 @@
 use {
     crate::{
         data::{Boolean, Char, Float, Integer, NonZeroU32, Scale, Str},
-        emitter::{ErrorKind, GenerateError, Generator},
+        emitter::{ErrorKind, GenerateError, Inkwell},
         tracker::Span,
     },
     inkwell::values::BasicValueEnum,
 };
 
-impl<'backend> Generator<'backend> {
+impl<'backend> Inkwell<'backend> {
     pub fn integer(
         &self,
         number: Integer,

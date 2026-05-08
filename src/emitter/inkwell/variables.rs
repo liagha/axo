@@ -5,7 +5,7 @@ use {
         data::*,
         emitter::{
             inkwell::{error::VariableError, Entity},
-            ErrorKind, GenerateError, Generator,
+            ErrorKind, GenerateError, Inkwell,
         },
         resolver::{Type, TypeKind},
         tracker::Span,
@@ -16,11 +16,7 @@ use {
     },
 };
 
-impl<'backend> Generator<'backend> {
-    fn target_name(target: &Target<'backend>) -> Str<'backend> {
-        target.name
-    }
-
+impl<'backend> Inkwell<'backend> {
     fn alias(&mut self, target: Str<'backend>, value: &Analysis<'backend>) -> bool {
         if let Some(entity) = self.entity(value) {
             self.insert_entity(target, entity);
@@ -32,17 +28,7 @@ impl<'backend> Generator<'backend> {
 
     fn pointee(&self, analysis: &Analysis<'backend>) -> Option<BasicTypeEnum<'backend>> {
         match &analysis.kind {
-            AnalysisKind::Usage(identifier) => match self.get_entity(identifier) {
-                Some(Entity::Variable { typing, .. }) => {
-                    if let TypeKind::Pointer { target } = &typing.kind {
-                        self.to_basic_type(target, analysis.span).ok()
-                    } else {
-                        None
-                    }
-                }
-                _ => None,
-            },
-            AnalysisKind::Symbol(target) => match self.get_entity(&target.name) {
+            AnalysisKind::Usage(_) | AnalysisKind::Symbol(_) => match self.entity_ref(analysis) {
                 Some(Entity::Variable { typing, .. }) => {
                     if let TypeKind::Pointer { target } = &typing.kind {
                         self.to_basic_type(target, analysis.span).ok()
@@ -64,25 +50,8 @@ impl<'backend> Generator<'backend> {
     ) -> Result<Option<(PointerValue<'backend>, BasicTypeEnum<'backend>)>, GenerateError<'backend>>
     {
         match &analysis.kind {
-            AnalysisKind::Usage(identifier) => {
-                if let Some(entity) = self.get_entity(identifier) {
-                    match entity {
-                        Entity::Variable { pointer, typing } => {
-                            let kind = self.to_basic_type(typing, analysis.span)?;
-                            Ok(Some((*pointer, kind)))
-                        }
-                        Entity::Function(function) => {
-                            let pointer = function.as_global_value().as_pointer_value();
-                            Ok(Some((pointer, pointer.get_type().into())))
-                        }
-                        _ => Ok(None),
-                    }
-                } else {
-                    Ok(None)
-                }
-            }
-            AnalysisKind::Symbol(target) => {
-                if let Some(entity) = self.get_entity(&target.name) {
+            AnalysisKind::Usage(_) | AnalysisKind::Symbol(_) => {
+                if let Some(entity) = self.entity_ref(analysis) {
                     match entity {
                         Entity::Variable { pointer, typing } => {
                             let kind = self.to_basic_type(typing, analysis.span)?;
@@ -413,7 +382,7 @@ impl<'backend> Generator<'backend> {
         target: Target<'backend>,
         span: Span,
     ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
-        self.usage(Self::target_name(&target), span)
+        self.usage(target.name, span)
     }
 
     pub fn usage(
@@ -511,7 +480,7 @@ impl<'backend> Generator<'backend> {
         value: Box<Analysis<'backend>>,
         span: Span,
     ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
-        self.assign(Self::target_name(&target), value, span)
+        self.assign(target.name, value, span)
     }
 
     pub fn assign(
@@ -561,216 +530,110 @@ impl<'backend> Generator<'backend> {
         binding: Binding<Box<Analysis<'backend>>, Box<Analysis<'backend>>, Type<'backend>>,
         span: Span,
     ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
-        match binding.target.kind {
-            AnalysisKind::Usage(target) => match binding.kind {
-                BindingKind::Static => {
-                    let expression = binding.value.ok_or_else(|| {
-                        GenerateError::new(
-                            ErrorKind::Variable(VariableError::BindingWithoutInitializer {
-                                name: target.to_string(),
-                            }),
-                            span,
-                        )
-                    })?;
-
-                    if self.alias(target.clone(), &expression) {
-                        return Ok(self.context.i64_type().const_zero().into());
-                    }
-
-                    let result = self.analysis(*expression)?;
-
-                    let declared = result.get_type();
-
-                    let variable = self.current_module().add_global(declared, None, &target);
-                    variable.set_initializer(&result);
-                    variable.set_alignment(self.align(declared));
-
-                    let pointer = variable.as_pointer_value();
-
-                    let typing = binding.annotation.clone();
-
-                    self.insert_entity(target.clone(), Entity::Variable { pointer, typing });
-
-                    Ok(result)
-                }
-
-                _ => {
-                    let expression = binding.value.ok_or_else(|| {
-                        GenerateError::new(
-                            ErrorKind::Variable(VariableError::BindingWithoutInitializer {
-                                name: target.to_string(),
-                            }),
-                            span,
-                        )
-                    })?;
-
-                    if self.alias(target.clone(), &expression) {
-                        return Ok(self.context.i64_type().const_zero().into());
-                    }
-
-                    let typing = binding.annotation.clone();
-                    let global = self.builder.get_insert_block().is_none();
-
-                    let scope = if global {
-                        let void = self.context.void_type();
-                        let signature = void.fn_type(&[], false);
-                        let function = self.current_module().add_function("init", signature, None);
-                        let block = self.context.append_basic_block(function, "entry");
-
-                        self.builder.position_at_end(block);
-                        Some(function)
-                    } else {
-                        None
-                    };
-
-                    let result = self.analysis(*expression)?;
-
-                    if let Some(function) = scope {
-                        self.builder.clear_insertion_position();
-                        unsafe {
-                            function.delete();
-                        }
-                    }
-
-                    let declared = result.get_type();
-
-                    let pointer = if global {
-                        let variable = self.current_module().add_global(declared, None, &target);
-                        variable.set_initializer(&result);
-                        variable.set_alignment(self.align(declared));
-                        variable.as_pointer_value()
-                    } else {
-                        let allocate =
-                            self.builder
-                                .build_alloca(declared, &target)
-                                .map_err(|error| {
-                                    GenerateError::new(ErrorKind::BuilderError(error.into()), span)
-                                })?;
-
-                        if let Some(instruction) = allocate.as_instruction_value() {
-                            instruction.set_alignment(self.align(declared)).ok();
-                        }
-
-                        let store =
-                            self.builder
-                                .build_store(allocate, result)
-                                .map_err(|error| {
-                                    GenerateError::new(ErrorKind::BuilderError(error.into()), span)
-                                })?;
-                        store.set_alignment(self.align(declared)).ok();
-
-                        allocate
-                    };
-
-                    self.insert_entity(target.clone(), Entity::Variable { pointer, typing });
-
-                    Ok(result)
-                }
-            },
-
-            AnalysisKind::Symbol(target) => match binding.kind {
-                BindingKind::Static => {
-                    let target = target.name;
-                    let expression = binding.value.ok_or_else(|| {
-                        GenerateError::new(
-                            ErrorKind::Variable(VariableError::BindingWithoutInitializer {
-                                name: target.to_string(),
-                            }),
-                            span,
-                        )
-                    })?;
-
-                    if self.alias(target.clone(), &expression) {
-                        return Ok(self.context.i64_type().const_zero().into());
-                    }
-
-                    let result = self.analysis(*expression)?;
-                    let declared = result.get_type();
-                    let variable = self.current_module().add_global(declared, None, &target);
-                    variable.set_initializer(&result);
-                    variable.set_alignment(self.align(declared));
-                    let pointer = variable.as_pointer_value();
-                    let typing = binding.annotation.clone();
-                    self.insert_entity(target.clone(), Entity::Variable { pointer, typing });
-                    Ok(result)
-                }
-                _ => {
-                    let target = target.name;
-                    let expression = binding.value.ok_or_else(|| {
-                        GenerateError::new(
-                            ErrorKind::Variable(VariableError::BindingWithoutInitializer {
-                                name: target.to_string(),
-                            }),
-                            span,
-                        )
-                    })?;
-
-                    if self.alias(target.clone(), &expression) {
-                        return Ok(self.context.i64_type().const_zero().into());
-                    }
-
-                    let typing = binding.annotation.clone();
-                    let global = self.builder.get_insert_block().is_none();
-
-                    let scope = if global {
-                        let void = self.context.void_type();
-                        let signature = void.fn_type(&[], false);
-                        let function = self.current_module().add_function("init", signature, None);
-                        let block = self.context.append_basic_block(function, "entry");
-
-                        self.builder.position_at_end(block);
-                        Some(function)
-                    } else {
-                        None
-                    };
-
-                    let result = self.analysis(*expression)?;
-
-                    if let Some(function) = scope {
-                        self.builder.clear_insertion_position();
-                        unsafe {
-                            function.delete();
-                        }
-                    }
-
-                    let declared = result.get_type();
-
-                    let pointer = if global {
-                        let variable = self.current_module().add_global(declared, None, &target);
-                        variable.set_initializer(&result);
-                        variable.set_alignment(self.align(declared));
-                        variable.as_pointer_value()
-                    } else {
-                        let allocate =
-                            self.builder
-                                .build_alloca(declared, &target)
-                                .map_err(|error| {
-                                    GenerateError::new(ErrorKind::BuilderError(error.into()), span)
-                                })?;
-
-                        if let Some(instruction) = allocate.as_instruction_value() {
-                            instruction.set_alignment(self.align(declared)).ok();
-                        }
-
-                        let store =
-                            self.builder
-                                .build_store(allocate, result)
-                                .map_err(|error| {
-                                    GenerateError::new(ErrorKind::BuilderError(error.into()), span)
-                                })?;
-                        store.set_alignment(self.align(declared)).ok();
-
-                        allocate
-                    };
-
-                    self.insert_entity(target.clone(), Entity::Variable { pointer, typing });
-
-                    Ok(result)
-                }
-            },
-
+        let target = match binding.target.kind {
+            AnalysisKind::Usage(name) => name,
+            AnalysisKind::Symbol(target) => target.name,
             _ => {
                 unimplemented!("destruction isn't implemented yet!");
+            }
+        };
+
+        match binding.kind {
+            BindingKind::Static => {
+                let expression = binding.value.ok_or_else(|| {
+                    GenerateError::new(
+                        ErrorKind::Variable(VariableError::BindingWithoutInitializer {
+                            name: target.to_string(),
+                        }),
+                        span,
+                    )
+                })?;
+
+                if self.alias(target.clone(), &expression) {
+                    return Ok(self.context.i64_type().const_zero().into());
+                }
+
+                let result = self.analysis(*expression)?;
+                let declared = result.get_type();
+                let variable = self.current_module().add_global(declared, None, &target);
+                variable.set_initializer(&result);
+                variable.set_alignment(self.align(declared));
+                let pointer = variable.as_pointer_value();
+                let typing = binding.annotation.clone();
+                self.insert_entity(target.clone(), Entity::Variable { pointer, typing });
+                Ok(result)
+            }
+            _ => {
+                let expression = binding.value.ok_or_else(|| {
+                    GenerateError::new(
+                        ErrorKind::Variable(VariableError::BindingWithoutInitializer {
+                            name: target.to_string(),
+                        }),
+                        span,
+                    )
+                })?;
+
+                if self.alias(target.clone(), &expression) {
+                    return Ok(self.context.i64_type().const_zero().into());
+                }
+
+                let typing = binding.annotation.clone();
+                let global = self.builder.get_insert_block().is_none();
+
+                let scope = if global {
+                    let void = self.context.void_type();
+                    let signature = void.fn_type(&[], false);
+                    let function = self.current_module().add_function("init", signature, None);
+                    let block = self.context.append_basic_block(function, "entry");
+
+                    self.builder.position_at_end(block);
+                    Some(function)
+                } else {
+                    None
+                };
+
+                let result = self.analysis(*expression)?;
+
+                if let Some(function) = scope {
+                    self.builder.clear_insertion_position();
+                    unsafe {
+                        function.delete();
+                    }
+                }
+
+                let declared = result.get_type();
+
+                let pointer = if global {
+                    let variable = self.current_module().add_global(declared, None, &target);
+                    variable.set_initializer(&result);
+                    variable.set_alignment(self.align(declared));
+                    variable.as_pointer_value()
+                } else {
+                    let allocate =
+                        self.builder
+                            .build_alloca(declared, &target)
+                            .map_err(|error| {
+                                GenerateError::new(ErrorKind::BuilderError(error.into()), span)
+                            })?;
+
+                    if let Some(instruction) = allocate.as_instruction_value() {
+                        instruction.set_alignment(self.align(declared)).ok();
+                    }
+
+                    let store = self
+                        .builder
+                        .build_store(allocate, result)
+                        .map_err(|error| {
+                            GenerateError::new(ErrorKind::BuilderError(error.into()), span)
+                        })?;
+                    store.set_alignment(self.align(declared)).ok();
+
+                    allocate
+                };
+
+                self.insert_entity(target.clone(), Entity::Variable { pointer, typing });
+
+                Ok(result)
             }
         }
     }

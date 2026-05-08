@@ -1,22 +1,18 @@
-// src/emitter/interpreter/compiler.rs
-
 use {
+    crate::emitter::interpreter::error::InterpretError,
     crate::{
-        analyzer::{Analysis, AnalysisKind, Target},
+        analyzer::{Analysis, AnalysisKind},
         data::{BindingKind, Str},
         emitter::{
-            interpreter::{op::Op, value::Value},
-            BitwiseError, ControlFlowError, DataStructureError, ErrorKind, FunctionError,
+            interpreter::instruction::Instruction, DataStructureError, ErrorKind, FunctionError,
             VariableError,
         },
         resolver::{Type, TypeKind},
-        tracker::Span,
     },
-    crate::emitter::interpreter::error::InterpretError,
 };
 
 pub struct Chunk<'a> {
-    pub ops: Vec<Op<'a>>,
+    pub ops: Vec<Instruction<'a>>,
 }
 
 impl<'a> Chunk<'a> {
@@ -24,14 +20,16 @@ impl<'a> Chunk<'a> {
         Self { ops: Vec::new() }
     }
 
-    fn emit(&mut self, op: Op<'a>) -> usize {
+    fn emit(&mut self, op: Instruction<'a>) -> usize {
         self.ops.push(op);
         self.ops.len() - 1
     }
 
     fn patch_jump(&mut self, at: usize, target: usize) {
         match &mut self.ops[at] {
-            Op::Jump(dest) | Op::JumpIf(dest) | Op::JumpIfNot(dest) => *dest = target,
+            Instruction::Jump(dest) | Instruction::JumpIf(dest) | Instruction::JumpIfNot(dest) => {
+                *dest = target
+            }
             _ => {}
         }
     }
@@ -111,79 +109,79 @@ impl<'a> Compiler<'a> {
 
         match &analysis.kind {
             AnalysisKind::Integer { value, .. } => {
-                chunk.emit(Op::Integer(*value as i64));
+                chunk.emit(Instruction::Integer(*value as i64));
             }
             AnalysisKind::Float { value, .. } => {
-                chunk.emit(Op::Float(value.0));
+                chunk.emit(Instruction::Float(value.0));
             }
             AnalysisKind::Boolean { value } => {
-                chunk.emit(Op::Boolean(*value));
+                chunk.emit(Instruction::Boolean(*value));
             }
             AnalysisKind::Character { value } => {
-                chunk.emit(Op::Character(*value));
+                chunk.emit(Instruction::Character(*value));
             }
             AnalysisKind::String { value } => {
-                chunk.emit(Op::String(*value));
+                chunk.emit(Instruction::String(*value));
             }
 
             AnalysisKind::Negate(operand) => {
                 self.compile_one(operand, chunk)?;
-                chunk.emit(Op::Negate);
+                chunk.emit(Instruction::Negate);
             }
             AnalysisKind::LogicalNot(operand) => {
                 self.compile_one(operand, chunk)?;
-                chunk.emit(Op::Not);
+                chunk.emit(Instruction::Not);
             }
             AnalysisKind::BitwiseNot(operand) => {
                 self.compile_one(operand, chunk)?;
-                chunk.emit(Op::BitwiseNot);
+                chunk.emit(Instruction::BitwiseNot);
             }
             AnalysisKind::AddressOf(operand) => {
                 self.compile_one(operand, chunk)?;
-                chunk.emit(Op::AddressOf);
+                chunk.emit(Instruction::AddressOf);
             }
             AnalysisKind::Dereference(operand) => {
                 self.compile_one(operand, chunk)?;
-                chunk.emit(Op::Deref);
+                chunk.emit(Instruction::Deref);
             }
 
             AnalysisKind::Add(l, r) => {
                 self.compile_one(l, chunk)?;
                 self.compile_one(r, chunk)?;
-                chunk.emit(Op::Add);
+                chunk.emit(Instruction::Add);
             }
             AnalysisKind::Subtract(l, r) => {
                 self.compile_one(l, chunk)?;
                 self.compile_one(r, chunk)?;
-                chunk.emit(Op::Subtract);
+                chunk.emit(Instruction::Subtract);
             }
             AnalysisKind::Multiply(l, r) => {
                 self.compile_one(l, chunk)?;
                 self.compile_one(r, chunk)?;
-                chunk.emit(Op::Multiply);
+                chunk.emit(Instruction::Multiply);
             }
             AnalysisKind::Divide(l, r) => {
                 self.compile_one(l, chunk)?;
                 self.compile_one(r, chunk)?;
-                chunk.emit(Op::Divide);
+                chunk.emit(Instruction::Divide);
             }
             AnalysisKind::Modulus(l, r) => {
                 self.compile_one(l, chunk)?;
                 self.compile_one(r, chunk)?;
-                chunk.emit(Op::Modulus);
+                chunk.emit(Instruction::Modulus);
             }
             AnalysisKind::LogicalAnd(l, r) => {
                 self.compile_one(l, chunk)?;
-                let short = chunk.emit(Op::JumpIfNot(0));
-                chunk.emit(Op::Pop);
+                let short = chunk.emit(Instruction::JumpIfNot(0));
+                chunk.emit(Instruction::Pop);
                 self.compile_one(r, chunk)?;
                 let end = chunk.here();
                 chunk.patch_jump(short, end);
             }
             AnalysisKind::LogicalOr(l, r) => {
                 self.compile_one(l, chunk)?;
-                let short = chunk.emit(Op::JumpIf(0));
-                chunk.emit(Op::Pop);
+                let short = chunk.emit(Instruction::JumpIf(0));
+                chunk.emit(Instruction::Pop);
                 self.compile_one(r, chunk)?;
                 let end = chunk.here();
                 chunk.patch_jump(short, end);
@@ -191,63 +189,63 @@ impl<'a> Compiler<'a> {
             AnalysisKind::LogicalXOr(l, r) => {
                 self.compile_one(l, chunk)?;
                 self.compile_one(r, chunk)?;
-                chunk.emit(Op::Xor);
+                chunk.emit(Instruction::Xor);
             }
             AnalysisKind::BitwiseAnd(l, r) => {
                 self.compile_one(l, chunk)?;
                 self.compile_one(r, chunk)?;
-                chunk.emit(Op::BitwiseAnd);
+                chunk.emit(Instruction::BitwiseAnd);
             }
             AnalysisKind::BitwiseOr(l, r) => {
                 self.compile_one(l, chunk)?;
                 self.compile_one(r, chunk)?;
-                chunk.emit(Op::BitwiseOr);
+                chunk.emit(Instruction::BitwiseOr);
             }
             AnalysisKind::BitwiseXOr(l, r) => {
                 self.compile_one(l, chunk)?;
                 self.compile_one(r, chunk)?;
-                chunk.emit(Op::BitwiseXor);
+                chunk.emit(Instruction::BitwiseXor);
             }
             AnalysisKind::ShiftLeft(l, r) => {
                 self.compile_one(l, chunk)?;
                 self.compile_one(r, chunk)?;
-                chunk.emit(Op::ShiftLeft);
+                chunk.emit(Instruction::ShiftLeft);
             }
             AnalysisKind::ShiftRight(l, r) => {
                 self.compile_one(l, chunk)?;
                 self.compile_one(r, chunk)?;
-                chunk.emit(Op::ShiftRight);
+                chunk.emit(Instruction::ShiftRight);
             }
 
             AnalysisKind::Equal(l, r) => {
                 self.compile_one(l, chunk)?;
                 self.compile_one(r, chunk)?;
-                chunk.emit(Op::Equal);
+                chunk.emit(Instruction::Equal);
             }
             AnalysisKind::NotEqual(l, r) => {
                 self.compile_one(l, chunk)?;
                 self.compile_one(r, chunk)?;
-                chunk.emit(Op::NotEqual);
+                chunk.emit(Instruction::NotEqual);
             }
             AnalysisKind::Less(l, r) => {
                 self.compile_one(l, chunk)?;
                 self.compile_one(r, chunk)?;
-                chunk.emit(Op::Less);
+                chunk.emit(Instruction::Less);
             }
             AnalysisKind::LessOrEqual(l, r) => {
                 self.compile_one(l, chunk)?;
                 self.compile_one(r, chunk)?;
-                chunk.emit(Op::LessOrEqual);
+                chunk.emit(Instruction::LessOrEqual);
             }
             AnalysisKind::Greater(l, r) => {
                 self.compile_one(l, chunk)?;
                 self.compile_one(r, chunk)?;
-                chunk.emit(Op::Greater);
+                chunk.emit(Instruction::Greater);
             }
             AnalysisKind::GreaterOrEqual(l, r) => {
                 self.compile_one(l, chunk)?;
                 self.compile_one(r, chunk)?;
-                chunk.emit(Op::GreaterOrEqual);
+                chunk.emit(Instruction::GreaterOrEqual);
             }
 
             AnalysisKind::Array(items) => {
@@ -255,60 +253,53 @@ impl<'a> Compiler<'a> {
                 for item in items {
                     self.compile_one(item, chunk)?;
                 }
-                chunk.emit(Op::MakeArray(count));
+                chunk.emit(Instruction::MakeArray(count));
             }
             AnalysisKind::Tuple(items) => {
                 let count = items.len();
                 for item in items {
                     self.compile_one(item, chunk)?;
                 }
-                chunk.emit(Op::MakeTuple(count));
+                chunk.emit(Instruction::MakeTuple(count));
             }
 
             AnalysisKind::SizeOf(typing) => {
                 let size = self.sizeof_type(typing);
-                chunk.emit(Op::SizeOf(size));
+                chunk.emit(Instruction::SizeOf(size));
             }
 
-            AnalysisKind::Usage(name) => {
-                if let Some(slot) = self.local(name) {
-                    chunk.emit(Op::Load(slot));
+            AnalysisKind::Usage(_) | AnalysisKind::Symbol(_) => {
+                let name = match &analysis.kind {
+                    AnalysisKind::Usage(name) => *name,
+                    AnalysisKind::Symbol(target) => target.name,
+                    _ => unreachable!(),
+                };
+                if let Some(slot) = self.local(&name) {
+                    chunk.emit(Instruction::Load(slot));
                 } else {
-                    chunk.emit(Op::LoadGlobal(*name));
-                }
-            }
-            AnalysisKind::Symbol(target) => {
-                if let Some(slot) = self.local(&target.name) {
-                    chunk.emit(Op::Load(slot));
-                } else {
-                    chunk.emit(Op::LoadGlobal(target.name));
+                    chunk.emit(Instruction::LoadGlobal(name));
                 }
             }
 
-            AnalysisKind::Assign(name, value) => {
+            AnalysisKind::Assign(_, value) | AnalysisKind::Write(_, value) => {
+                let name = match &analysis.kind {
+                    AnalysisKind::Assign(name, _) => *name,
+                    AnalysisKind::Write(target, _) => target.name,
+                    _ => unreachable!(),
+                };
                 self.compile_one(value, chunk)?;
-                if let Some(slot) = self.local(name) {
-                    chunk.emit(Op::Store(slot));
-                    chunk.emit(Op::Load(slot));
+                if let Some(slot) = self.local(&name) {
+                    chunk.emit(Instruction::Store(slot));
+                    chunk.emit(Instruction::Load(slot));
                 } else {
-                    chunk.emit(Op::StoreGlobal(*name));
-                    chunk.emit(Op::LoadGlobal(*name));
-                }
-            }
-            AnalysisKind::Write(target, value) => {
-                self.compile_one(value, chunk)?;
-                if let Some(slot) = self.local(&target.name) {
-                    chunk.emit(Op::Store(slot));
-                    chunk.emit(Op::Load(slot));
-                } else {
-                    chunk.emit(Op::StoreGlobal(target.name));
-                    chunk.emit(Op::LoadGlobal(target.name));
+                    chunk.emit(Instruction::StoreGlobal(name));
+                    chunk.emit(Instruction::LoadGlobal(name));
                 }
             }
             AnalysisKind::Store(target, value) => {
                 self.compile_one(value, chunk)?;
                 self.compile_one(target, chunk)?;
-                chunk.emit(Op::SetIndex);
+                chunk.emit(Instruction::SetIndex);
             }
 
             AnalysisKind::Binding(binding) => {
@@ -316,7 +307,7 @@ impl<'a> Compiler<'a> {
                     AnalysisKind::Usage(n) => *n,
                     AnalysisKind::Symbol(t) => t.name,
                     _ => {
-                        chunk.emit(Op::Void);
+                        chunk.emit(Instruction::Void);
                         return Ok(());
                     }
                 };
@@ -333,19 +324,19 @@ impl<'a> Compiler<'a> {
                 }
 
                 if matches!(binding.kind, BindingKind::Static) || self.depth == 0 {
-                    chunk.emit(Op::DefineGlobal(name));
-                    chunk.emit(Op::LoadGlobal(name));
+                    chunk.emit(Instruction::DefineGlobal(name));
+                    chunk.emit(Instruction::LoadGlobal(name));
                 } else {
                     let slot = self.define_local(name);
-                    chunk.emit(Op::Store(slot));
-                    chunk.emit(Op::Load(slot));
+                    chunk.emit(Instruction::Store(slot));
+                    chunk.emit(Instruction::Load(slot));
                 }
             }
 
             AnalysisKind::Block(analyses) => {
                 self.depth += 1;
                 let base = self.locals.len();
-                chunk.emit(Op::EnterBlock);
+                chunk.emit(Instruction::EnterBlock);
 
                 let mut last_void = true;
                 for inner in analyses {
@@ -353,23 +344,22 @@ impl<'a> Compiler<'a> {
                     last_void = false;
                 }
 
-                let popped = self.locals.len() - base;
                 self.locals.truncate(base);
                 self.depth -= 1;
 
-                chunk.emit(Op::LeaveBlock);
+                chunk.emit(Instruction::LeaveBlock);
 
                 if last_void {
-                    chunk.emit(Op::Void);
+                    chunk.emit(Instruction::Void);
                 }
             }
 
             AnalysisKind::Conditional(condition, then, otherwise) => {
                 self.compile_one(condition, chunk)?;
-                let to_else = chunk.emit(Op::JumpIfNot(0));
+                let to_else = chunk.emit(Instruction::JumpIfNot(0));
 
                 self.compile_one(then, chunk)?;
-                let to_end = chunk.emit(Op::Jump(0));
+                let to_end = chunk.emit(Instruction::Jump(0));
 
                 let else_start = chunk.here();
                 chunk.patch_jump(to_else, else_start);
@@ -377,7 +367,7 @@ impl<'a> Compiler<'a> {
                 if let Some(branch) = otherwise {
                     self.compile_one(branch, chunk)?;
                 } else {
-                    chunk.emit(Op::Void);
+                    chunk.emit(Instruction::Void);
                 }
 
                 let end = chunk.here();
@@ -390,11 +380,11 @@ impl<'a> Compiler<'a> {
                 self.loop_exits.push(Vec::new());
 
                 self.compile_one(condition, chunk)?;
-                let exit_jump = chunk.emit(Op::JumpIfNot(0));
+                let exit_jump = chunk.emit(Instruction::JumpIfNot(0));
 
                 self.compile_one(body, chunk)?;
-                chunk.emit(Op::Pop);
-                chunk.emit(Op::Jump(loop_start));
+                chunk.emit(Instruction::Pop);
+                chunk.emit(Instruction::Jump(loop_start));
 
                 let exit = chunk.here();
                 chunk.patch_jump(exit_jump, exit);
@@ -405,25 +395,25 @@ impl<'a> Compiler<'a> {
                 }
                 self.loop_starts.pop();
 
-                chunk.emit(Op::Integer(0));
+                chunk.emit(Instruction::Integer(0));
             }
 
             AnalysisKind::Return(value) => {
                 if let Some(v) = value {
                     self.compile_one(v, chunk)?;
                 } else {
-                    chunk.emit(Op::Void);
+                    chunk.emit(Instruction::Void);
                 }
-                chunk.emit(Op::ReturnSignal);
+                chunk.emit(Instruction::ReturnSignal);
             }
             AnalysisKind::Break(value) => {
                 if let Some(v) = value {
                     self.compile_one(v, chunk)?;
                 } else {
-                    chunk.emit(Op::Void);
+                    chunk.emit(Instruction::Void);
                 }
-                chunk.emit(Op::BreakSignal);
-                let at = chunk.emit(Op::Jump(0));
+                chunk.emit(Instruction::BreakSignal);
+                let at = chunk.emit(Instruction::Jump(0));
                 if let Some(exits) = self.loop_exits.last_mut() {
                     exits.push(at);
                 }
@@ -432,18 +422,18 @@ impl<'a> Compiler<'a> {
                 if let Some(v) = value {
                     self.compile_one(v, chunk)?;
                 } else {
-                    chunk.emit(Op::Void);
+                    chunk.emit(Instruction::Void);
                 }
-                chunk.emit(Op::ContinueSignal);
+                chunk.emit(Instruction::ContinueSignal);
                 let top = self.loop_starts.last().copied().unwrap_or(0);
-                chunk.emit(Op::Jump(top));
+                chunk.emit(Instruction::Jump(top));
             }
 
             AnalysisKind::Call(target, args) => {
                 for arg in args {
                     self.compile_one(arg, chunk)?;
                 }
-                chunk.emit(Op::Call(target.name, args.len()));
+                chunk.emit(Instruction::Call(target.name, args.len()));
             }
             AnalysisKind::Invoke(invoke) => {
                 let name = match &invoke.target.typing.kind {
@@ -460,22 +450,22 @@ impl<'a> Compiler<'a> {
                 for arg in &invoke.members {
                     self.compile_one(arg, chunk)?;
                 }
-                chunk.emit(Op::Call(name, invoke.members.len()));
+                chunk.emit(Instruction::Call(name, invoke.members.len()));
             }
 
             AnalysisKind::Function(function) => {
-                chunk.emit(Op::DefineGlobal(function.target));
-                chunk.emit(Op::Void);
+                chunk.emit(Instruction::DefineGlobal(function.target));
+                chunk.emit(Instruction::Void);
             }
             AnalysisKind::Structure(_) | AnalysisKind::Union(_) => {
-                chunk.emit(Op::Void);
+                chunk.emit(Instruction::Void);
             }
-            AnalysisKind::Module(name, inner) => {
+            AnalysisKind::Module(_, inner) => {
                 for analysis in inner {
                     self.compile_one(analysis, chunk)?;
-                    chunk.emit(Op::Pop);
+                    chunk.emit(Instruction::Pop);
                 }
-                chunk.emit(Op::Void);
+                chunk.emit(Instruction::Void);
             }
 
             AnalysisKind::Constructor(constructor) => {
@@ -484,7 +474,7 @@ impl<'a> Compiler<'a> {
                 for member in &constructor.members {
                     self.compile_one(member, chunk)?;
                 }
-                chunk.emit(Op::MakeStruct(name, count));
+                chunk.emit(Instruction::MakeStruct(name, count));
             }
             AnalysisKind::Pack(target, values) => {
                 let mut sorted = values.clone();
@@ -493,7 +483,7 @@ impl<'a> Compiler<'a> {
                 for (_, analysis) in &sorted {
                     self.compile_one(analysis, chunk)?;
                 }
-                chunk.emit(Op::MakeStruct(target.name, count));
+                chunk.emit(Instruction::MakeStruct(target.name, count));
             }
             AnalysisKind::Composite(composite) => {
                 let name = composite.target.name;
@@ -501,7 +491,7 @@ impl<'a> Compiler<'a> {
                 for member in &composite.members {
                     self.compile_one(member, chunk)?;
                 }
-                chunk.emit(Op::MakeStruct(name, count));
+                chunk.emit(Instruction::MakeStruct(name, count));
             }
 
             AnalysisKind::Access(target, member) => {
@@ -519,22 +509,18 @@ impl<'a> Compiler<'a> {
                 };
                 let index = self.field_index(&typing, &field).unwrap_or(0);
                 self.compile_one(target, chunk)?;
-                chunk.emit(Op::GetField(index));
+                chunk.emit(Instruction::GetField(index));
             }
             AnalysisKind::Slot(target, index) => {
                 self.compile_one(target, chunk)?;
-                chunk.emit(Op::GetField(*index));
+                chunk.emit(Instruction::GetField(*index));
             }
             AnalysisKind::Index(index) => {
                 self.compile_one(&index.target, chunk)?;
                 if !index.members.is_empty() {
                     self.compile_one(&index.members[0], chunk)?;
-                    chunk.emit(Op::GetIndex);
+                    chunk.emit(Instruction::GetIndex);
                 }
-            }
-
-            _ => {
-                chunk.emit(Op::Void);
             }
         }
 
@@ -544,11 +530,9 @@ impl<'a> Compiler<'a> {
     fn field_index(&self, typing: &Type<'a>, name: &Str<'a>) -> Option<usize> {
         match &typing.kind {
             TypeKind::Structure(agg) | TypeKind::Union(agg) => {
-                agg.members.iter().position(|m| {
-                    match &m.kind {
-                        TypeKind::Binding(b) => b.target == *name,
-                        _ => false,
-                    }
+                agg.members.iter().position(|m| match &m.kind {
+                    TypeKind::Binding(b) => b.target == *name,
+                    _ => false,
                 })
             }
             _ => None,

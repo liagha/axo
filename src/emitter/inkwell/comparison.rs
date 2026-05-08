@@ -1,13 +1,13 @@
 use {
     crate::{
         analyzer::Analysis,
-        emitter::{ErrorKind, GenerateError, Generator},
+        emitter::{ErrorKind, GenerateError, Inkwell},
         tracker::Span,
     },
     inkwell::{values::BasicValueEnum, FloatPredicate, IntPredicate},
 };
 
-impl<'backend> Generator<'backend> {
+impl<'backend> Inkwell<'backend> {
     fn string_equal(
         &mut self,
         left: Box<Analysis<'backend>>,

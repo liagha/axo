@@ -7,7 +7,7 @@ use {
                 error::{ControlFlowError, FunctionError},
                 Entity,
             },
-            ErrorKind, GenerateError, Generator,
+            ErrorKind, GenerateError, Inkwell,
         },
         resolver::{Type, TypeKind},
         tracker::Span,
@@ -21,7 +21,7 @@ use {
     },
 };
 
-impl<'backend> Generator<'backend> {
+impl<'backend> Inkwell<'backend> {
     fn bind_name(target: &Analysis<'backend>) -> Option<Str<'backend>> {
         match &target.kind {
             AnalysisKind::Usage(name) => Some(*name),

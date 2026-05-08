@@ -1,13 +1,13 @@
 use {
     crate::{
         analyzer::Analysis,
-        emitter::{BuilderError, ErrorKind, GenerateError, Generator},
+        emitter::{BuilderError, ErrorKind, GenerateError, Inkwell},
         tracker::Span,
     },
     inkwell::values::{BasicValueEnum, IntValue},
 };
 
-impl<'backend> Generator<'backend> {
+impl<'backend> Inkwell<'backend> {
     fn check_boolean(
         &self,
         value: BasicValueEnum<'backend>,

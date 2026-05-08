@@ -1,9 +1,7 @@
-// src/emitter/interpreter/op.rs
-
-use crate::data::{Scale, Str};
+use crate::data::Str;
 
 #[derive(Clone, Debug)]
-pub enum Op<'a> {
+pub enum Instruction<'a> {
     Integer(i64),
     Float(f64),
     Boolean(bool),

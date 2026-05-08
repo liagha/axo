@@ -1,10 +1,4 @@
-use {
-    crate::{
-        data::Str,
-        emitter::interpreter::value::Value,
-    },
-    std::sync::Arc,
-};
+use {crate::emitter::interpreter::value::Value, std::sync::Arc};
 
 pub type NativeFn<'a> = Arc<dyn Fn(&[Value<'a>]) -> Value<'a> + Send + Sync>;
 

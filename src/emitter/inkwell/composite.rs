@@ -3,7 +3,7 @@ use {
         analyzer::{Analysis, AnalysisKind, Target},
         data::{Aggregate, Index, Scale, Str},
         emitter::{
-            inkwell::{Entity, GenerateError, Generator},
+            inkwell::{Entity, GenerateError, Inkwell},
             BuilderError, DataStructureError, ErrorKind,
         },
         resolver::{Type, TypeKind},
@@ -16,7 +16,7 @@ use {
     },
 };
 
-impl<'backend> Generator<'backend> {
+impl<'backend> Inkwell<'backend> {
     fn member(target: &Analysis<'backend>) -> Option<Str<'backend>> {
         match &target.kind {
             AnalysisKind::Usage(name) => Some(*name),

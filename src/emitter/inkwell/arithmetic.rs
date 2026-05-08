@@ -1,13 +1,13 @@
 use {
     crate::{
         analyzer::Analysis,
-        emitter::{ErrorKind, GenerateError, Generator},
+        emitter::{ErrorKind, GenerateError, Inkwell},
         tracker::Span,
     },
     inkwell::{values::BasicValueEnum, IntPredicate},
 };
 
-impl<'backend> Generator<'backend> {
+impl<'backend> Inkwell<'backend> {
     pub fn normalize(
         &self,
         left: BasicValueEnum<'backend>,
