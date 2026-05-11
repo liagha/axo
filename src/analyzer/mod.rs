@@ -5,40 +5,38 @@ mod error;
 
 pub use {analysis::*, analyzer::*, error::*};
 
+pub type AnalyzeError<'error> = Error<'error, ErrorKind<'error>>;
+
 use crate::{
     combinator::{Combinator, Operation, Operator},
-    data::memory::Arc,
-    internal::{platform::Lock, Session},
+    internal::session::Store,
     reporter::Error,
 };
 
-pub type AnalyzeError<'error> = Error<'error, ErrorKind<'error>>;
-
-impl<'source>
-    Combinator<
-        'static,
-        Operator<Arc<Lock<Session<'source>>>>,
-        Operation<'source, Arc<Lock<Session<'source>>>>,
-    > for Analyzer<'source>
+impl<'op, 'source>
+Combinator<
+'static,
+(&'op mut Operator<Store<'source>>, &'op mut Operation<'source, Store<'source>>),
+> for Analyzer<'source>
 {
-    fn combinator(
-        &self,
-        operator: &mut Operator<Arc<Lock<Session<'source>>>>,
-        operation: &mut Operation<'source, Arc<Lock<Session<'source>>>>,
-    ) {
-        let mut session = operator.store.write().unwrap();
+fn combinator(
+&self,
+joint: &mut (&'op mut Operator<Store<'source>>, &'op mut Operation<'source, Store<'source>>),
+) {
+let (operator, operation) = (&mut joint.0, &mut joint.1);
 
-        let mut keys: Vec<_> = session.records.keys().copied().collect();
-        keys.sort();
+let mut session = operator.store.write().unwrap();
+let mut keys: Vec<_> = session.records.keys().copied().collect();
+keys.sort();
 
-        Analyzer::execute(&mut session, &keys);
+Analyzer::execute(&mut session, &keys);
 
-        if session.errors.is_empty() {
-            operation.set_resolve(Vec::new());
-        } else {
-            operation.set_reject();
-        }
-    }
+if session.errors.is_empty() {
+operation.set_resolve(Vec::new());
+} else {
+operation.set_reject();
+}
+}
 }
 
 impl<'source> Default for Analyzer<'source> {

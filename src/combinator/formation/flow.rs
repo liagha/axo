@@ -1,8 +1,10 @@
 use crate::{
     combinator::{Combinator, Form, Formable, Formation, Former, Outcome},
-    data::{memory::Arc},
+    data::memory::Arc,
     tracker::Peekable,
 };
+
+use super::Joint;
 
 pub struct Consume;
 
@@ -71,14 +73,15 @@ impl Build {
         Failure: Formable<'a>,
     {
         let combinator: Arc<
-            dyn Combinator<
-                'a,
-                Former<'a, 'source, Source, Input, Output, Failure>,
-                Formation<'a, 'source, Source, Input, Output, Failure>,
-            > + Send
+            dyn Combinator<'a, Joint<'a, 'source, Source, Input, Output, Failure>>
+            + Send
             + Sync
             + 'source,
         > = formation.combinator.clone();
-        combinator.combinator(former, formation);
+
+        let mut joint: Joint<'a, 'source, Source, Input, Output, Failure> = unsafe {
+            std::mem::transmute_copy(&(former, formation))
+        };
+        combinator.combinator(&mut joint);
     }
 }

@@ -1,7 +1,7 @@
 use crate::{
     combinator::{
-        Alternative, Combinator, Command, Condition, Cycle, Multiple, Operation, Operator,
-        Repetition, Sequence, Status, Transform, Trigger,
+        Alternative, Combinator, Command, Condition, Cycle, Repetition,
+        Sequence, Status, Transform, Trigger,
     },
     data::{memory::take, Identity, Scale},
     internal::{
@@ -10,15 +10,39 @@ use crate::{
     },
 };
 
-impl<'source, Store: Clone + Send + Sync + 'source>
-    Combinator<'static, Operator<Store>, Operation<'source, Store>> for Command
+use super::{Joint, Mapper, Operation, Operator};
+
+type Boxed<'source, Store> = Vec<
+crate::data::memory::Arc<
+dyn for<'op> Combinator<
+'static,
+(&'op mut Operator<Store>, &'op mut Operation<'source, Store>),
+> + Send + Sync + 'source,
+>,
+>;
+
+pub struct Many<'source, Store> {
+    pub steps: Boxed<'source, Store>,
+}
+
+impl<'op, 'source, Store: Clone + Send + Sync + 'static>
+Combinator<'static, Joint<'op, 'source, Store>> for Many<'source, Store>
 {
     #[inline]
-    fn combinator(
-        &self,
-        _operator: &mut Operator<Store>,
-        operation: &mut Operation<'source, Store>,
-    ) {
+    fn combinator(&self, joint: &mut Joint<'op, 'source, Store>) {
+        for step in self.steps.iter() {
+            step.combinator(joint);
+        }
+    }
+}
+
+impl<'op, 'source, Store: Clone + Send + Sync>
+Combinator<'static, Joint<'op, 'source, Store>> for Command
+{
+    #[inline]
+    fn combinator(&self, joint: &mut Joint<'op, 'source, Store>) {
+        let (_operator, operation) = (&mut joint.0, &mut joint.1);
+
         let mut terminal = Terminal::new(&self.program);
         terminal.args(&self.arguments);
 
@@ -51,15 +75,13 @@ impl<'source, Store: Clone + Send + Sync + 'source>
     }
 }
 
-impl<'source, Store: Clone + Send + Sync + 'source>
-    Combinator<'static, Operator<Store>, Operation<'source, Store>> for Trigger<'source, Store>
+impl<'op, 'source, Store: Clone + Send + Sync + 'source>
+Combinator<'static, Joint<'op, 'source, Store>> for Trigger<'source, Store>
 {
     #[inline]
-    fn combinator(
-        &self,
-        operator: &mut Operator<Store>,
-        operation: &mut Operation<'source, Store>,
-    ) {
+    fn combinator(&self, joint: &mut Joint<'op, 'source, Store>) {
+        let (_operator, operation) = (&mut joint.0, &mut joint.1);
+
         match &self.condition {
             Condition::Always => {}
             Condition::Time(time) => {
@@ -99,36 +121,18 @@ impl<'source, Store: Clone + Send + Sync + 'source>
             }
         }
 
-        self.combinator.combinator(operator, operation);
+        self.combinator.combinator(joint);
     }
 }
 
-impl<'source, Store: Clone + Send + Sync + 'source>
-    Combinator<'static, Operator<Store>, Operation<'source, Store>>
-    for Multiple<'static, 'source, Operator<Store>, Operation<'source, Store>>
+impl<'op, 'source, Store: Clone + Send + Sync + 'static, const SIZE: Scale>
+Combinator<'static, Joint<'op, 'source, Store>>
+for Sequence<Operation<'source, Store>, SIZE>
 {
     #[inline]
-    fn combinator(
-        &self,
-        operator: &mut Operator<Store>,
-        operation: &mut Operation<'source, Store>,
-    ) {
-        for step in self.combinators.iter() {
-            step.combinator(operator, operation);
-        }
-    }
-}
+    fn combinator(&self, joint: &mut Joint<'op, 'source, Store>) {
+        let (operator, operation) = (&mut joint.0, &mut joint.1);
 
-impl<'source, Store: Clone + Send + Sync + 'source, const SIZE: Scale>
-    Combinator<'static, Operator<Store>, Operation<'source, Store>>
-    for Sequence<Operation<'source, Store>, SIZE>
-{
-    #[inline]
-    fn combinator(
-        &self,
-        operator: &mut Operator<Store>,
-        operation: &mut Operation<'source, Store>,
-    ) {
         let mut current_stack = take(&mut operation.stack);
         let mut current_payload = take(&mut operation.payload);
         let base_stack = current_stack.len();
@@ -148,7 +152,6 @@ impl<'source, Store: Clone + Send + Sync + 'source, const SIZE: Scale>
             operator.build(&mut child);
 
             let halted = (self.halt)(&child);
-
             current_stack = take(&mut child.stack);
 
             if let Status::Resolved(data) = &child.status {
@@ -175,16 +178,14 @@ impl<'source, Store: Clone + Send + Sync + 'source, const SIZE: Scale>
     }
 }
 
-impl<'source, Store: Clone + Send + Sync + 'source, const SIZE: Scale>
-    Combinator<'static, Operator<Store>, Operation<'source, Store>>
-    for Alternative<Operation<'source, Store>, SIZE>
+impl<'op, 'source, Store: Clone + Send + Sync + 'static, const SIZE: Scale>
+Combinator<'static, Joint<'op, 'source, Store>>
+for Alternative<Operation<'source, Store>, SIZE>
 {
     #[inline]
-    fn combinator(
-        &self,
-        operator: &mut Operator<Store>,
-        operation: &mut Operation<'source, Store>,
-    ) {
+    fn combinator(&self, joint: &mut Joint<'op, 'source, Store>) {
+        let (operator, operation) = (&mut joint.0, &mut joint.1);
+
         let mut best: Option<Operation<'source, Store>> = None;
         let current_stack = take(&mut operation.stack);
         let current_payload = take(&mut operation.payload);
@@ -238,16 +239,14 @@ impl<'source, Store: Clone + Send + Sync + 'source, const SIZE: Scale>
     }
 }
 
-impl<'source, Store: Clone + Send + Sync + 'source>
-    Combinator<'static, Operator<Store>, Operation<'source, Store>>
-    for Repetition<Operation<'source, Store>>
+impl<'op, 'source, Store: Clone + Send + Sync + 'static>
+Combinator<'static, Joint<'op, 'source, Store>>
+for Repetition<Operation<'source, Store>>
 {
     #[inline]
-    fn combinator(
-        &self,
-        operator: &mut Operator<Store>,
-        operation: &mut Operation<'source, Store>,
-    ) {
+    fn combinator(&self, joint: &mut Joint<'op, 'source, Store>) {
+        let (operator, operation) = (&mut joint.0, &mut joint.1);
+
         let mut current_stack = take(&mut operation.stack);
         let mut current_payload = take(&mut operation.payload);
         let base_stack = current_stack.len();
@@ -317,16 +316,14 @@ impl<'source, Store: Clone + Send + Sync + 'source>
     }
 }
 
-impl<'source, Store: Clone + Send + Sync + 'source>
-    Combinator<'static, Operator<Store>, Operation<'source, Store>>
-    for Cycle<Operation<'source, Store>>
+impl<'op, 'source, Store: Clone + Send + Sync + 'static>
+Combinator<'static, Joint<'op, 'source, Store>>
+for Cycle<Operation<'source, Store>>
 {
     #[inline]
-    fn combinator(
-        &self,
-        operator: &mut Operator<Store>,
-        operation: &mut Operation<'source, Store>,
-    ) {
+    fn combinator(&self, joint: &mut Joint<'op, 'source, Store>) {
+        let (operator, operation) = (&mut joint.0, &mut joint.1);
+
         let mut current_stack = take(&mut operation.stack);
         let mut current_payload = take(&mut operation.payload);
 
@@ -358,16 +355,24 @@ impl<'source, Store: Clone + Send + Sync + 'source>
     }
 }
 
-impl<'source, Store: Clone + Send + Sync + 'source, Failure>
-    Combinator<'static, Operator<Store>, Operation<'source, Store>>
-    for Transform<'static, 'source, Operator<Store>, Operation<'source, Store>, Failure>
+impl<'op, 'source, Store: Clone + Send + Sync + 'static, Failure>
+Combinator<'static, Joint<'op, 'source, Store>>
+for Transform<'source, Joint<'op, 'source, Store>, Failure>
 {
     #[inline]
-    fn combinator(
-        &self,
-        operator: &mut Operator<Store>,
-        operation: &mut Operation<'source, Store>,
-    ) {
-        let _ = (self.transformer)(operator, operation);
+    fn combinator(&self, joint: &mut Joint<'op, 'source, Store>) {
+        let _ = (self.transformer)(joint);
+    }
+}
+
+impl<'op, 'source, Store: Clone + Send + Sync + 'static>
+Combinator<'static, Joint<'op, 'source, Store>> for Mapper<'source, Store>
+{
+    #[inline]
+    fn combinator(&self, joint: &mut Joint<'op, 'source, Store>) {
+        self.inner.combinator(joint);
+        if let Status::Resolved(data) = &joint.1.status {
+            joint.1.status = Status::Resolved((self.transform)(data.clone()));
+        }
     }
 }

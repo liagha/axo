@@ -28,7 +28,9 @@ impl<'a> Parser<'a> {
             Formation::predicate(|t: &Token| {
                 t.kind == TokenKind::Punctuation(PunctuationKind::RightBrace)
             })
-            .with_panic(|former, formation| {
+            .with_panic(|joint| {
+                let (former, formation) = (&mut joint.0, &mut joint.1);
+
                 let consumed: Vec<Token> = formation
                     .consumed
                     .iter()
@@ -49,7 +51,9 @@ impl<'a> Parser<'a> {
                 )
             }),
         ])
-        .with_transform(|former, formation| {
+        .with_transform(|joint| {
+            let (former, formation) = (&mut joint.0, &mut joint.1);
+
             let form = former.forms.get_mut(formation.form).unwrap();
             let delimiters = form.collect_inputs();
             let elements = form.collect_outputs();
@@ -112,7 +116,9 @@ impl<'a> Parser<'a> {
             Formation::predicate(|t: &Token| {
                 t.kind == TokenKind::Punctuation(PunctuationKind::RightBrace)
             })
-            .with_panic(|former, formation| {
+            .with_panic(|joint| {
+                let (former, formation) = (&mut joint.0, &mut joint.1);
+
                 let consumed: Vec<Token> = formation
                     .consumed
                     .iter()
@@ -133,7 +139,9 @@ impl<'a> Parser<'a> {
                 )
             }),
         ])
-        .with_transform(|former, formation| {
+        .with_transform(|joint| {
+            let (former, formation) = (&mut joint.0, &mut joint.1);
+
             let form = former.forms.get_mut(formation.form).unwrap();
             let delimiters = form.collect_inputs();
             let elements = form.collect_outputs();
@@ -196,7 +204,9 @@ impl<'a> Parser<'a> {
             Formation::predicate(|t: &Token| {
                 t.kind == TokenKind::Punctuation(PunctuationKind::RightParenthesis)
             })
-            .with_panic(|former, formation| {
+            .with_panic(|joint| {
+                let (former, formation) = (&mut joint.0, &mut joint.1);
+
                 let consumed: Vec<Token> = formation
                     .consumed
                     .iter()
@@ -217,7 +227,9 @@ impl<'a> Parser<'a> {
                 )
             }),
         ])
-        .with_transform(|former, formation| {
+        .with_transform(|joint| {
+            let (former, formation) = (&mut joint.0, &mut joint.1);
+
             let form = former.forms.get_mut(formation.form).unwrap();
             let delimiters = form.collect_inputs();
             let elements = form.collect_outputs();
@@ -280,7 +292,9 @@ impl<'a> Parser<'a> {
             Formation::predicate(|t: &Token| {
                 t.kind == TokenKind::Punctuation(PunctuationKind::RightParenthesis)
             })
-            .with_panic(|former, formation| {
+            .with_panic(|joint| {
+                let (former, formation) = (&mut joint.0, &mut joint.1);
+
                 let consumed: Vec<Token> = formation
                     .consumed
                     .iter()
@@ -301,7 +315,9 @@ impl<'a> Parser<'a> {
                 )
             }),
         ])
-        .with_transform(|former, formation| {
+        .with_transform(|joint| {
+            let (former, formation) = (&mut joint.0, &mut joint.1);
+
             let form = former.forms.get_mut(formation.form).unwrap();
             let delimiters = form.collect_inputs();
             let elements = form.collect_outputs();
@@ -364,7 +380,9 @@ impl<'a> Parser<'a> {
             Formation::predicate(|t: &Token| {
                 t.kind == TokenKind::Punctuation(PunctuationKind::RightBracket)
             })
-            .with_panic(|former, formation| {
+            .with_panic(|joint| {
+                let (former, formation) = (&mut joint.0, &mut joint.1);
+
                 let consumed: Vec<Token> = formation
                     .consumed
                     .iter()
@@ -385,7 +403,9 @@ impl<'a> Parser<'a> {
                 )
             }),
         ])
-        .with_transform(|former, formation| {
+        .with_transform(|joint| {
+            let (former, formation) = (&mut joint.0, &mut joint.1);
+
             let form = former.forms.get_mut(formation.form).unwrap();
             let delimiters = form.collect_inputs();
             let elements = form.collect_outputs();
@@ -448,7 +468,9 @@ impl<'a> Parser<'a> {
             Formation::predicate(|t: &Token| {
                 t.kind == TokenKind::Punctuation(PunctuationKind::RightBracket)
             })
-            .with_panic(|former, formation| {
+            .with_panic(|joint| {
+                let (former, formation) = (&mut joint.0, &mut joint.1);
+
                 let consumed: Vec<Token> = formation
                     .consumed
                     .iter()
@@ -469,7 +491,9 @@ impl<'a> Parser<'a> {
                 )
             }),
         ])
-        .with_transform(|former, formation| {
+        .with_transform(|joint| {
+            let (former, formation) = (&mut joint.0, &mut joint.1);
+
             let form = former.forms.get_mut(formation.form).unwrap();
             let delimiters = form.collect_inputs();
             let elements = form.collect_outputs();

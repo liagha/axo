@@ -1,22 +1,22 @@
 use crate::{
-    combinator::{Combinator, Operation, Operator, Status},
+    combinator::Combinator,
     data::memory::take,
     internal::platform::scope,
 };
+
+use super::{Joint, Operation, Operator, Status};
 
 pub struct Plan<'source, Store = ()> {
     pub states: Vec<Operation<'source, Store>>,
 }
 
-impl<'source, Store: Clone + Send + Sync + 'source>
-    Combinator<'static, Operator<Store>, Operation<'source, Store>> for Plan<'source, Store>
+impl<'op, 'source, Store: Clone + Send + Sync + 'static>
+Combinator<'static, Joint<'op, 'source, Store>> for Plan<'source, Store>
 {
     #[inline]
-    fn combinator(
-        &self,
-        operator: &mut Operator<Store>,
-        operation: &mut Operation<'source, Store>,
-    ) {
+    fn combinator(&self, joint: &mut Joint<'op, 'source, Store>) {
+        let (operator, operation) = (&mut joint.0, &mut joint.1);
+
         let mut all_resolved = true;
         let mut any_rejected = false;
         let mut final_payload = take(&mut operation.payload);
@@ -60,15 +60,13 @@ pub struct Parallel<'source, Store = ()> {
     pub states: Vec<Operation<'source, Store>>,
 }
 
-impl<'source, Store: Clone + Send + Sync + 'source>
-    Combinator<'static, Operator<Store>, Operation<'source, Store>> for Parallel<'source, Store>
+impl<'op, 'source, Store: Clone + Send + Sync + 'static>
+Combinator<'static, Joint<'op, 'source, Store>> for Parallel<'source, Store>
 {
     #[inline]
-    fn combinator(
-        &self,
-        operator: &mut Operator<Store>,
-        operation: &mut Operation<'source, Store>,
-    ) {
+    fn combinator(&self, joint: &mut Joint<'op, 'source, Store>) {
+        let (operator, operation) = (&mut joint.0, &mut joint.1);
+
         let mut all_resolved = true;
         let mut any_rejected = false;
         let mut final_payload = take(&mut operation.payload);

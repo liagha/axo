@@ -13,23 +13,22 @@ pub type ScanError<'error> = Error<'error, ErrorKind<'error>>;
 
 use crate::{
     combinator::{Combinator, Operation},
-    data::memory::Arc,
-    internal::{platform::Lock, Session},
+    internal::session::Store,
     reporter::Error,
 };
 
-impl<'source>
-    Combinator<
-        'static,
-        crate::combinator::Operator<Arc<Lock<Session<'source>>>>,
-        Operation<'source, Arc<Lock<Session<'source>>>>,
-    > for Scanner<'source>
+impl<'op, 'source>
+Combinator<
+    'static,
+    (&'op mut crate::combinator::Operator<Store<'source>>, &'op mut Operation<'source, Store<'source>>),
+> for Scanner<'source>
 {
     fn combinator(
         &self,
-        operator: &mut crate::combinator::Operator<Arc<Lock<Session<'source>>>>,
-        operation: &mut Operation<'source, Arc<Lock<Session<'source>>>>,
+        joint: &mut (&'op mut crate::combinator::Operator<Store<'source>>, &'op mut Operation<'source, Store<'source>>),
     ) {
+        let (operator, operation) = (&mut joint.0, &mut joint.1);
+
         let mut session = operator.store.write().unwrap();
         let mut keys: Vec<_> = session.records.keys().copied().collect();
         keys.sort();
@@ -43,7 +42,6 @@ impl<'source>
         }
     }
 }
-
 impl<'source> Default for Scanner<'source> {
     fn default() -> Self {
         let position = crate::tracker::Position::new(0);
@@ -261,7 +259,7 @@ mod tests {
     #[test]
     fn debug_failing_span() {
         let source = "a\"\"";
-        let mut scanner = Scanner::new(Position::new(1), crate::data::Str::from(source));
+        let mut scanner = Scanner::new(Position::new(1), Str::from(source));
         scanner.scan();
 
         let mut previous = 0;

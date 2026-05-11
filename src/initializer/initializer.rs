@@ -8,6 +8,7 @@ use crate::{
     scanner::{PunctuationKind, Scanner, Token, TokenKind},
     tracker::{Location, Peekable, Position, Span},
 };
+use crate::combinator::formation::Joint;
 
 #[derive(Clone)]
 pub struct Initializer<'a> {
@@ -122,15 +123,10 @@ impl<'a> Initializer<'a> {
             Self::cranelift(),
             Self::implicit(),
             Formation::anything().with_panic(
-                |former: &mut Former<
-                    'a,
-                    'source,
-                    Self,
-                    Token<'a>,
-                    Symbol<'a>,
-                    InitializeError<'a>,
-                >,
-                 formation| {
+                |joint: &mut Joint<'a, 'source, Self, Token<'a>, Symbol<'a>, InitializeError<'a>>| {
+                    let former = &mut joint.0;
+                    let formation = &mut joint.1;
+
                     let form = former.forms.get_mut(formation.form).unwrap();
                     let input = form.collect_inputs()[0].clone();
                     let span = input.span;

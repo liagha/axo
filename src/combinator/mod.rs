@@ -4,11 +4,14 @@ use crate::data::{
     Identity, Scale,
 };
 
-mod formation;
-mod operation;
+pub mod formation;
+pub mod operation;
 
-pub use formation::*;
 pub use operation::*;
+pub use formation::*;
+
+pub use operation::Joint as OperationJoint;
+pub use formation::Joint as FormationJoint;
 
 pub static COUNTER: AtomicUsize = AtomicUsize::new(0);
 
@@ -22,12 +25,12 @@ pub trait Formable<'a>: Clone + Eq + Hash + PartialEq + Show<'a> + 'a {}
 
 impl<'a, T> Formable<'a> for T where T: Clone + Eq + Hash + PartialEq + Show<'a> + 'a {}
 
-pub trait Combinator<'a, Host, State>: Send + Sync {
-    fn combinator(&self, host: &mut Host, state: &mut State);
+pub trait Combinator<'a, Joint>: Send + Sync {
+    fn combinator(&self, joint: &mut Joint);
 }
 
-pub struct Multiple<'a, 'source, Host, State> {
-    pub combinators: Vec<Arc<dyn Combinator<'a, Host, State> + Send + Sync + 'source>>,
+pub struct Multiple<'a, 'source, Joint> {
+    pub combinators: Vec<Arc<dyn Combinator<'a, Joint> + Send + Sync + 'source>>,
 }
 
 pub struct Resolve;
@@ -37,30 +40,26 @@ pub struct Depend;
 pub struct Pulse {
     pub idle: u64,
 }
+
 pub struct Ignore;
 
 pub struct Skip;
 
-pub struct Transform<'a, 'source, Host, State, Failure> {
-    pub transformer:
-        Arc<dyn Fn(&mut Host, &mut State) -> Result<(), Failure> + Send + Sync + 'source>,
-    pub phantom: PhantomData<&'a ()>,
+pub struct Transform<'bound, Joint, Failure> {
+    pub transformer: Arc<dyn Fn(&mut Joint) -> Result<(), Failure> + Send + Sync + 'bound>,
 }
 
-pub struct Fail<'a, 'source, Host, State, Failure> {
-    pub emitter: Arc<dyn Fn(&mut Host, State) -> Failure + Send + Sync + 'source>,
-    pub phantom: PhantomData<&'a ()>,
+pub struct Fail<'bound, Joint, Failure> {
+    pub emitter: Arc<dyn Fn(&mut Joint) -> Failure + Send + Sync + 'bound>,
 }
 
-pub struct Panic<'a, 'source, Host, State, Failure> {
-    pub emitter: Arc<dyn Fn(&mut Host, State) -> Failure + Send + Sync + 'source>,
-    pub phantom: PhantomData<&'a ()>,
+pub struct Panic<'bound, Joint, Failure> {
+    pub emitter: Arc<dyn Fn(&mut Joint) -> Failure + Send + Sync + 'bound>,
 }
 
-pub struct Recover<'a, 'source, Host, State, Input, Failure> {
-    pub sync: Arc<dyn Fn(&Input) -> bool + Send + Sync + 'source>,
-    pub emitter: Arc<dyn Fn(&mut Host, State) -> Failure + Send + Sync + 'source>,
-    pub phantom: PhantomData<&'a ()>,
+pub struct Recover<'bound, Joint, Input, Failure> {
+    pub sync: Arc<dyn Fn(&Input) -> bool + Send + Sync + 'bound>,
+    pub emitter: Arc<dyn Fn(&mut Joint) -> Failure + Send + Sync + 'bound>,
 }
 
 #[derive(Clone)]

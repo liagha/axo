@@ -107,7 +107,9 @@ impl<'a> Initializer<'a> {
                         false
                     }
                 })
-                .with_transform(move |former, formation| {
+                .with_transform(move |joint| {
+                    let (former, formation) = (&mut joint.0, &mut joint.1);
+                    
                     let form = former.forms.get_mut(formation.form).unwrap();
                     let identifier = form.collect_inputs()[0].clone();
                     let span = identifier.span();
@@ -117,7 +119,9 @@ impl<'a> Initializer<'a> {
                 }),
                 Self::value(),
             ]),
-            move |former, formation| {
+            move |joint| {
+                let (former, formation) = (&mut joint.0, &mut joint.1);
+                
                 let form = former.forms.get_mut(formation.form).unwrap();
                 let forms = form.as_forms();
                 let identifier = forms[0].unwrap_input().clone();
@@ -184,7 +188,9 @@ impl<'a> Initializer<'a> {
                 }
             }),
         ])
-        .with_transform(move |former, formation| {
+        .with_transform(move |joint| {
+            let (former, formation) = (&mut joint.0, &mut joint.1);
+            
             let form = former.forms.get_mut(formation.form).unwrap();
             let identifier = form.collect_inputs()[0].clone();
             let span = identifier.span;
@@ -225,7 +231,9 @@ impl<'a> Initializer<'a> {
                     false
                 }
             })
-            .with_transform(|former, formation| {
+            .with_transform(|joint| {
+                let (former, formation) = (&mut joint.0, &mut joint.1);
+                
                 let form = former.forms.get_mut(formation.form).unwrap();
                 let identifier = form.collect_inputs()[0].clone();
                 let span = identifier.span();
@@ -238,7 +246,9 @@ impl<'a> Initializer<'a> {
             }),
             Formation::predicate(|token: &Token| token.kind.is_integer()),
         ])
-        .with_transform(|former, formation| {
+        .with_transform(|joint| {
+            let (former, formation) = (&mut joint.0, &mut joint.1);
+            
             let form = former.forms.get_mut(formation.form).unwrap();
             let identifier = form.collect_inputs()[0].clone();
             let value = form.collect_inputs()[1].clone();
@@ -295,7 +305,9 @@ impl<'a> Initializer<'a> {
 
     pub fn implicit<'source>(
     ) -> Formation<'a, 'source, Self, Token<'a>, Symbol<'a>, InitializeError<'a>> {
-        Formation::with_transform(Self::value(), |former, formation| {
+        Formation::with_transform(Self::value(), |joint| {
+            let (former, formation) = (&mut joint.0, &mut joint.1);
+            
             let form = former.forms.get_mut(formation.form).unwrap();
             let inputs = form.collect_inputs();
 

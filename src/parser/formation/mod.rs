@@ -2,12 +2,13 @@ mod delimited;
 mod symbol;
 
 use crate::{
-    combinator::{Form, Formation, Former},
+    combinator::{Form, Formation},
     data::*,
     parser::{Element, ElementKind, ErrorKind, ParseError, Parser},
     scanner::{PunctuationKind, Token, TokenKind},
     tracker::{Peekable, Span, Spanned},
 };
+use crate::combinator::formation::Joint;
 
 impl<'a> Parser<'a> {
     #[inline]
@@ -57,9 +58,10 @@ impl<'a> Parser<'a> {
 
     #[inline]
     fn recover_emit<'source>(
-        former: &mut Former<'a, 'source, Self, Token<'a>, Element<'a>, ParseError<'a>>,
-        formation: Formation<'a, 'source, Self, Token<'a>, Element<'a>, ParseError<'a>>,
+        joint: &mut Joint<'a, 'source, Self, Token<'a>, Element<'a>, ParseError<'a>>,
     ) -> ParseError<'a> {
+        let (former, formation) = (&mut joint.0, &mut joint.1);
+
         if let Some(form) = former.forms.get(formation.form) {
             if let Some(error) = form.get_failure() {
                 return error.clone();
@@ -94,7 +96,9 @@ impl<'a> Parser<'a> {
             ),
             _ => false,
         })
-        .with_transform(|former, formation| {
+        .with_transform(|joint| {
+            let (former, formation) = (&mut joint.0, &mut joint.1);
+
             let form = former.forms.get_mut(formation.form).unwrap();
             let inputs = form.collect_inputs();
             let input = inputs.into_iter().next().unwrap();
@@ -126,7 +130,9 @@ impl<'a> Parser<'a> {
             }),
             Formation::deferred(Self::primary),
         ])
-        .with_transform(|former, formation| {
+        .with_transform(|joint| {
+            let (former, formation) = (&mut joint.0, &mut joint.1);
+
             let form = former.forms.get_mut(formation.form).unwrap();
             let prefixes = form.collect_inputs();
             let mut outputs = form.collect_outputs();
@@ -163,7 +169,9 @@ impl<'a> Parser<'a> {
                 None,
             ),
         ])
-        .with_transform(move |former, formation| {
+        .with_transform(move |joint| {
+            let (former, formation) = (&mut joint.0, &mut joint.1);
+
             let form = former.forms.get_mut(formation.form).unwrap();
             let sequence = form.as_forms();
             let operand = sequence[0].unwrap_output();
@@ -255,7 +263,9 @@ impl<'a> Parser<'a> {
                     None,
                 ),
             ]),
-            |former, formation| {
+            |joint| {
+                let (former, formation) = (&mut joint.0, &mut joint.1);
+
                 let form = former.forms.get_mut(formation.form).unwrap();
                 let sequence = form.as_forms();
                 let left = sequence[0].unwrap_output().clone();
@@ -341,7 +351,9 @@ impl<'a> Parser<'a> {
 
     pub fn fallback<'source>(
     ) -> Formation<'a, 'source, Self, Token<'a>, Element<'a>, ParseError<'a>> {
-        Formation::with_fail(Formation::anything(), |former, formation| {
+        Formation::with_fail(Formation::anything(), |joint| {
+            let (former, formation) = (&mut joint.0, &mut joint.1);
+
             let form = former.forms.get_mut(formation.form).unwrap();
             let token = form.unwrap_input();
 

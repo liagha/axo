@@ -29,20 +29,21 @@ impl Cache {
 
 impl Resolve {
     #[inline]
-    pub fn run<'source, Store: Clone + Send + Sync>(
-        operator: &mut Operator<Store>,
-        operation: &mut Operation<'source, Store>,
+    pub fn run<'op, 'source, Store: Clone + Send + Sync>(
+        operator: &'op mut Operator<Store>,
+        operation: &'op mut Operation<'source, Store>,
     ) {
         let combinator = operation.combinator.clone();
-        combinator.combinator(operator, operation);
+        let mut joint = (operator, operation);
+        combinator.combinator(&mut joint);
     }
 }
 
 impl Depend {
     #[inline]
-    pub fn run<'source, Store: Clone + Send + Sync>(
-        operator: &mut Operator<Store>,
-        operation: &mut Operation<'source, Store>,
+    pub fn run<'op, 'source, Store: Clone + Send + Sync>(
+        operator: &'op mut Operator<Store>,
+        operation: &'op mut Operation<'source, Store>,
     ) -> bool {
         for dependency in &operation.depends {
             if let Some(status) = operator.cache.get(dependency) {
@@ -65,6 +66,7 @@ impl Pulse {
         sleep(Duration::from_millis(self.idle));
     }
 }
+
 pub struct Operator<Store = ()> {
     pub cache: Map<Identity, Status>,
     pub store: Store,
@@ -80,8 +82,8 @@ impl<Store: Clone + Send + Sync> Operator<Store> {
     }
 
     #[inline]
-    pub fn build<'source>(&mut self, operation: &mut Operation<'source, Store>) {
-        if let Some(status) = Cache::get(&self.cache, operation.identity) {
+    pub fn build<'op, 'source>(&'op mut self, operation: &'op mut Operation<'source, Store>) {
+        if let Some(status) = self.cache.get(&operation.identity).cloned() {
             operation.status = status;
             return;
         }
@@ -93,16 +95,13 @@ impl<Store: Clone + Send + Sync> Operator<Store> {
         Resolve::run(self, operation);
 
         if !operation.is_pending() {
-            Cache::put(
-                &mut self.cache,
-                operation.identity,
-                operation.status.clone(),
-            );
+            self.cache
+                .insert(operation.identity, operation.status.clone());
         }
     }
 
     #[inline]
-    pub fn execute<'source>(&mut self, operation: &mut Operation<'source, Store>) -> Status {
+    pub fn execute<'op, 'source>(&'op mut self, operation: &'op mut Operation<'source, Store>) -> Status {
         loop {
             self.build(operation);
 
@@ -116,7 +115,7 @@ impl<Store: Clone + Send + Sync> Operator<Store> {
     }
 
     #[inline]
-    pub fn watch<'source>(&mut self, operation: &mut Operation<'source, Store>, paths: &[&str]) {
+    pub fn watch<'op, 'source>(&'op mut self, operation: &'op mut Operation<'source, Store>, paths: &[&str]) {
         let mut last: Vec<_> = paths
             .iter()
             .map(|path| metadata(path).and_then(|m| m.modified()).ok())

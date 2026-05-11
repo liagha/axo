@@ -28,6 +28,8 @@ pub use {
     inkwell::{Context, ContextRef, Inkwell, TargetMachine},
 };
 
+use crate::internal::session::Store;
+
 pub static CRANELIFT: AtomicBool = AtomicBool::new(false);
 
 pub type GenerateError<'source> = Error<'source, ErrorKind<'source>>;
@@ -39,33 +41,33 @@ fn use_cranelift(session: &Session) -> bool {
 }
 
 #[cfg(feature = "llvm")]
-impl<'source>
-    Combinator<
-        'static,
-        Operator<Arc<Lock<Session<'source>>>>,
-        Operation<'source, Arc<Lock<Session<'source>>>>,
-    > for GenerateCombinator
+impl<'op, 'source>
+Combinator<
+'static,
+(&'op mut Operator<Store<'source>>, &'op mut Operation<'source, Store<'source>>),
+> for GenerateCombinator
 {
-    fn combinator(
-        &self,
-        operator: &mut Operator<Arc<Lock<Session<'source>>>>,
-        operation: &mut Operation<'source, Arc<Lock<Session<'source>>>>,
-    ) {
-        let guard = operator.store.read().unwrap();
-        let has_input = guard.has_input();
-        let cranelift = use_cranelift(&guard);
-        drop(guard);
+fn combinator(
+    &self,
+    joint: &mut (&'op mut Operator<Store<'source>>, &'op mut Operation<'source, Store<'source>>),
+) {
+    let (operator, operation) = (&mut joint.0, &mut joint.1);
 
-        if !has_input {
-            operation.set_resolve(Vec::new());
-            return;
-        }
+    let guard = operator.store.read().unwrap();
+    let has_input = guard.has_input();
+    let cranelift = use_cranelift(&guard);
+    drop(guard);
 
-        if cranelift {
-        } else {
-            generate_inkwell(operator, operation);
-        }
+    if !has_input {
+        operation.set_resolve(Vec::new());
+        return;
     }
+
+    if cranelift {
+    } else {
+        generate_inkwell(operator, operation);
+    }
+}
 }
 
 #[cfg(feature = "llvm")]
@@ -171,18 +173,18 @@ fn generate_inkwell<'source>(
 
 pub struct EmitCombinator;
 
-impl<'source>
-    Combinator<
-        'static,
-        Operator<Arc<Lock<Session<'source>>>>,
-        Operation<'source, Arc<Lock<Session<'source>>>>,
-    > for EmitCombinator
+impl<'op, 'source>
+Combinator<
+'static,
+(&'op mut Operator<Store<'source>>, &'op mut Operation<'source, Store<'source>>),
+> for EmitCombinator
 {
-    fn combinator(
-        &self,
-        operator: &mut Operator<Arc<Lock<Session<'source>>>>,
-        operation: &mut Operation<'source, Arc<Lock<Session<'source>>>>,
-    ) {
+fn combinator(
+    &self,
+    joint: &mut (&'op mut Operator<Store<'source>>, &'op mut Operation<'source, Store<'source>>),
+) {
+    let (operator, operation) = (&mut joint.0, &mut joint.1);
+
         let mut session = operator.store.write().unwrap();
         if !session.has_input() || session.get_directive(Str::from("Discard")).is_some() {
             if session.errors.is_empty() {
@@ -350,18 +352,18 @@ impl<'source>
 
 pub struct RunCombinator;
 
-impl<'source>
-    Combinator<
-        'static,
-        Operator<Arc<Lock<Session<'source>>>>,
-        Operation<'source, Arc<Lock<Session<'source>>>>,
-    > for RunCombinator
+impl<'op, 'source>
+Combinator<
+'static,
+(&'op mut Operator<Store<'source>>, &'op mut Operation<'source, Store<'source>>),
+> for RunCombinator
 {
-    fn combinator(
-        &self,
-        operator: &mut Operator<Arc<Lock<Session<'source>>>>,
-        operation: &mut Operation<'source, Arc<Lock<Session<'source>>>>,
-    ) {
+fn combinator(
+    &self,
+    joint: &mut (&'op mut Operator<Store<'source>>, &'op mut Operation<'source, Store<'source>>),
+) {
+    let (operator, operation) = (&mut joint.0, &mut joint.1);
+
         let session = operator.store.write().unwrap();
         if !session.has_input() || session.get_directive(Str::from("Discard")).is_some() {
             if session.errors.is_empty() {

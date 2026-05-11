@@ -8,18 +8,15 @@ use crate::{
     tracker::Peekable,
 };
 
-use super::{memo::Memo, Sink};
+use super::{Joint, memo::Memo, Sink};
 
 pub type Stash<'a, 'source, Source, Input, Output, Failure> = Vec<(
     usize,
     Arc<
-        dyn Combinator<
-                'a,
-                Former<'a, 'source, Source, Input, Output, Failure>,
-                Formation<'a, 'source, Source, Input, Output, Failure>,
-            > + Send
-            + Sync
-            + 'source,
+        dyn Combinator<'a, Joint<'a, 'source, Source, Input, Output, Failure>>
+        + Send
+        + Sync
+        + 'source,
     >,
 )>;
 
@@ -39,7 +36,7 @@ where
 }
 
 impl<'a, 'source, Source, Input, Output, Failure>
-    Former<'a, 'source, Source, Input, Output, Failure>
+Former<'a, 'source, Source, Input, Output, Failure>
 where
     Source: Peekable<'a, Input> + Clone,
     Source::State: Default,

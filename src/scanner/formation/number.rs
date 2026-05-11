@@ -29,7 +29,9 @@ impl<'a> Scanner<'a> {
                     None,
                 ),
             ]),
-            move |former, formation| {
+            move |joint| {
+                let (former, formation) = (&mut joint.0, &mut joint.1);
+                
                 let form = former.forms.get_mut(formation.form).unwrap();
                 let inputs = form.collect_inputs();
                 let span = inputs.span().clone();
@@ -62,7 +64,9 @@ impl<'a> Scanner<'a> {
                     None,
                 ),
             ]),
-            |former, formation| {
+            |joint| {
+                let (former, formation) = (&mut joint.0, &mut joint.1);
+                
                 let form = former.forms.get_mut(formation.form).unwrap();
                 let inputs = form.collect_inputs();
                 let span = inputs.span().clone();
@@ -95,7 +99,9 @@ impl<'a> Scanner<'a> {
                     None,
                 ),
             ]),
-            |former, formation| {
+            |joint| {
+                let (former, formation) = (&mut joint.0, &mut joint.1);
+                
                 let form = former.forms.get_mut(formation.form).unwrap();
                 let inputs = form.collect_inputs();
                 let span = inputs.span().clone();
@@ -138,7 +144,9 @@ impl<'a> Scanner<'a> {
                     ),
                 ])),
             ]),
-            |former, formation| {
+            |joint| {
+                let (former, formation) = (&mut joint.0, &mut joint.1);
+                
                 let form = former.forms.get_mut(formation.form).unwrap();
                 let inputs = form.collect_inputs();
                 let span = inputs.span().clone();

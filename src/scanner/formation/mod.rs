@@ -25,7 +25,9 @@ impl<'a> Scanner<'a> {
             ),
             Formation::literal('"'),
         ])
-            .with_transform(move |former, formation| {
+            .with_transform(move |joint| {
+                let (former, formation) = (&mut joint.0, &mut joint.1);
+
                 let form = former.forms.get_mut(formation.form).unwrap();
                 let mut inputs = form.collect_inputs();
                 let span = inputs.span().clone();
@@ -54,7 +56,9 @@ impl<'a> Scanner<'a> {
             ),
             Formation::literal('`'),
         ])
-            .with_transform(move |former, formation| {
+            .with_transform(move |joint| {
+                let (former, formation) = (&mut joint.0, &mut joint.1);
+
                 let form = former.forms.get_mut(formation.form).unwrap();
                 let mut inputs = form.collect_inputs();
                 let span = inputs.span().clone();
@@ -79,7 +83,9 @@ impl<'a> Scanner<'a> {
             ]),
             Formation::literal('\''),
         ])
-            .with_transform(|former, formation| {
+            .with_transform(|joint| {
+                let (former, formation) = (&mut joint.0, &mut joint.1);
+
                 let form = former.forms.get_mut(formation.form).unwrap();
                 let inputs = form.collect_inputs();
                 let character = inputs[1];
@@ -104,7 +110,9 @@ impl<'a> Scanner<'a> {
                     None,
                 ),
             ]),
-            |former, formation| {
+            |joint| {
+                let (former, formation) = (&mut joint.0, &mut joint.1);
+
                 let form = former.forms.get_mut(formation.form).unwrap();
                 let inputs = form.collect_inputs();
                 let span = inputs.span().clone();
@@ -130,7 +138,9 @@ impl<'a> Scanner<'a> {
                 1,
                 Some(3),
             ),
-            |former, formation| {
+            |joint| {
+                let (former, formation) = (&mut joint.0, &mut joint.1);
+
                 let form = former.forms.get_mut(formation.form).unwrap();
                 let inputs = form.collect_inputs();
                 let span = inputs.span().clone();
@@ -146,7 +156,9 @@ impl<'a> Scanner<'a> {
     fn punctuation<'source>() -> Formation<'a, 'source, Self, Character, Token<'a>, ScanError<'a>> {
         Formation::with_transform(
             Formation::predicate(|c: &Character| c.is_punctuation()),
-            |former, formation| {
+            |joint| {
+                let (former, formation) = (&mut joint.0, &mut joint.1);
+
                 let form = former.forms.get_mut(formation.form).unwrap();
                 let inputs = form.collect_inputs();
                 let span = inputs.span().clone();
@@ -165,7 +177,9 @@ impl<'a> Scanner<'a> {
     fn whitespace<'source>() -> Formation<'a, 'source, Self, Character, Token<'a>, ScanError<'a>> {
         Formation::with_transform(
             Formation::predicate(|c: &Character| c.is_whitespace() && *c != '\n'),
-            |former, formation| {
+            |joint| {
+                let (former, formation) = (&mut joint.0, &mut joint.1);
+
                 let form = former.forms.get_mut(formation.form).unwrap();
                 let input = form.unwrap_input();
                 let span = input.span().clone();
@@ -201,7 +215,9 @@ impl<'a> Scanner<'a> {
                     Formation::sequence([Formation::literal('*'), Formation::literal('/')]),
                 ]),
             ])]),
-            |former, formation| {
+            |joint| {
+                let (former, formation) = (&mut joint.0, &mut joint.1);
+
                 let form = former.forms.get_mut(formation.form).unwrap();
                 let mut inputs = form.collect_inputs();
                 let span = inputs.span().clone();
@@ -230,7 +246,9 @@ impl<'a> Scanner<'a> {
     fn fallback<'source>() -> Formation<'a, 'source, Self, Character, Token<'a>, ScanError<'a>> {
         Formation::with_combinator(
             Formation::anything(),
-            Formation::fail(|former, formation| {
+            Formation::fail(|joint| {
+                let (former, formation) = (&mut joint.0, &mut joint.1);
+
                 let form = former.forms.get_mut(formation.form).unwrap();
                 let ch: &Character = form.unwrap_input();
 
