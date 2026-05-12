@@ -33,7 +33,7 @@ use crate::{
         platform::Lock,
     },
     tracker::{
-        Span, TrackError,c
+        Span, TrackError,
     },
 };
 
