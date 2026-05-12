@@ -202,9 +202,9 @@ impl<'session> Session<'session> {
     }
 
     pub fn has_input(&self) -> bool {
-        self.records.iter().any(|(&id, record)| {
-            record.kind == RecordKind::Source && (id & 0x40000000) != 0
-        })
+        self.records
+            .iter()
+            .any(|(&id, record)| record.kind == RecordKind::Source && (id & 0x40000000) != 0)
     }
 
     pub fn arguments() -> Str<'static> {
@@ -249,9 +249,9 @@ impl<'session> Session<'session> {
     pub fn get_stencil(&self) -> Option<Stencil> {
         match self.get_directive(Str::from("Verbosity")) {
             Some(Token {
-                     kind: TokenKind::Integer(_),
-                     ..
-                 }) => Some(Stencil::default()),
+                kind: TokenKind::Integer(_),
+                ..
+            }) => Some(Stencil::default()),
             _ => None,
         }
     }
@@ -271,13 +271,13 @@ impl<'session> Session<'session> {
     pub fn get_target(&self) -> Option<Str<'session>> {
         match self.get_directive(Str::from("Target")) {
             Some(Token {
-                     kind: TokenKind::Identifier(value),
-                     ..
-                 }) => Some(*value),
+                kind: TokenKind::Identifier(value),
+                ..
+            }) => Some(*value),
             Some(Token {
-                     kind: TokenKind::String(value),
-                     ..
-                 }) => Some(*value),
+                kind: TokenKind::String(value),
+                ..
+            }) => Some(*value),
             _ => None,
         }
     }

@@ -227,7 +227,7 @@ impl<'a> Resolver<'a> {
             ElementKind::literal(Token::new(TokenKind::identifier(name), span)),
             span,
         )
-            .into();
+        .into();
 
         let mut symbol = Symbol::new(SymbolKind::module(Module::new(head)), span);
         symbol.identity = identity;
@@ -249,7 +249,7 @@ impl<'a> Resolver<'a> {
                         .find_map(|(&target, symbol)| {
                             (matches!(symbol.kind, SymbolKind::Module(_))
                                 && symbol.target() == Some(name.clone()))
-                                .then_some(target)
+                            .then_some(target)
                         })
                 {
                     record.artifacts.insert(0, Artifact::Module(target));

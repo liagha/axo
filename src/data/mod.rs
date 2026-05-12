@@ -439,3 +439,24 @@ impl Number for isize {
         Some(value as isize)
     }
 }
+
+use crate::tracker::{Span, Spanned};
+use chaint::{Form, Formable};
+
+impl<'a, Input, Output, Failure> Spanned<'a> for Form<'a, Input, Output, Failure>
+where
+    Input: Formable<'a> + Spanned<'a>,
+    Output: Formable<'a> + Spanned<'a>,
+    Failure: Formable<'a> + Spanned<'a>,
+{
+    fn span(&self) -> Span {
+        match self {
+            Form::Blank => Span::void(),
+            Form::Input(input) => input.span(),
+            Form::Output(output) => output.span(),
+            Form::Multiple(multiple) => multiple.span(),
+            Form::Failure(failure) => failure.span(),
+            Form::_Phantom(_) => unreachable!(),
+        }
+    }
+}

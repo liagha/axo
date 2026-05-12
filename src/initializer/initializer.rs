@@ -1,14 +1,15 @@
-use crate::{
-    combinator::{Form, Formation, Former},
-    data::{Binding, BindingKind, Offset, Scale, Str},
-    initializer::{ErrorKind, InitializeError},
-    internal::platform::{ARCH, OS},
-    parser::{Element, ElementKind, ParseError, Symbol, SymbolKind},
-    reporter::Error,
-    scanner::{PunctuationKind, Scanner, Token, TokenKind},
-    tracker::{Location, Peekable, Position, Span},
+use {
+    crate::{
+        data::{Binding, BindingKind, Offset, Scale, Str},
+        initializer::{ErrorKind, InitializeError},
+        internal::platform::{ARCH, OS},
+        parser::{Element, ElementKind, ParseError, Symbol, SymbolKind},
+        reporter::Error,
+        scanner::{PunctuationKind, Scanner, Token, TokenKind},
+        tracker::{Location, Position, Span},
+    },
+    chaint::{formation::Joint, Form, Formation, Former, Peekable},
 };
-use crate::combinator::formation::Joint;
 
 #[derive(Clone)]
 pub struct Initializer<'a> {
@@ -123,7 +124,14 @@ impl<'a> Initializer<'a> {
             Self::cranelift(),
             Self::implicit(),
             Formation::anything().with_panic(
-                |joint: &mut Joint<'a, 'source, Self, Token<'a>, Symbol<'a>, InitializeError<'a>>| {
+                |joint: &mut Joint<
+                    'a,
+                    'source,
+                    Self,
+                    Token<'a>,
+                    Symbol<'a>,
+                    InitializeError<'a>,
+                >| {
                     let former = &mut joint.0;
                     let formation = &mut joint.1;
 

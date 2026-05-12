@@ -1,6 +1,5 @@
 pub mod error;
 mod format;
-mod peekable;
 mod position;
 mod span;
 
@@ -10,7 +9,7 @@ use crate::{
     internal::platform::{read_to_string, Path, PathBuf},
     reporter::Error,
 };
-pub use {error::*, peekable::*, position::*, span::*};
+pub use {error::*, position::*, span::*};
 
 pub type Location<'a> = Str<'a>;
 

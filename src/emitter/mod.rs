@@ -6,16 +6,15 @@ mod interpreter;
 
 use {
     crate::{
-        combinator::{Combinator, Operation, Operator},
-        data::{memory::Arc, Str},
+        data::{Str},
         internal::{
-            platform::{create_dir_all, Command, Lock},
-            Artifact, RecordKind, Session, SessionError,
+            platform::{create_dir_all, Command},
+            Artifact, RecordKind, Session,
         },
         reporter::Error,
-        tracker::{Span, TrackError},
     },
-    std::sync::atomic::{AtomicBool, Ordering},
+    chaint::{Combinator, Operation, Operator},
+    std::sync::atomic::{AtomicBool},
 };
 
 pub use {
@@ -24,8 +23,18 @@ pub use {
 };
 
 #[cfg(feature = "llvm")]
-pub use {
-    inkwell::{Context, ContextRef, Inkwell, TargetMachine},
+pub use inkwell::{Context, ContextRef, Inkwell, TargetMachine};
+
+#[cfg(feature = "llvm")]
+use crate::{
+    data::memory::{Arc},
+    internal::{
+        SessionError,
+        platform::Lock,
+    },
+    tracker::{
+        Span, TrackError,c
+    },
 };
 
 use crate::internal::session::Store;
@@ -36,38 +45,36 @@ pub type GenerateError<'source> = Error<'source, ErrorKind<'source>>;
 
 pub struct GenerateCombinator;
 
-fn use_cranelift(session: &Session) -> bool {
-    CRANELIFT.load(Ordering::Relaxed) || session.get_directive(Str::from("Cranelift")).is_some()
-}
-
 #[cfg(feature = "llvm")]
 impl<'op, 'source>
-Combinator<
-'static,
-(&'op mut Operator<Store<'source>>, &'op mut Operation<'source, Store<'source>>),
-> for GenerateCombinator
+    Combinator<
+        'static,
+        (
+            &'op mut Operator<Store<'source>>,
+            &'op mut Operation<'source, Store<'source>>,
+        ),
+    > for GenerateCombinator
 {
-fn combinator(
-    &self,
-    joint: &mut (&'op mut Operator<Store<'source>>, &'op mut Operation<'source, Store<'source>>),
-) {
-    let (operator, operation) = (&mut joint.0, &mut joint.1);
+    fn combinator(
+        &self,
+        joint: &mut (
+            &'op mut Operator<Store<'source>>,
+            &'op mut Operation<'source, Store<'source>>,
+        ),
+    ) {
+        let (operator, operation) = (&mut joint.0, &mut joint.1);
 
-    let guard = operator.store.read().unwrap();
-    let has_input = guard.has_input();
-    let cranelift = use_cranelift(&guard);
-    drop(guard);
+        let guard = operator.store.read().unwrap();
+        let has_input = guard.has_input();
+        drop(guard);
 
-    if !has_input {
-        operation.set_resolve(Vec::new());
-        return;
-    }
+        if !has_input {
+            operation.set_resolve(Vec::new());
+            return;
+        }
 
-    if cranelift {
-    } else {
         generate_inkwell(operator, operation);
     }
-}
 }
 
 #[cfg(feature = "llvm")]
@@ -174,16 +181,22 @@ fn generate_inkwell<'source>(
 pub struct EmitCombinator;
 
 impl<'op, 'source>
-Combinator<
-'static,
-(&'op mut Operator<Store<'source>>, &'op mut Operation<'source, Store<'source>>),
-> for EmitCombinator
+    Combinator<
+        'static,
+        (
+            &'op mut Operator<Store<'source>>,
+            &'op mut Operation<'source, Store<'source>>,
+        ),
+    > for EmitCombinator
 {
-fn combinator(
-    &self,
-    joint: &mut (&'op mut Operator<Store<'source>>, &'op mut Operation<'source, Store<'source>>),
-) {
-    let (operator, operation) = (&mut joint.0, &mut joint.1);
+    fn combinator(
+        &self,
+        joint: &mut (
+            &'op mut Operator<Store<'source>>,
+            &'op mut Operation<'source, Store<'source>>,
+        ),
+    ) {
+        let (operator, operation) = (&mut joint.0, &mut joint.1);
 
         let mut session = operator.store.write().unwrap();
         if !session.has_input() || session.get_directive(Str::from("Discard")).is_some() {
@@ -353,16 +366,22 @@ fn combinator(
 pub struct RunCombinator;
 
 impl<'op, 'source>
-Combinator<
-'static,
-(&'op mut Operator<Store<'source>>, &'op mut Operation<'source, Store<'source>>),
-> for RunCombinator
+    Combinator<
+        'static,
+        (
+            &'op mut Operator<Store<'source>>,
+            &'op mut Operation<'source, Store<'source>>,
+        ),
+    > for RunCombinator
 {
-fn combinator(
-    &self,
-    joint: &mut (&'op mut Operator<Store<'source>>, &'op mut Operation<'source, Store<'source>>),
-) {
-    let (operator, operation) = (&mut joint.0, &mut joint.1);
+    fn combinator(
+        &self,
+        joint: &mut (
+            &'op mut Operator<Store<'source>>,
+            &'op mut Operation<'source, Store<'source>>,
+        ),
+    ) {
+        let (operator, operation) = (&mut joint.0, &mut joint.1);
 
         let session = operator.store.write().unwrap();
         if !session.has_input() || session.get_directive(Str::from("Discard")).is_some() {

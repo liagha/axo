@@ -1,14 +1,15 @@
 mod delimited;
 mod symbol;
 
-use crate::{
-    combinator::{Form, Formation},
-    data::*,
-    parser::{Element, ElementKind, ErrorKind, ParseError, Parser},
-    scanner::{PunctuationKind, Token, TokenKind},
-    tracker::{Peekable, Span, Spanned},
+use {
+    crate::{
+        data::*,
+        parser::{Element, ElementKind, ErrorKind, ParseError, Parser},
+        scanner::{PunctuationKind, Token, TokenKind},
+        tracker::{Span, Spanned},
+    },
+    chaint::{formation::Joint, Form, Formation, Peekable},
 };
-use crate::combinator::formation::Joint;
 
 impl<'a> Parser<'a> {
     #[inline]

@@ -1,11 +1,13 @@
-use crate::{
-    combinator::{Form, Formation},
-    data::{
-        character::{from_u32, parse_radix},
-        Str,
+use {
+    crate::{
+        data::{
+            character::{from_u32, parse_radix},
+            Str,
+        },
+        scanner::{Character, CharacterError, ErrorKind, EscapeError, ScanError, Scanner, Token},
+        tracker::Spanned,
     },
-    scanner::{Character, CharacterError, ErrorKind, EscapeError, ScanError, Scanner, Token},
-    tracker::Spanned,
+    chaint::{Form, Formation},
 };
 
 impl<'a> Scanner<'a> {
@@ -21,7 +23,7 @@ impl<'a> Scanner<'a> {
         ])
         .with_transform(|joint| {
             let (former, formation) = (&mut joint.0, &mut joint.1);
-            
+
             let form = former.forms.get_mut(formation.form).unwrap();
             let inputs = form.collect_inputs();
             let span = inputs.span().clone();
@@ -66,7 +68,7 @@ impl<'a> Scanner<'a> {
         ])
         .with_transform(|joint| {
             let (former, formation) = (&mut joint.0, &mut joint.1);
-            
+
             let form = former.forms.get_mut(formation.form).unwrap();
             let inputs = form.collect_inputs();
             let digits: Str = inputs.iter().skip(1).map(|c| c.value).collect();
@@ -114,7 +116,7 @@ impl<'a> Scanner<'a> {
         ])
         .with_transform(|joint| {
             let (former, formation) = (&mut joint.0, &mut joint.1);
-            
+
             let form = former.forms.get_mut(formation.form).unwrap();
             let inputs = form.collect_inputs();
             let digits: Str = inputs.iter().skip(2).map(|c| c.value).collect();
@@ -164,7 +166,7 @@ impl<'a> Scanner<'a> {
         ])
         .with_transform(|joint| {
             let (former, formation) = (&mut joint.0, &mut joint.1);
-            
+
             let form = former.forms.get_mut(formation.form).unwrap();
             let inputs = form.collect_inputs();
             let digits: Str = inputs
@@ -221,7 +223,7 @@ impl<'a> Scanner<'a> {
         ])
         .with_transform(move |joint| {
             let (former, formation) = (&mut joint.0, &mut joint.1);
-            
+
             let form = former.forms.get_mut(formation.form).unwrap();
             let inputs = form.collect_inputs();
             let digits: Str = inputs.iter().skip(2).map(|c| c.value).collect();

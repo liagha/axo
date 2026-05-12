@@ -60,8 +60,13 @@ where
         let (end_line, end_column) = end_lc.unwrap_or((0, 0));
 
         details.push_str(
-            &format!(" --> {}:{}:{}\n", record.location, start_line + 1, start_column + 1)
-                .colorize(Color::Blue),
+            &format!(
+                " --> {}:{}:{}\n",
+                record.location,
+                start_line + 1,
+                start_column + 1
+            )
+            .colorize(Color::Blue),
         );
 
         let surround = 3;

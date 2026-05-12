@@ -1,9 +1,11 @@
-use crate::{
-    combinator::{Form, Former},
-    data::{Identity, Offset, Scale, Str},
-    internal::{Artifact, RecordKind, Session, SessionError},
-    scanner::{Character, ErrorKind, ScanError, Token},
-    tracker::{Peekable, Position},
+use {
+    crate::{
+        data::{Identity, Offset, Scale, Str},
+        internal::{Artifact, RecordKind, Session, SessionError},
+        scanner::{Character, ErrorKind, ScanError, Token},
+        tracker::Position,
+    },
+    chaint::{Form, Former, Peekable},
 };
 
 #[derive(Clone)]

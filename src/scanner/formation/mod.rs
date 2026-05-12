@@ -1,14 +1,16 @@
 mod escape;
 mod number;
 
-use crate::{
-    combinator::{Form, Formation},
-    data::Str,
-    scanner::{
-        Character, CharacterError, ErrorKind, Operator, Punctuation, PunctuationKind, ScanError,
-        Scanner, Token, TokenKind,
+use {
+    crate::{
+        data::Str,
+        scanner::{
+            Character, CharacterError, ErrorKind, Operator, Punctuation, PunctuationKind,
+            ScanError, Scanner, Token, TokenKind,
+        },
+        tracker::Spanned,
     },
-    tracker::Spanned,
+    chaint::{Form, Formation},
 };
 
 impl<'a> Scanner<'a> {
@@ -25,22 +27,22 @@ impl<'a> Scanner<'a> {
             ),
             Formation::literal('"'),
         ])
-            .with_transform(move |joint| {
-                let (former, formation) = (&mut joint.0, &mut joint.1);
+        .with_transform(move |joint| {
+            let (former, formation) = (&mut joint.0, &mut joint.1);
 
-                let form = former.forms.get_mut(formation.form).unwrap();
-                let mut inputs = form.collect_inputs();
-                let span = inputs.span().clone();
-                if inputs.len() >= 2 {
-                    inputs.drain(0..1);
-                    inputs.pop();
-                }
-                let content: Str = inputs.into_iter().collect();
+            let form = former.forms.get_mut(formation.form).unwrap();
+            let mut inputs = form.collect_inputs();
+            let span = inputs.span().clone();
+            if inputs.len() >= 2 {
+                inputs.drain(0..1);
+                inputs.pop();
+            }
+            let content: Str = inputs.into_iter().collect();
 
-                *form = Form::output(Token::new(TokenKind::string(content), span));
+            *form = Form::output(Token::new(TokenKind::string(content), span));
 
-                Ok(())
-            })
+            Ok(())
+        })
     }
 
     fn backtick<'source>() -> Formation<'a, 'source, Self, Character, Token<'a>, ScanError<'a>> {
@@ -56,22 +58,22 @@ impl<'a> Scanner<'a> {
             ),
             Formation::literal('`'),
         ])
-            .with_transform(move |joint| {
-                let (former, formation) = (&mut joint.0, &mut joint.1);
+        .with_transform(move |joint| {
+            let (former, formation) = (&mut joint.0, &mut joint.1);
 
-                let form = former.forms.get_mut(formation.form).unwrap();
-                let mut inputs = form.collect_inputs();
-                let span = inputs.span().clone();
-                if inputs.len() >= 2 {
-                    inputs.drain(0..1);
-                    inputs.pop();
-                }
-                let content: Str = inputs.into_iter().collect();
+            let form = former.forms.get_mut(formation.form).unwrap();
+            let mut inputs = form.collect_inputs();
+            let span = inputs.span().clone();
+            if inputs.len() >= 2 {
+                inputs.drain(0..1);
+                inputs.pop();
+            }
+            let content: Str = inputs.into_iter().collect();
 
-                *form = Form::output(Token::new(TokenKind::string(content), span));
+            *form = Form::output(Token::new(TokenKind::string(content), span));
 
-                Ok(())
-            })
+            Ok(())
+        })
     }
 
     fn character<'source>() -> Formation<'a, 'source, Self, Character, Token<'a>, ScanError<'a>> {
@@ -83,21 +85,18 @@ impl<'a> Scanner<'a> {
             ]),
             Formation::literal('\''),
         ])
-            .with_transform(|joint| {
-                let (former, formation) = (&mut joint.0, &mut joint.1);
+        .with_transform(|joint| {
+            let (former, formation) = (&mut joint.0, &mut joint.1);
 
-                let form = former.forms.get_mut(formation.form).unwrap();
-                let inputs = form.collect_inputs();
-                let character = inputs[1];
-                let span = inputs.span().clone();
+            let form = former.forms.get_mut(formation.form).unwrap();
+            let inputs = form.collect_inputs();
+            let character = inputs[1];
+            let span = inputs.span().clone();
 
-                *form = Form::output(Token::new(
-                    TokenKind::character(character.value),
-                    span,
-                ));
+            *form = Form::output(Token::new(TokenKind::character(character.value), span));
 
-                Ok(())
-            })
+            Ok(())
+        })
     }
 
     fn identifier<'source>() -> Formation<'a, 'source, Self, Character, Token<'a>, ScanError<'a>> {
@@ -223,14 +222,14 @@ impl<'a> Scanner<'a> {
                 let span = inputs.span().clone();
 
                 if inputs.len() >= 4
-                    && inputs[0].value == '/' && inputs[1].value == '*'
-                    && inputs[inputs.len()-2].value == '*' && inputs[inputs.len()-1].value == '/'
+                    && inputs[0].value == '/'
+                    && inputs[1].value == '*'
+                    && inputs[inputs.len() - 2].value == '*'
+                    && inputs[inputs.len() - 1].value == '/'
                 {
                     inputs.drain(0..2);
-                    inputs.drain(inputs.len()-2..);
-                } else if inputs.len() >= 2
-                    && inputs[0].value == '/' && inputs[1].value == '/'
-                {
+                    inputs.drain(inputs.len() - 2..);
+                } else if inputs.len() >= 2 && inputs[0].value == '/' && inputs[1].value == '/' {
                     inputs.drain(0..2);
                 }
 

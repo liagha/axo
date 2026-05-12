@@ -70,18 +70,18 @@ impl Dialog {
 
         loop {
             if let Ok(Event::Key(KeyEvent {
-                                     code, modifiers, ..
-                                 })) = read()
+                code, modifiers, ..
+            })) = read()
             {
                 match code {
                     KeyCode::Enter => break,
                     KeyCode::Char('c') | KeyCode::Char('d')
-                    if modifiers.contains(KeyModifiers::CONTROL) =>
-                        {
-                            let _ = disable_raw_mode();
-                            println!();
-                            return None;
-                        }
+                        if modifiers.contains(KeyModifiers::CONTROL) =>
+                    {
+                        let _ = disable_raw_mode();
+                        println!();
+                        return None;
+                    }
                     KeyCode::Char('l') if modifiers.contains(KeyModifiers::CONTROL) => {
                         print!("\x1B[2J\x1B[1;1H");
                         render(&buffer, cursor);

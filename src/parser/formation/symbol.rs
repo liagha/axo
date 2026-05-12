@@ -1,9 +1,11 @@
-use crate::{
-    combinator::{Form, Formation},
-    data::*,
-    parser::{Element, ElementKind, ErrorKind, ParseError, Parser, Symbol, SymbolKind},
-    scanner::{OperatorKind, Token, TokenKind},
-    tracker::{Span, Spanned},
+use {
+    crate::{
+        data::*,
+        parser::{Element, ElementKind, ErrorKind, ParseError, Parser, Symbol, SymbolKind},
+        scanner::{OperatorKind, Token, TokenKind},
+        tracker::{Span, Spanned},
+    },
+    chaint::{Form, Formation},
 };
 
 impl<'a> Parser<'a> {

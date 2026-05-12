@@ -1,5 +1,4 @@
 mod analyzer;
-mod combinator;
 mod data;
 mod parser;
 mod reporter;

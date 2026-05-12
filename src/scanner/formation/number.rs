@@ -1,8 +1,10 @@
-use crate::{
-    combinator::{Form, Formation},
-    data::{Float, Str},
-    scanner::{Character, ErrorKind, ScanError, Scanner, Token, TokenKind},
-    tracker::Spanned,
+use {
+    crate::{
+        data::{Float, Str},
+        scanner::{Character, ErrorKind, ScanError, Scanner, Token, TokenKind},
+        tracker::Spanned,
+    },
+    chaint::{Form, Formation},
 };
 
 impl<'a> Scanner<'a> {
@@ -31,7 +33,7 @@ impl<'a> Scanner<'a> {
             ]),
             move |joint| {
                 let (former, formation) = (&mut joint.0, &mut joint.1);
-                
+
                 let form = former.forms.get_mut(formation.form).unwrap();
                 let inputs = form.collect_inputs();
                 let span = inputs.span().clone();
@@ -66,7 +68,7 @@ impl<'a> Scanner<'a> {
             ]),
             |joint| {
                 let (former, formation) = (&mut joint.0, &mut joint.1);
-                
+
                 let form = former.forms.get_mut(formation.form).unwrap();
                 let inputs = form.collect_inputs();
                 let span = inputs.span().clone();
@@ -101,7 +103,7 @@ impl<'a> Scanner<'a> {
             ]),
             |joint| {
                 let (former, formation) = (&mut joint.0, &mut joint.1);
-                
+
                 let form = former.forms.get_mut(formation.form).unwrap();
                 let inputs = form.collect_inputs();
                 let span = inputs.span().clone();
@@ -146,7 +148,7 @@ impl<'a> Scanner<'a> {
             ]),
             |joint| {
                 let (former, formation) = (&mut joint.0, &mut joint.1);
-                
+
                 let form = former.forms.get_mut(formation.form).unwrap();
                 let inputs = form.collect_inputs();
                 let span = inputs.span().clone();

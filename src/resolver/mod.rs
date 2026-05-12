@@ -17,39 +17,47 @@ pub fn next_identity() -> Identity {
 
 pub type ResolveError<'error> = Error<'error, ErrorKind<'error>>;
 
-use crate::{
-    combinator::{Combinator, Operation, Operator},
-    data::sync::{AtomicUsize, Ordering},
-    data::Identity,
-    internal::session::Store,
-    reporter::Error,
+use {
+    crate::{
+        data::sync::{AtomicUsize, Ordering},
+        data::Identity,
+        internal::session::Store,
+        reporter::Error,
+    },
+    chaint::{Combinator, Operation, Operator},
 };
 
 impl<'op, 'source>
-Combinator<
-'static,
-(&'op mut Operator<Store<'source>>, &'op mut Operation<'source, Store<'source>>),
-> for Resolver<'source>
+    Combinator<
+        'static,
+        (
+            &'op mut Operator<Store<'source>>,
+            &'op mut Operation<'source, Store<'source>>,
+        ),
+    > for Resolver<'source>
 {
-fn combinator(
-&self,
-joint: &mut (&'op mut Operator<Store<'source>>, &'op mut Operation<'source, Store<'source>>),
-) {
-let (operator, operation) = (&mut joint.0, &mut joint.1);
+    fn combinator(
+        &self,
+        joint: &mut (
+            &'op mut Operator<Store<'source>>,
+            &'op mut Operation<'source, Store<'source>>,
+        ),
+    ) {
+        let (operator, operation) = (&mut joint.0, &mut joint.1);
 
-let mut guard = operator.store.write().unwrap();
-let session = &mut *guard;
-let mut keys: Vec<_> = session.records.keys().copied().collect();
-keys.sort();
+        let mut guard = operator.store.write().unwrap();
+        let session = &mut *guard;
+        let mut keys: Vec<_> = session.records.keys().copied().collect();
+        keys.sort();
 
-Resolver::execute(session, &keys);
+        Resolver::execute(session, &keys);
 
-if session.errors.is_empty() {
-operation.set_resolve(Vec::new());
-} else {
-operation.set_reject();
-}
-}
+        if session.errors.is_empty() {
+            operation.set_resolve(Vec::new());
+        } else {
+            operation.set_reject();
+        }
+    }
 }
 impl<'source> Default for Resolver<'source> {
     fn default() -> Self {

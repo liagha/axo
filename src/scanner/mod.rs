@@ -11,21 +11,26 @@ pub use {character::Character, error::*, operator::*, punctuation::*, scanner::S
 
 pub type ScanError<'error> = Error<'error, ErrorKind<'error>>;
 
-use crate::{
-    combinator::{Combinator, Operation},
-    internal::session::Store,
-    reporter::Error,
+use {
+    crate::{internal::session::Store, reporter::Error},
+    chaint::{Combinator, Operation},
 };
 
 impl<'op, 'source>
-Combinator<
-    'static,
-    (&'op mut crate::combinator::Operator<Store<'source>>, &'op mut Operation<'source, Store<'source>>),
-> for Scanner<'source>
+    Combinator<
+        'static,
+        (
+            &'op mut chaint::Operator<Store<'source>>,
+            &'op mut Operation<'source, Store<'source>>,
+        ),
+    > for Scanner<'source>
 {
     fn combinator(
         &self,
-        joint: &mut (&'op mut crate::combinator::Operator<Store<'source>>, &'op mut Operation<'source, Store<'source>>),
+        joint: &mut (
+            &'op mut chaint::Operator<Store<'source>>,
+            &'op mut Operation<'source, Store<'source>>,
+        ),
     ) {
         let (operator, operation) = (&mut joint.0, &mut joint.1);
 
@@ -52,10 +57,7 @@ impl<'source> Default for Scanner<'source> {
 #[cfg(test)]
 mod tests {
     use super::{OperatorKind, PunctuationKind, Scanner, TokenKind};
-    use crate::{
-        data::Str,
-        tracker::Position,
-    };
+    use crate::{data::Str, tracker::Position};
 
     fn scan(source: &'static str) -> Scanner<'static> {
         let mut scanner = Scanner::new(Position::new(1), Str::from(source));
@@ -130,14 +132,38 @@ mod tests {
             kinds[5].try_unwrap_operator(),
             Some(OperatorKind::Composite(op)) if op.as_slice() == [OperatorKind::Dot, OperatorKind::Dot, OperatorKind::Dot]
         ));
-        assert!(matches!(kinds[6], TokenKind::Punctuation(PunctuationKind::LeftParenthesis)));
-        assert!(matches!(kinds[7], TokenKind::Punctuation(PunctuationKind::RightParenthesis)));
-        assert!(matches!(kinds[8], TokenKind::Punctuation(PunctuationKind::LeftBracket)));
-        assert!(matches!(kinds[9], TokenKind::Punctuation(PunctuationKind::RightBracket)));
-        assert!(matches!(kinds[10], TokenKind::Punctuation(PunctuationKind::LeftBrace)));
-        assert!(matches!(kinds[11], TokenKind::Punctuation(PunctuationKind::RightBrace)));
-        assert!(matches!(kinds[12], TokenKind::Punctuation(PunctuationKind::Comma)));
-        assert!(matches!(kinds[13], TokenKind::Punctuation(PunctuationKind::Semicolon)));
+        assert!(matches!(
+            kinds[6],
+            TokenKind::Punctuation(PunctuationKind::LeftParenthesis)
+        ));
+        assert!(matches!(
+            kinds[7],
+            TokenKind::Punctuation(PunctuationKind::RightParenthesis)
+        ));
+        assert!(matches!(
+            kinds[8],
+            TokenKind::Punctuation(PunctuationKind::LeftBracket)
+        ));
+        assert!(matches!(
+            kinds[9],
+            TokenKind::Punctuation(PunctuationKind::RightBracket)
+        ));
+        assert!(matches!(
+            kinds[10],
+            TokenKind::Punctuation(PunctuationKind::LeftBrace)
+        ));
+        assert!(matches!(
+            kinds[11],
+            TokenKind::Punctuation(PunctuationKind::RightBrace)
+        ));
+        assert!(matches!(
+            kinds[12],
+            TokenKind::Punctuation(PunctuationKind::Comma)
+        ));
+        assert!(matches!(
+            kinds[13],
+            TokenKind::Punctuation(PunctuationKind::Semicolon)
+        ));
     }
 
     #[test]
@@ -146,9 +172,13 @@ mod tests {
         assert!(scanner.errors.is_empty());
         let kinds = compact(&scanner);
         assert_eq!(kinds.len(), 3);
-        assert!(matches!(kinds[0].try_unwrap_string(), Some(value) if value.as_str() == Some("a\nA")));
+        assert!(
+            matches!(kinds[0].try_unwrap_string(), Some(value) if value.as_str() == Some("a\nA"))
+        );
         assert!(matches!(kinds[1], TokenKind::Character('A')));
-        assert!(matches!(kinds[2].try_unwrap_string(), Some(value) if value.as_str() == Some("b\t")));
+        assert!(
+            matches!(kinds[2].try_unwrap_string(), Some(value) if value.as_str() == Some("b\t"))
+        );
     }
 
     #[test]
@@ -170,11 +200,9 @@ mod tests {
         assert!(scanner.errors.is_empty());
         let kinds = compact(&scanner);
         assert!(!kinds.is_empty());
-        assert!(
-            kinds
-                .iter()
-                .any(|kind| matches!(kind.try_unwrap_identifier(), Some(name) if name.as_str() == Some("q")))
-        );
+        assert!(kinds.iter().any(
+            |kind| matches!(kind.try_unwrap_identifier(), Some(name) if name.as_str() == Some("q"))
+        ));
     }
 
     #[test]
@@ -266,12 +294,16 @@ mod tests {
         for (i, token) in scanner.output.iter().enumerate() {
             assert!(
                 token.span.start <= token.span.end,
-                "Token [{}] has invalid span: {:?}", i, token.span
+                "Token [{}] has invalid span: {:?}",
+                i,
+                token.span
             );
             assert!(
                 token.span.start >= previous,
                 "Token [{}] starts before previous token ends: {:?} (previous ended at {})",
-                i, token.span, previous
+                i,
+                token.span,
+                previous
             );
             previous = token.span.end;
         }
@@ -288,10 +320,7 @@ mod tests {
 #[cfg(test)]
 mod property {
     use super::Scanner;
-    use crate::{
-        data::Str,
-        tracker::Position,
-    };
+    use crate::{data::Str, tracker::Position};
     use proptest::prelude::*;
 
     fn scan(source: &str) -> Scanner<'_> {

@@ -2,28 +2,30 @@ mod core;
 
 pub use core::*;
 
-use crate::{
-    analyzer::Analyzer,
-    combinator::{Combinator, Operation, Operator},
-    data::{memory::Arc, Identity, Module, Str},
-    identifier,
-    initializer::Initializer,
-    internal::{
-        platform::Lock,
-        time::{Duration, Instant},
-        SessionError,
+use {
+    crate::{
+        analyzer::Analyzer,
+        data::{memory::Arc, Identity, Module, Str},
+        identifier,
+        initializer::Initializer,
+        internal::{
+            platform::Lock,
+            time::{Duration, Instant},
+            SessionError,
+        },
+        literal, module,
+        parser::Parser,
+        resolver::Resolver,
+        scanner::Scanner,
+        tracker::{ErrorKind as TrackErrorKind, TrackError},
     },
-    literal, module,
-    parser::Parser,
-    resolver::Resolver,
-    scanner::Scanner,
-    tracker::{ErrorKind as TrackErrorKind, TrackError},
+    chaint::{Combinator, Operation, Operator},
 };
 
-#[cfg(feature = "interpreter")]
-use crate::emitter::{Engine, Value};
 #[cfg(feature = "llvm")]
 use crate::emitter::{EmitCombinator, GenerateCombinator, RunCombinator};
+#[cfg(feature = "interpreter")]
+use crate::emitter::{Engine, Value};
 
 pub type Store<'s> = Arc<Lock<Session<'s>>>;
 
@@ -32,100 +34,118 @@ pub struct Initialize {
 }
 
 impl<'op, 'source>
-Combinator<
-'static,
-(&'op mut Operator<Store<'source>>, &'op mut Operation<'source, Store<'source>>),
-> for Initialize
+    Combinator<
+        'static,
+        (
+            &'op mut Operator<Store<'source>>,
+            &'op mut Operation<'source, Store<'source>>,
+        ),
+    > for Initialize
 {
-fn combinator(
-    &self,
-    joint: &mut (&'op mut Operator<Store<'source>>, &'op mut Operation<'source, Store<'source>>),
-) {
-    let (operator, operation) = (&mut joint.0, &mut joint.1);
-    let mut guard = operator.store.write().unwrap();
-    let session = &mut *guard;
+    fn combinator(
+        &self,
+        joint: &mut (
+            &'op mut Operator<Store<'source>>,
+            &'op mut Operation<'source, Store<'source>>,
+        ),
+    ) {
+        let (operator, operation) = (&mut joint.0, &mut joint.1);
+        let mut guard = operator.store.write().unwrap();
+        let session = &mut *guard;
 
-    let mut initializer = Initializer::new(self.flag);
-    let targets = initializer.initialize();
+        let mut initializer = Initializer::new(self.flag);
+        let targets = initializer.initialize();
 
-    for (target, span) in targets {
-        let string = target.to_string();
-        if let Some(kind) = RecordKind::from_path(&string) {
-            let mut hasher = crate::internal::hash::DefaultHasher::new();
-            crate::internal::hash::Hash::hash(&string, &mut hasher);
-            let identity =
-                (crate::internal::hash::Hasher::finish(&hasher) as Identity) | 0x40000000;
-            session.records.insert(identity, Record::new(kind, target));
+        for (target, span) in targets {
+            let string = target.to_string();
+            if let Some(kind) = RecordKind::from_path(&string) {
+                let mut hasher = crate::internal::hash::DefaultHasher::new();
+                crate::internal::hash::Hash::hash(&string, &mut hasher);
+                let identity =
+                    (crate::internal::hash::Hasher::finish(&hasher) as Identity) | 0x40000000;
+                session.records.insert(identity, Record::new(kind, target));
+            } else {
+                session.errors.push(SessionError::Track(TrackError::new(
+                    TrackErrorKind::UnSupportedInput(target),
+                    span,
+                )));
+            }
+        }
+
+        let directive = module!(Module::new(literal!(identifier!("directive"))))
+            .with_members(initializer.output.clone());
+        for symbol in initializer.output {
+            session.resolver.registry.insert(symbol.identity, symbol);
+        }
+        session.resolver.insert(directive);
+
+        for error in initializer.errors {
+            session.errors.push(SessionError::Initialize(error));
+        }
+
+        if session.errors.is_empty() {
+            operation.set_resolve(Vec::new());
         } else {
-            session.errors.push(SessionError::Track(TrackError::new(
-                TrackErrorKind::UnSupportedInput(target),
-                span,
-            )));
+            operation.set_reject();
         }
     }
-
-    let directive = module!(Module::new(literal!(identifier!("directive"))))
-        .with_members(initializer.output.clone());
-    for symbol in initializer.output {
-        session.resolver.registry.insert(symbol.identity, symbol);
-    }
-    session.resolver.insert(directive);
-
-    for error in initializer.errors {
-        session.errors.push(SessionError::Initialize(error));
-    }
-
-    if session.errors.is_empty() {
-        operation.set_resolve(Vec::new());
-    } else {
-        operation.set_reject();
-    }
-}
 }
 
 pub struct Prepare;
 
 impl<'op, 'source>
-Combinator<
-'static,
-(&'op mut Operator<Store<'source>>, &'op mut Operation<'source, Store<'source>>),
-> for Prepare
+    Combinator<
+        'static,
+        (
+            &'op mut Operator<Store<'source>>,
+            &'op mut Operation<'source, Store<'source>>,
+        ),
+    > for Prepare
 {
-fn combinator(
-    &self,
-    joint: &mut (&'op mut Operator<Store<'source>>, &'op mut Operation<'source, Store<'source>>),
-) {
-    let (operator, operation) = (&mut joint.0, &mut joint.1);
-    let mut guard = operator.store.write().unwrap();
-    let session = &mut *guard;
-    if session.prepare() {
-        operation.set_resolve(Vec::new());
-    } else {
-        operation.set_reject();
+    fn combinator(
+        &self,
+        joint: &mut (
+            &'op mut Operator<Store<'source>>,
+            &'op mut Operation<'source, Store<'source>>,
+        ),
+    ) {
+        let (operator, operation) = (&mut joint.0, &mut joint.1);
+        let mut guard = operator.store.write().unwrap();
+        let session = &mut *guard;
+        if session.prepare() {
+            operation.set_resolve(Vec::new());
+        } else {
+            operation.set_reject();
+        }
     }
-}
 }
 
 pub struct Report;
 
 impl<'op, 'source>
-Combinator<
-'static,
-(&'op mut Operator<Store<'source>>, &'op mut Operation<'source, Store<'source>>),
-> for Report
+    Combinator<
+        'static,
+        (
+            &'op mut Operator<Store<'source>>,
+            &'op mut Operation<'source, Store<'source>>,
+        ),
+    > for Report
 {
-fn combinator(
-    &self,
-    joint: &mut (&'op mut Operator<Store<'source>>, &'op mut Operation<'source, Store<'source>>),
-) {
-    let (operator, operation) = (&mut joint.0, &mut joint.1);
-    let session = operator.store.read().unwrap();
-    let keys = session.all_source_keys();
-    session.report_tokens(&keys);
-    session.report_elements(&keys);
-    session.report_analyses(&keys);
-    operation.set_resolve(Vec::new());
-}
+    fn combinator(
+        &self,
+        joint: &mut (
+            &'op mut Operator<Store<'source>>,
+            &'op mut Operation<'source, Store<'source>>,
+        ),
+    ) {
+        let (operator, operation) = (&mut joint.0, &mut joint.1);
+        let session = operator.store.read().unwrap();
+        let keys = session.all_source_keys();
+        session.report_tokens(&keys);
+        session.report_elements(&keys);
+        session.report_analyses(&keys);
+        operation.set_resolve(Vec::new());
+    }
 }
 
 impl<'session> Session<'session> {
@@ -155,37 +175,61 @@ impl<'session> Session<'session> {
     }
 
     pub fn report_tokens(&self, keys: &[Identity]) {
-        let Some(stencil) = self.get_stencil() else { return };
+        let Some(stencil) = self.get_stencil() else {
+            return;
+        };
         use crate::format::Show;
         use broccli::Color;
         for key in self.source_keys(keys) {
-            let Some(record) = self.records.get(&key) else { continue };
+            let Some(record) = self.records.get(&key) else {
+                continue;
+            };
             if let Some(Artifact::Tokens(tokens)) = record.fetch(1) {
-                self.report_section("Tokens", Color::Cyan, tokens.format(stencil.clone()).to_string());
+                self.report_section(
+                    "Tokens",
+                    Color::Cyan,
+                    tokens.format(stencil.clone()).to_string(),
+                );
             }
         }
     }
 
     pub fn report_elements(&self, keys: &[Identity]) {
-        let Some(stencil) = self.get_stencil() else { return };
+        let Some(stencil) = self.get_stencil() else {
+            return;
+        };
         use crate::format::Show;
         use broccli::Color;
         for key in self.source_keys(keys) {
-            let Some(record) = self.records.get(&key) else { continue };
+            let Some(record) = self.records.get(&key) else {
+                continue;
+            };
             if let Some(Artifact::Elements(elements)) = record.fetch(2) {
-                self.report_section("Elements", Color::Cyan, elements.format(stencil.clone()).to_string());
+                self.report_section(
+                    "Elements",
+                    Color::Cyan,
+                    elements.format(stencil.clone()).to_string(),
+                );
             }
         }
     }
 
     pub fn report_analyses(&self, keys: &[Identity]) {
-        let Some(stencil) = self.get_stencil() else { return };
+        let Some(stencil) = self.get_stencil() else {
+            return;
+        };
         use crate::format::Show;
         use broccli::Color;
         for key in self.source_keys(keys) {
-            let Some(record) = self.records.get(&key) else { continue };
+            let Some(record) = self.records.get(&key) else {
+                continue;
+            };
             if let Some(Artifact::Analyses(analyses)) = record.fetch(3) {
-                self.report_section("Analysis", Color::Blue, analyses.format(stencil.clone()).to_string());
+                self.report_section(
+                    "Analysis",
+                    Color::Blue,
+                    analyses.format(stencil.clone()).to_string(),
+                );
             }
         }
     }
@@ -248,12 +292,17 @@ impl<'session> Session<'session> {
         drop(session);
         drop(operator);
 
-        Arc::try_unwrap(store).unwrap_or_else(|_| panic!()).into_inner().unwrap()
+        Arc::try_unwrap(store)
+            .unwrap_or_else(|_| panic!())
+            .into_inner()
+            .unwrap()
     }
 
     pub fn pipeline() -> Operation<'static, Store<'static>> {
         let states = vec![
-            Operation::new(Arc::new(Initialize { flag: Session::arguments() })),
+            Operation::new(Arc::new(Initialize {
+                flag: Session::arguments(),
+            })),
             Operation::new(Arc::new(Prepare)),
             Operation::new(Arc::new(Scanner::default())),
             Operation::new(Arc::new(Parser::default())),
@@ -274,7 +323,10 @@ impl<'session> Session<'session> {
         Operation::plan(states)
     }
 
-    pub fn compile(self) -> Self where 'session: 'static {
+    pub fn compile(self) -> Self
+    where
+        'session: 'static,
+    {
         self.run(Self::pipeline())
     }
 }

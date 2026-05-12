@@ -64,7 +64,9 @@ impl<'analyzer> Analyzer<'analyzer> {
         );
 
         let record = session.records.get_mut(&key).unwrap();
-        record.artifacts.insert(3, Artifact::Analyses(analyzer.output));
+        record
+            .artifacts
+            .insert(3, Artifact::Analyses(analyzer.output));
     }
 }
 

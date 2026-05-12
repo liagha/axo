@@ -14,36 +14,41 @@ pub use {
 
 pub type ParseError<'error> = Error<'error, ErrorKind<'error>>;
 
-use crate::{
-    combinator::{Combinator, Operation, Operator},
-    internal::session::Store,
-    reporter::Error,
+use {
+    crate::{internal::session::Store, reporter::Error},
+    chaint::{Combinator, Operation, Operator},
 };
 
 impl<'op, 'source>
-Combinator<
-'static,
-(&'op mut Operator<Store<'source>>, &'op mut Operation<'source, Store<'source>>),
-> for Parser<'source>
+    Combinator<
+        'static,
+        (
+            &'op mut Operator<Store<'source>>,
+            &'op mut Operation<'source, Store<'source>>,
+        ),
+    > for Parser<'source>
 {
-fn combinator(
-&self,
-joint: &mut (&'op mut Operator<Store<'source>>, &'op mut Operation<'source, Store<'source>>),
-) {
-let (operator, operation) = (&mut joint.0, &mut joint.1);
+    fn combinator(
+        &self,
+        joint: &mut (
+            &'op mut Operator<Store<'source>>,
+            &'op mut Operation<'source, Store<'source>>,
+        ),
+    ) {
+        let (operator, operation) = (&mut joint.0, &mut joint.1);
 
-let mut session = operator.store.write().unwrap();
-let mut keys: Vec<_> = session.records.keys().copied().collect();
-keys.sort();
+        let mut session = operator.store.write().unwrap();
+        let mut keys: Vec<_> = session.records.keys().copied().collect();
+        keys.sort();
 
-Parser::execute(&mut session, &keys);
+        Parser::execute(&mut session, &keys);
 
-if session.errors.is_empty() {
-operation.set_resolve(Vec::new());
-} else {
-operation.set_reject();
-}
-}
+        if session.errors.is_empty() {
+            operation.set_resolve(Vec::new());
+        } else {
+            operation.set_reject();
+        }
+    }
 }
 impl<'source> Default for Parser<'source> {
     fn default() -> Self {
@@ -55,11 +60,12 @@ impl<'source> Default for Parser<'source> {
 mod tests {
     use super::{ErrorKind, Parser};
     use crate::{
-        parser::ElementKind,
         data::Str,
+        parser::ElementKind,
         scanner::{OperatorKind, PunctuationKind, Scanner, TokenKind},
-        tracker::{Peekable, Position},
+        tracker::Position,
     };
+    use chaint::Peekable;
 
     fn parse(source: &'static str) -> Parser<'static> {
         let mut scanner = Scanner::new(Position::new(1), Str::from(source));
@@ -292,14 +298,7 @@ mod tests {
     #[test]
     fn invalid_corpus_has_parse_errors() {
         let corpus = [
-            "(",
-            "[1,2",
-            "{1,2",
-            "func",
-            "func f(",
-            "struct",
-            "union",
-            "let",
+            "(", "[1,2", "{1,2", "func", "func f(", "struct", "union", "let",
         ];
 
         for source in corpus {
@@ -357,11 +356,8 @@ mod tests {
 #[cfg(test)]
 mod property {
     use super::Parser;
-    use crate::{
-        data::Str,
-        scanner::Scanner,
-        tracker::{Peekable, Position},
-    };
+    use crate::{data::Str, scanner::Scanner, tracker::Position};
+    use chaint::Peekable;
     use proptest::prelude::*;
 
     fn parse(source: &str) -> Parser<'_> {
